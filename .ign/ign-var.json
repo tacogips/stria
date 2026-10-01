@@ -1,0 +1,20 @@
+{
+  "variables": {
+    "DESCRIPTION": "Kaiba Viewer Swift application",
+    "EXECUTABLE_NAME": "kaiba-viewer",
+    "GITHUB_REPOSITORY": "tacogips/kaiba-viewer",
+    "HOMEBREW_CASK_TOKEN": "kaiba-viewer",
+    "HOMEBREW_FORMULA_CLASS": "KaibaViewer",
+    "HOMEBREW_TAP": "tacogips/homebrew-tap",
+    "HOMEBREW_TAP_DIR": "../homebrew-tap",
+    "HOMEPAGE": "https://github.com/tacogips/kaiba-viewer",
+    "LICENSE": "MIT",
+    "MACOS_VERSION": "v14",
+    "PROJECT_NAME": "KaibaViewer",
+    "SWIFT_COMMAND_TYPE": "KaibaViewerCommand",
+    "SWIFT_EXECUTABLE_TARGET": "KaibaViewerCLI",
+    "SWIFT_LIBRARY_TARGET": "KaibaViewerCore",
+    "SWIFT_TOOLS_VERSION": "6.0",
+    "VERSION": "0.1.0"
+  }
+}
