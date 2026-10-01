@@ -1,12 +1,141 @@
 # P05 agent-gateway Adapters, Live Services, pdf-text-layer, Redaction, Run Log Writer
 
-**Status**: Ready (re-issued in session 243)
+**Status**: Ready (stabilization plan, re-issued in session 245)
 **planId**: P05
-**Wave**: 1 of the session-243 manifest
-**dependsOn**: none in this manifest (builds on completed P01, commit `2ea8582`)
+**Wave**: 1 of `impl-plans/active/stria-v01-session-245-dispatch.json` (stabilization wave)
+**dependsOn**: none in this manifest (builds on completed P01, commit `2ea8582`; the code under review is in commit `0082491`)
 **Design Reference**: `design-docs/specs/design-agent-integration.md#service-boundary`, `#run-records`, `#pdf-text-layer-local-service`, `#prompt`, `#agent-gateway-integration` (including the pre-call checks), `#secrets`; `design-docs/specs/architecture.md#implementation-rollout`; `design-docs/references/agent-gateway-c7f2697.md` (authoritative for signatures)
 
-## Session-243 Revision
+## Session-245 Stabilization (authoritative for this run)
+
+### Intent
+
+Commit `0082491` contains all P05 files and all six suites. A read-only
+audit confirmed that every agent-gateway name used in
+`Integration/GatewayPromptRunner.swift` exists at the pinned revision.
+
+Two things still contradict the design:
+
+1. `LiveRoutingTests.routesPDFTextLayerOffline` fails. The PDF text layer
+   returns the typographic ligature U+FB04, so "offline" comes back as
+   "o\u{FB04}ine". The design now requires `pdf-text-layer` to
+   NFKC-normalize its text (`design-agent-integration.md#pdf-text-layer-local-service`).
+2. `GatewayPromptRunner` maps `GatewayProcessError.launchFailed` to
+   `unavailable`, but that branch can never run.
+   `GatewayACPAgent.prompt` at the pinned revision rethrows every executor
+   error as `ACPError.internalError(String)`, so a launch failure is always
+   `failed`. The design and the reference doc were corrected in session-245
+   Step 4 (`design-agent-integration.md#agent-gateway-integration`;
+   `design-docs/references/agent-gateway-c7f2697.md`, the paragraph after
+   `GatewayProcessError`). The dead branch must go, so the code matches
+   them.
+
+The audit also found two missing test cases from the original plan text.
+The original sections below stay the baseline; where this section differs,
+this section wins. That includes the `GatewayPromptRunner` error mapping and
+the `PDFTextLayerOCRService` contract.
+
+Follow the Common Execution Protocol and the session-245 Stabilization
+Protocol in `impl-plans/active/stria-00-overview.md`. Evidence logs go to
+`tmp/stria-v01-session-245/P05/`.
+
+### Current API (verified; keep these signatures)
+
+- `GatewayPreflight.check(_ settings: ServiceSettings, environment: [String: String]) throws(ServiceError) -> PreflightResult`
+  - `PreflightResult { vendor: GatewayVendor; secretValue: String? }`
+- `GatewayPromptRunner.run(settings:systemPrompt:parts:cwd:environment:secretValue:) async throws(ServiceError) -> String`
+- `GatewayOCRService(paths:environment:)`, `GatewayAgentService(paths:environment:)`, internal `LiveOCRService(paths:environment:)`
+- `StriaEnvironment.liveServices(paths:config:)` and `StriaEnvironment.live(paths:config:environment:)`
+- `RunLogWriter(paths:).append(_:) throws`
+- `SecretRedactor.redact(_:secrets:)` and `truncate(_:limit: = 2000)`
+- `PDFTextLayerOCRService(paths:).recognize(_:)`
+
+### Tasks
+
+**P05-S1. NFKC in `pdf-text-layer`.**
+
+- File: `Sources/StriaCore/OCR/PDFTextLayerOCRService.swift`.
+- Return `(page.string ?? "").precomposedStringWithCompatibilityMapping`.
+- Do not trim and do not strip code fences here. P07's
+  `OCRTextPostProcessor` does the usual post-processing for every vendor.
+- Do not normalize text from the gateway services. Model OCR output is
+  stored as returned.
+- Red-green evidence: run `swift test --filter LiveRoutingTests` before the
+  change (`red-S1.log`, `routesPDFTextLayerOffline` fails) and after it
+  (`green-S1.log`).
+- Do not change the `LiveRoutingTests` assertion.
+
+**P05-S2. Remove the unreachable `launchFailed` mapping.**
+
+- File: `Sources/StriaCore/Integration/GatewayPromptRunner.swift`, lines
+  43-47 at `0082491`: the `catch let error as GatewayProcessError` clause.
+- Delete that whole clause. The remaining clauses already do the right
+  thing:
+  - `catch let error as ServiceError` rethrows the error;
+  - the final `catch` maps everything else to
+    `.failed(SecretRedactor.redact(...))`.
+- Truncation stays with the coordinators (P07 and P08).
+- If the local `vendor` value becomes unused, remove it, but keep the
+  `GatewayVendor(rawValue:)` check if it is still needed to build the
+  defaults.
+- Do not add any error-string matching. Do not add a `PATH` lookup or any
+  other executable check. The design accepts `failed` for launch failures.
+- `grep -rn "launchFailed" Sources` must print nothing afterwards.
+
+**P05-S3. `PDFTextLayerTests`: add the missing cases.**
+
+File: `Tests/StriaCoreTests/Integration/PDFTextLayerTests.swift`.
+
+- **Ligatures:** a PDF page with the text "offline efficient fluffy". The
+  result contains "offline", "efficient" and "fluffy", and no Unicode
+  scalar in U+FB00...U+FB06. This passes only after P05-S1 when the host
+  font produces ligatures. On every host it proves that the output is NFKC.
+- **Missing page:** page 99 of an existing 2-page document throws
+  `ServiceError.failed("page not available")`.
+- **Blank page:** `SamplePDFFactory.makePDF(pages: [""])`, page 1. After
+  `trimmingCharacters(in: .whitespacesAndNewlines)` the text is empty, and
+  no error is thrown.
+
+**P05-S4. `PreflightTests`: add the missing cases.**
+
+File: `Tests/StriaCoreTests/Integration/PreflightTests.swift`.
+
+- **Secret leakage:** for every `unavailable` case in this file, use an
+  environment that maps each referenced variable name to `"sk-SECRET-123"`
+  where the case allows a value. Assert that no thrown message contains
+  `"sk-SECRET-123"`.
+- **cursor-api with full settings:** `vendor "cursor-api"`, `model "m"`,
+  `apiKeyEnvironment "CURSOR_API_KEY"`, environment
+  `["CURSOR_API_KEY": "x"]` throws
+  `.unavailable("vendor cursor-api does not support image input")`.
+
+### Accepted divergences (no change)
+
+- `GatewayPromptRunner.run` takes an extra `secretValue:` parameter and
+  uses typed `throws(ServiceError)`.
+- `RunLogWriter.append` re-applies 0700 on every call.
+- `liveServices` ignores its `config` argument, because routing is per
+  request.
+
+### Test integrity
+
+No existing assertion may be removed or loosened.
+`routesPDFTextLayerOffline` must pass unchanged.
+
+### Done criteria (mechanically checkable)
+
+- `swift build --build-tests` exits 0.
+- `swift test --filter 'PreflightTests|PromptPartsTests|RedactorTests|RunLogWriterTests|PDFTextLayerTests|LiveRoutingTests'`
+  exits 0 with 0 failures, run at the end of the run (`focused-final.log`).
+- `grep -rn "launchFailed" Sources` prints nothing.
+- `grep -rnE '^import (AgentGateway|AgentGatewayAppCore|ACP)$' Sources | grep -v '^Sources/StriaCore/Integration/'`
+  prints nothing.
+- `swiftlint lint Sources/StriaCore/Integration Sources/StriaCore/OCR/PDFTextLayerOCRService.swift Tests/StriaCoreTests/Integration`
+  reports 0 violations.
+- `git diff 0082491 -- Tests/StriaCoreTests/Integration` removes no
+  `#expect` or `#require` line.
+
+## Session-243 Notes (still valid unless superseded above)
 
 - The session-241 fanout failed because this plan declared
   `.build/checkouts/agent-gateway` as a sharedPath. That entry is removed.
@@ -326,3 +455,11 @@ command, exit code and log path in the Progress Log.
 
 - 2026-10-02 Step 6 implementation: added the Mode A gateway runner and OCR/agent adapters, ordered prompt parts, preflight, redaction, JSONL writer, PDF text-layer service, live routing/factories, and offline suites under the P05 write paths. `swift build` passed (log `tmp/stria-v01-session-243/P05-step6-intents/logs/build-final.log`). Exact changed-file SwiftLint passed (manifest `tmp/stria-v01-session-243/P05-step6-intents/changed-swift-files.nul`, log `tmp/stria-v01-session-243/P05-step6-intents/logs/swiftlint-final2.log`); Swift parse, gateway import boundary, Mode B absence, line-count, and write-path `.build` checks passed in the same evidence directory.
 - Focused tests were attempted. The first attempt exposed a Swift 6.3 compiler ownership crash in `PreflightTests`; the test now asserts the exact typed error using `#expect(throws:)`. The next attempt compiled all P05 tests but stopped before test execution on the out-of-scope `Tests/StriaCoreTests/Imaging/P04ImagingTests.swift:19` throwing expression inside `#expect` (log `tmp/stria-v01-session-243/P05-step6-intents/logs/focused-tests-compiler-fix.log`, exit 1). The initial shared-tree build/test also encountered transient P03/P06 source diagnostics; the final build passes. Serial integration verification must repair/resolve P04's test compilation before rerunning the P05 suites. No agent-gateway API signature differences were found.
+
+### Session 245
+
+- 2026-10-02 (Step 4 audit): the session-243 entry above is incomplete.
+  `GatewayACPAgent.prompt` wraps `GatewayProcessError` as
+  `ACPError.internalError`, so the `launchFailed` mapping is unreachable.
+  The design and the reference doc have been corrected; see P05-S2.
+- (worker appends entries here)

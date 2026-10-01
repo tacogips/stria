@@ -36,8 +36,10 @@ directory and is then atomically renamed.
 
 ## Import Pipeline
 
-1. Open the file with `PDFDocument(url:)`. Reject unreadable, locked or
-   encrypted, and zero-page files with `invalidPDF`.
+1. Open the file with `PDFDocument(url:)`. Reject unreadable files, locked
+   files (encrypted with a user password, `isLocked`), and zero-page files
+   with `invalidPDF`. A PDF that is encrypted only with an owner password
+   (permission restrictions) opens without a password and is accepted.
 2. Hash the file and run the idempotency check above.
 3. Copy it to `originals/<docId>.pdf` (atomic).
 4. Insert the `documents` row with `import_status = 'rendering'`, the render
@@ -251,8 +253,14 @@ retrieval query built from the question:
 
 - Split the NFKC-normalized question into tokens on whitespace and
   punctuation.
-- Every token of 3 or more characters contributes its distinct character
-  trigrams, up to 64 in total.
+- Every token of 3 or more characters contributes its character trigrams
+  (Unicode scalars) in first-occurrence order. Trigrams are de-duplicated
+  across the whole question first, and the distinct list is then capped at
+  64. Repeating a token adds nothing: `"transformer transformer encoder"`
+  starts with `tra` and has no duplicates, `"abcdef"` repeated 20 times yields
+  exactly 4 trigrams (`abc`, `bcd`, `cde`, `def`), and the cap of 64 is reached
+  only by questions with more than 64 distinct trigrams. Tests assert the cap
+  with such a question and do not loosen the dedup rule.
 - Backend `fts5`: the trigrams are quoted phrases joined by `OR`, ranked by
   `bm25`.
 - Backend `like`: a page matches when it contains at least one trigram. Its

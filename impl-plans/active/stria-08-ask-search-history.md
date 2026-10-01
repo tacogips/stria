@@ -1,12 +1,55 @@
 # P08 Ask (RAG), Search Facade, History Facade, Citation Parser
 
-**Status**: Ready (re-issued in session 243)
+**Status**: Ready (re-issued in session 245)
 **planId**: P08
-**Wave**: 2 of the session-243 manifest
-**dependsOn**: P03, P04, P05
-**Design Reference**: `design-docs/specs/design-agent-integration.md#ask` (context selection, prompt, persistence), `#run-records`; `design-docs/specs/design-storage.md#search`, `#fuzzy-retrieval-ask`, `#chat-history-queries`; `design-docs/specs/command.md` (search, ask, history); `design-docs/specs/design-app-ui.md#reader-right-inspector-agent-pane` (citation chips); `design-docs/specs/architecture.md#implementation-rollout`
+**Wave**: 2 of `impl-plans/active/stria-v01-session-245-dispatch.json`
+**dependsOn**: P03, P04, P05 (the session-245 stabilization wave)
+**Design Reference**: `design-docs/specs/design-agent-integration.md#ask` (context selection, prompt, persistence), `#run-records`; `design-docs/specs/design-storage.md#search`, `#fuzzy-retrieval-ask`, `#chat-history-queries`; `design-docs/specs/command.md` (search, ask, history); `design-docs/specs/design-app-ui.md#reader-right-inspector-agent-pane` (citation chips); `design-docs/specs/architecture.md#testing-strategy`, `#implementation-rollout`
 
-## Session-243 Revision
+## Session-245 Revision
+
+No file of this plan exists yet; this plan is a new implementation. Its
+tasks, contracts and paths are unchanged. Start only after wave 1 has
+joined green. It runs in parallel with P07: the two plans have disjoint
+`writePaths`, and both only read P03-P05. Follow the overview's Common
+Execution Protocol and session-245 Stabilization Protocol (rules S5-S7).
+Evidence logs go to `tmp/stria-v01-session-245/P08/`.
+
+### Verified APIs to call
+
+All `StriaStore` methods are actor-isolated and synchronous `throws`, so
+call them with `try await`.
+
+- `store.search(text:documentId:limit:) -> SearchOutcome`.
+- `store.fuzzyRetrieve(question:documentId:limit:) -> [PageRef]`:
+  - throws `usageError` for a `limit` outside 1...100;
+  - after P03-S2, returns `[]` for an empty question before checking
+    `limit`.
+
+  `ContextSelector` validates `cap` in 1...10 first, so a `cap` passed in is
+  always valid.
+- `store.history(documentId:page:limit:)`: throws `usageError` when
+  `limit <= 0`.
+- `store.threadMessages(threadId:)`, `store.persistAskExchange(_ exchange: AskExchange)`.
+- `store.pageInfo(documentId:page:)`, `store.pageImage(documentId:page:)`,
+  `store.document(id:)`.
+- `PageImageCache(paths:).validCachedURL(docId:page:width:height:)` and
+  `expand(docId:page:image:)`.
+- `RunLogWriter(paths:).append(_:)` and `SecretRedactor.truncate(_:limit:)`.
+- `AgentRequest.systemPrompt` is a non-optional `String`.
+
+### Behaviour notes from the session-245 design corrections
+
+- A CLI vendor whose executable cannot be launched surfaces as
+  `ServiceError.failed`. The ask is persisted as an assistant `error`
+  message and the call throws `serviceFailed` (exit 5). No special case is
+  needed.
+- `withTestDataRoot` now creates the temp root before the test body
+  (P04-S1).
+- Snippets now use LIKE-like matching: case-insensitive and not
+  diacritic-insensitive (P03-S3).
+
+## Session-243 Notes (still valid)
 
 The tasks, contracts and paths are unchanged from session 241; only the wave
 numbering moved (wave 3 became wave 2). Checked against the wave-1 code:
@@ -245,5 +288,7 @@ Fixture helper, in this plan's test dir:
   exact signatures.
 
 ## Progress Log
+
+### Session 245
 
 - (worker appends entries here)

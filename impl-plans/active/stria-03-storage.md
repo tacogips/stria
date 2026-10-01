@@ -1,12 +1,184 @@
 # P03 SQLite Store, Migrations, Search, Chat and Agent Runs
 
-**Status**: Ready (re-issued in session 243)
+**Status**: Ready (stabilization plan, re-issued in session 245)
 **planId**: P03
-**Wave**: 1 of the session-243 manifest
-**dependsOn**: none in this manifest (builds on completed P01, commit `2ea8582`)
-**Design Reference**: `design-docs/specs/design-storage.md` (all sections); `design-docs/specs/design-agent-integration.md#ocr` (state machine), `#persistence`; `design-docs/specs/architecture.md#implementation-rollout`
+**Wave**: 1 of `impl-plans/active/stria-v01-session-245-dispatch.json` (stabilization wave)
+**dependsOn**: none in this manifest (builds on completed P01, commit `2ea8582`; the code under review is in commit `0082491`)
+**Design Reference**: `design-docs/specs/design-storage.md` (all sections, especially `#fuzzy-retrieval-ask` and `#search`); `design-docs/specs/design-agent-integration.md#ocr` (state machine), `#persistence`; `design-docs/specs/architecture.md#testing-strategy`, `#implementation-rollout`
 
-## Session-243 Revision
+## Session-245 Stabilization (authoritative for this run)
+
+### Intent
+
+Commit `0082491` already contains every P03 file listed below, and all seven
+P03 suites exist. That code is not yet accepted. This run does not rewrite
+it. The job is to:
+
+- fix the one failing P03 test without weakening it;
+- close the gaps that a read-only audit found between this plan's original
+  text (the sections below this one) and the code;
+- pass the test-integrity and adversarial review gates.
+
+The original sections below stay the requirement baseline. Where this
+section differs from them, this section wins.
+
+Follow the Common Execution Protocol and the session-245 Stabilization
+Protocol in `impl-plans/active/stria-00-overview.md`. Evidence logs go to
+`tmp/stria-v01-session-245/P03/`.
+
+### Current API (verified by reading the code; do not change these signatures)
+
+- `public actor StriaStore`:
+  - `init(databaseURL: URL, options: StoreOptions = .init(), clock: @escaping @Sendable () -> Date = { Date() }) throws`
+  - `public let searchBackend: SearchBackend`
+  - `search(text:documentId:limit:) throws -> SearchOutcome`
+  - `fuzzyRetrieve(question:documentId:limit:) throws -> [PageRef]`
+  - `history(documentId:page:limit:)`, `threadMessages(threadId:)`, `persistAskExchange(_:)`, `agentRuns(documentId:)`
+  - the document and page methods in `StriaStore+Documents.swift` and `StriaStore+Pages.swift`
+- `public struct StriaLibrary: Sendable`:
+  - `static func open(environment: StriaEnvironment, storeOptions: StoreOptions = .init()) throws -> StriaLibrary`
+  - `environment`, `store`, `paths`
+- `enum SearchQueryBuilder` (internal): `trigrams(question:) -> TrigramTerms`, `swiftSnippet(text:term:)`, `likePattern(term:)`, `ftsMatchExpression(terms:)`
+
+### Tasks
+
+**P03-S1. Correct the trigram-cap test without weakening it.**
+
+- File: `Tests/StriaCoreTests/Storage/SearchQueryBuilderTests.swift`, line 11.
+- Why it fails: the test expects 64 trigrams for `String(repeating:
+  "abcdef ", count: 20)`, but that input has only 4 distinct trigrams. The
+  design rule (`design-storage.md#fuzzy-retrieval-ask`) is: de-duplicate
+  across the whole question first, then cap at 64. The builder
+  (`Sources/StriaCore/Storage/SearchQueryBuilder.swift:trigrams(question:)`)
+  already does this. The test is the defect.
+- Replace that one assertion with two:
+  - the repeated input yields exactly `["abc", "bcd", "cde", "def"]`;
+  - a question with more than 64 distinct trigrams yields exactly 64
+    trigrams. Use, for example, one token made of 80 distinct CJK scalars
+    U+4E00 through U+4E4F, which has 78 distinct trigrams. Assert:
+    - the count is 64;
+    - the first element is the first three scalars;
+    - the last element is scalars 64-66 (1-based), which proves
+      first-occurrence order;
+    - `Set(trigrams).count == 64`.
+- Keep every other assertion in the test unchanged (lines 7-10 and 12-14).
+- Do not change `SearchQueryBuilder.trigrams`.
+
+**P03-S2. Empty question returns `[]` before the limit check.**
+
+- `StriaStore+Search.swift:fuzzyRetrieve` currently validates `limit` (1...100)
+  before it checks for an empty question.
+- An empty or whitespace-only question, or one with no tokens, must return
+  `[]` regardless of `limit`.
+- A non-empty question with an out-of-range limit still throws `usageError`.
+- Tests (in `Tests/StriaCoreTests/Storage/FuzzyRetrieveTests.swift`):
+  - `fuzzyRetrieve(question: "", documentId: nil, limit: 0)` returns `[]`.
+  - `fuzzyRetrieve(question: "   ", documentId: nil, limit: 101)` returns
+    `[]`.
+  - `fuzzyRetrieve(question: "transformer", documentId: nil, limit: 0)`
+    still throws `usageError`.
+- Red evidence: the first two cases are the red cases. They fail before the
+  fix because the limit check throws first. An empty question with a valid
+  limit is already green today, so it cannot serve as red evidence. The
+  third case guards the unchanged behaviour.
+
+**P03-S3. Snippet matching must follow LIKE semantics.**
+
+- `SearchQueryBuilder.swiftSnippet` uses `.diacriticInsensitive`. SQL `LIKE`
+  is not diacritic-insensitive, so the snippet can bracket a different
+  occurrence than the one that matched.
+- Remove `.diacriticInsensitive` and keep `.caseInsensitive`.
+- Do not change the 40-character window, the `...` markers or the `[` `]`
+  bracketing.
+
+**P03-S4. Make `SearchTests` prove what the plan claims.**
+
+Add or strengthen these cases in `Tests/StriaCoreTests/Storage/SearchTests.swift`.
+Do not delete or loosen any existing assertion.
+
+- **English search:** assert both `docId` and `page` of the hit, not only
+  the doc.
+- **Cross-document:** two docs with 3 pages each, where a term appears only
+  in doc2 page 2. The first result is exactly `(doc2, 2)` and there is
+  exactly 1 result.
+- **Doc filter:** a term present in both docs, searched with `documentId:
+  doc1`. Results are non-empty and every result is doc1. Without the filter,
+  both docs appear.
+- **LIKE escaping (forced LIKE backend):**
+  - page A stores `50xyoff`, page B stores `50%_off`;
+  - searching `50%_off` returns only page B, which proves `%` and `_` are
+    literals;
+  - searching `5` (1 character, so LIKE mode) still matches.
+- **NFKC both directions:** ASCII text `ABC 123` is found by the full-width
+  query `ＡＢＣ`. Assert this on the default backend and on a store opened
+  with `StoreOptions(forceLikeSearch: true)`. Keep the existing
+  full-width-text test.
+- **Snippet (P03-S3):** on a store opened with
+  `StoreOptions(forceLikeSearch: true)`, so that the Swift snippet path
+  runs, text `café then cafe` and query `cafe` give a snippet containing
+  `[cafe]` and not `[café]`. Also add a unit assertion on
+  `SearchQueryBuilder.swiftSnippet(text:term:)` directly.
+
+**P03-S5. Make `FuzzyRetrieveTests` prove ranking and the fallback paths.**
+
+Add these cases to `Tests/StriaCoreTests/Storage/FuzzyRetrieveTests.swift`:
+
+- **Ranking:** a document with a page containing "transformer attention"
+  and a distractor page containing only "attention". The question
+  "transformer attention mechanism" ranks the first page first. This holds
+  on both the fts5 backend (when available) and forced LIKE.
+- **No trigram tokens:** the question `"AI 学習"` (all tokens shorter than 3
+  scalars, so the `like` short-token path) uses three pages:
+  - page 1 contains both `AI` and `学習` (for example "AI と 学習") and is
+    returned;
+  - page 2 contains `AI` but not `学習` and is not returned;
+  - page 3 contains `学習` but not `AI` and is not returned.
+  - This proves every short token is required (`like` mode, per
+    `design-storage.md#fuzzy-retrieval-ask`). Pitfall: do not change
+    `fuzzyShortLike` to OR the tokens.
+- **Empty question:** covered by the P03-S2 cases (limit 0 and 101); do not
+  add a separate green-only case.
+
+### Accepted divergences (no change; reviewers must not reopen these)
+
+- `SQLiteConnection.transaction` is `throws`, not `rethrows`.
+- The connection opens with `SQLITE_OPEN_FULLMUTEX`.
+- `Migrations.run` checks `user_version` before applying the pragmas. This
+  is safer: a too-new DB stays unmodified (`design-storage.md#migrations`).
+- `searchBackend` is a `let`.
+- Mutating methods throw `documentNotFound` or `pageNotFound` when no row
+  changes.
+- `trigrams` stops collecting short tokens once it reaches the cap. Short
+  tokens are only used when there are no trigrams.
+
+### Review check (no new test)
+
+The `pageInfo`, `pageInfos` and `listDocuments` SQL must not select the
+`image` column. Verify with
+`grep -n "SELECT" Sources/StriaCore/Storage/StriaStore+Pages.swift Sources/StriaCore/Storage/StriaStore+Documents.swift`
+and record the output in the Progress Log.
+
+### Test integrity
+
+- The only existing assertion this plan may change is
+  `SearchQueryBuilderTests.swift:11` (P03-S1).
+- Every new behaviour-fix test (P03-S2, P03-S3) must be run once before the
+  code fix, and the failing output kept in
+  `tmp/stria-v01-session-245/P03/red-<task>.log`.
+
+### Done criteria (mechanically checkable)
+
+- `swift build --build-tests` exits 0 (`tmp/stria-v01-session-245/P03/build-tests.log`).
+- `swift test --filter 'MigrationTests|DocumentStoreTests|PageStoreTests|SearchTests|SearchQueryBuilderTests|FuzzyRetrieveTests|ChatStoreTests'`
+  exits 0 with 0 failures. Run it at the end of the run, after any wait
+  (`tmp/stria-v01-session-245/P03/focused-final.log`).
+- `swiftlint lint Sources/StriaCore/Storage Sources/StriaCore/Library/StriaLibrary.swift Tests/StriaCoreTests/Storage`
+  reports 0 violations.
+- `git diff 0082491 -- Tests/StriaCoreTests/Storage` removes no `#expect`
+  or `#require` line, apart from the single P03-S1 replacement. Paste the
+  diff stat into the Progress Log.
+
+## Session-243 Notes (still valid)
 
 The tasks, contracts and paths are unchanged from session 241. Checked
 against the wave-1 code: the models this plan consumes exist with the
@@ -346,3 +518,7 @@ Use `withTestDataRoot`, and insert pages with arbitrary bytes, for example
 
 - 2026-10-02 (P03 implementation): Added the SQLite connection, schema-v1 migration and backend probe, actor store and document/page/search/chat APIs, query builder, and `StriaLibrary` facade. Added all seven assigned storage test suites. Completion criteria: signatures and schema implemented; forced LIKE and FTS coverage authored; ask transaction inserts thread, run, user, assistant in FK-safe order; page info/document list projections omit `image`. Behavioral suite execution is pending because SwiftPM currently fails compiling another plan's `Tests/StriaCoreTests/Imaging/P04ImagingTests.swift:19` (`#expect` contains an unhandled throwing expression); see P03 evidence logs under `tmp/stria-v01-session-243/P03/`. `swift build`, selected-file strict SwiftLint, and the under-1000-line gate pass. Review/integration gates and commit remain downstream workflow steps.
 - Final P03 verification retry: `swift build` exit 0 (`tmp/stria-v01-session-243/P03/build-source-final.log`); exact changed-file `swiftlint lint --strict --quiet --no-cache` exit 0 (`lint-source-final.log`); 1000-line gate exit 0 (`line-count-source-final.log`). The assigned `swift test --filter 'MigrationTests|DocumentStoreTests|PageStoreTests|SearchTests|SearchQueryBuilderTests|FuzzyRetrieveTests|ChatStoreTests'` stops during shared test-target compilation at P04's `Tests/StriaCoreTests/Imaging/P04ImagingTests.swift:19`; no P03 behavioral tests executed (`test-final-attempt.log`). P03 does not own that write path; serial integration must repair it and rerun this suite.
+
+### Session 245
+
+- (worker appends entries here; entries above are session-243 history)

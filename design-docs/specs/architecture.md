@@ -3,8 +3,8 @@
 ## Status
 
 Accepted (stria v0.1 design, commit `72246dd`). Replaces the ign scaffold
-description. Wave 1 is implemented; see
-[Implementation Rollout](#implementation-rollout).
+description. Wave 1 is implemented and accepted. Wave 2 code exists but is not
+accepted. See [Implementation Rollout](#implementation-rollout).
 
 ## Overview
 
@@ -137,7 +137,13 @@ the root, and every test uses a unique temp root.
 
 - Tests use Swift Testing in `StriaCoreTests`. Every test builds `StriaPaths`
   from a unique `FileManager.default.temporaryDirectory` subdirectory and
-  removes it afterwards.
+  removes it afterwards. The shared helper `withTestDataRoot` creates that
+  root directory (mode 0700) before the test body runs, because fixtures
+  write input files such as generated PDFs directly into it, and
+  `CGDataConsumer(url:)` cannot create a file in a missing directory. It
+  creates only the root. `originals/`, `cache/` and `logs/` are still created
+  by production code (`StriaPaths.ensureDirectories` or first use), so tests
+  of that behaviour stay meaningful.
 - PDFs are generated in-test with CoreGraphics (a `CGContext` PDF plus
   CoreText), with distinct English and Japanese text per page.
 - `FakeOCRService` and `FakeAgentService` record requests and return scripted
@@ -184,6 +190,27 @@ those contracts and do not redefine them. Their dependency order is:
 | P09 | CLI command handlers, `main.swift`, smoke script | P05, P06, P07, P08 |
 | P10 | `AppModel/` view models | P07, P08 |
 | P11 | `StriaApp` SwiftUI views and PDFKit wrapper | P10 |
+
+Wave 2 status: commit `0082491` contains unreviewed code for P03-P06. `swift
+build` passes, swiftlint reports 0 violations, and `swift test` has 7
+failures out of 51. Those plans are re-issued as stabilization plans. Each
+one fixes the failing tests it owns by fixing behaviour, finishes any
+requirement from its original plan text that is still missing, and passes
+the test-integrity and adversarial review gates before acceptance. The
+known failures and their design-level fixes:
+
+| Owner | Failing tests | Fix (design rule) |
+| --- | --- | --- |
+| P04 | `IdentityTests`, `InspectorTests`, `OutlineTests`, `RenderCodecTests` | `withTestDataRoot` creates the root first ([Testing Strategy](#testing-strategy)). P04 owns `Tests/StriaCoreTests/Support/` in the stabilization wave |
+| P03 | `SearchQueryBuilderTests.quotingTrigramsAndSnippets` | The builder already follows the dedup-then-cap rule (`design-storage.md#fuzzy-retrieval-ask`). The test's cap case is corrected to use a question with more than 64 distinct trigrams, and the test also asserts that the repeated question yields exactly 4 |
+| P05 | `LiveRoutingTests.routesPDFTextLayerOffline` | `pdf-text-layer` NFKC-normalizes the extracted text (`design-agent-integration.md#pdf-text-layer-local-service`). The assertion is unchanged |
+
+P07-P11 start only after the P03-P06 stabilization wave passes `swift build
+--build-tests` and `swift test`. Because every plan shares the one
+`StriaCoreTests` target, an implementer finishes only after `swift build
+--build-tests` passes with its own files and its focused tests have been
+re-run at the end of its run. If another plan's file breaks the build, the
+implementer waits and re-runs before reporting a blocker.
 
 Rules for every plan and dispatch manifest:
 

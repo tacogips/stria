@@ -1,12 +1,126 @@
 # P04 Document Identity, PDF Inspection, Rendering, Image Codec, Outline, PNG Cache
 
-**Status**: Ready (re-issued in session 243)
+**Status**: Ready (stabilization plan, re-issued in session 245)
 **planId**: P04
-**Wave**: 1 of the session-243 manifest
-**dependsOn**: none in this manifest (builds on completed P01, commit `2ea8582`)
-**Design Reference**: `design-docs/specs/design-storage.md#document-identity`, `#import-pipeline` (steps 1, 5, 6), `#image-codec`, `#expanded-png-cache`; `design-docs/specs/architecture.md#implementation-rollout`
+**Wave**: 1 of `impl-plans/active/stria-v01-session-245-dispatch.json` (stabilization wave)
+**dependsOn**: none in this manifest (builds on completed P01, commit `2ea8582`; the code under review is in commit `0082491`)
+**Design Reference**: `design-docs/specs/design-storage.md#document-identity`, `#import-pipeline` (steps 1, 5, 6), `#image-codec`, `#expanded-png-cache`; `design-docs/specs/architecture.md#testing-strategy`, `#implementation-rollout`
 
-## Session-243 Revision
+## Session-245 Stabilization (authoritative for this run)
+
+### Intent
+
+Commit `0082491` contains all six P04 production files and the five suites,
+in `Tests/StriaCoreTests/Imaging/P04ImagingTests.swift`. A read-only audit
+found that every signature matches the contracts below.
+
+Four suites fail: `IdentityTests`, `InspectorTests`, `OutlineTests` and
+`RenderCodecTests.rendersAtDPIWithCapAndRotation`. They write fixture files
+directly into `paths.root`, but the shared helper `withTestDataRoot` never
+creates that directory, so `CGDataConsumer(url:)` and `Data.write` fail
+("Could not create PDF data consumer").
+
+The design fixes this in the helper (`architecture.md#testing-strategy`),
+and this plan owns that helper in the stabilization wave. This plan also
+closes the test gaps the audit found. The original sections below stay the
+baseline; where this section differs, this section wins.
+
+Follow the Common Execution Protocol and the session-245 Stabilization
+Protocol in `impl-plans/active/stria-00-overview.md`. Evidence logs go to
+`tmp/stria-v01-session-245/P04/`.
+
+### Ownership change
+
+This plan is the only writer of
+`Tests/StriaCoreTests/Support/TestDataRoot.swift` in wave 1. Every other
+Support file stays read-only:
+
+- `SamplePDFFactory.swift`
+- `FakeOCRService.swift`
+- `FakeAgentService.swift`
+
+### Tasks
+
+**P04-S1. `withTestDataRoot` creates the root directory.**
+
+- File: `Tests/StriaCoreTests/Support/TestDataRoot.swift`.
+- Before calling `body`, create `root` with
+  `FileManager.default.createDirectory(at:withIntermediateDirectories: true,
+  attributes: [.posixPermissions: 0o700])`.
+- Keep the `defer` removal.
+- Create only the root. Do not call `paths.ensureDirectories()` and do not
+  create `originals/`, `cache/` or `logs/`. The test
+  `PageImageCacheTests.explicitWriteDoesNotCreateCacheDirectory` asserts
+  that `paths.cache` does not exist. `PathsTests` and `ConfigTests` must keep
+  testing first-use creation.
+- Do not change the signature of `withTestDataRoot` or of
+  `makeTestEnvironment`.
+- Red-green evidence: run
+  `swift test --filter 'IdentityTests|InspectorTests|OutlineTests|RenderCodecTests'`
+  before the change (`red-S1.log`, failures expected) and after it
+  (`green-S1.log`, 0 failures).
+- Do not change the failing tests themselves to create their own roots.
+  The helper fix is the design decision, and it also protects P07-P11
+  fixtures.
+
+**P04-S2. `IdentityTests`: test a one-byte change, as the plan specifies.**
+
+- Write a file, copy its bytes, flip the last byte, and write the result.
+- The `docId` must differ.
+- Keep the existing assertions.
+
+**P04-S3. `PageImageCacheTests`: complete the validity assertions.**
+
+After `expand`:
+
+- `ImageCodec.pixelSize(ofImageAt:)` equals both the width and the height
+  of the stored image;
+- the file starts with the bytes `89 50 4E 47`;
+- the `cache/<docId>` directory has POSIX permissions `0o700`.
+
+**P04-S4. `InspectorTests`: cover the locked-PDF rule.**
+
+- The design now says: reject `isLocked`; accept a PDF that is encrypted
+  with an owner password only (`design-storage.md#import-pipeline` step 1).
+  The code already does this (`PDFInspector.inspect` rejects `isLocked`).
+- Add a test-local helper in the Imaging test file (not in Support) that
+  writes a 1-page PDF through `CGContext(consumer:mediaBox:auxiliaryInfo)`.
+  Use `kCGPDFContextUserPassword` and `kCGPDFContextOwnerPassword` for the
+  locked case, and only `kCGPDFContextOwnerPassword` for the owner-only
+  case.
+- Cases:
+  - user password set -> `invalidPDF`;
+  - owner password only -> accepted, with `pageCount` 1.
+- If the host's PDFKit reports `isLocked == false` for the user-password
+  file, record the host behaviour in the Progress Log and keep only the
+  owner-only assertion. Never assert something the host cannot produce.
+
+### Accepted divergences (no change)
+
+- `ImageCodec.encode` clamps `quality` to 0...1.
+- `PageRenderer` throws `ioError` for a non-positive dpi or max dimension.
+- `PDFInspection` is `Equatable`.
+- `PageImageCache.expand` writes with `Data.write(options: .atomic)`, as the
+  contract below specifies.
+
+### Test integrity
+
+No existing assertion may be removed or loosened. The four failing suites
+must pass only because of P04-S1.
+
+### Done criteria (mechanically checkable)
+
+- `swift build --build-tests` exits 0.
+- `swift test --filter 'IdentityTests|InspectorTests|RenderCodecTests|OutlineTests|PageImageCacheTests'`
+  exits 0 with 0 failures, run at the end of the run (`focused-final.log`).
+- `swift test --filter 'PathsTests|ConfigTests|SamplePDFTests'` exits 0.
+  This checks that the helper change does not break first-use tests.
+- `swiftlint lint Sources/StriaCore/Import Sources/StriaCore/Cache Tests/StriaCoreTests/Imaging Tests/StriaCoreTests/Support/TestDataRoot.swift`
+  reports 0 violations.
+- `git diff 0082491 -- Tests/StriaCoreTests/Imaging` removes no `#expect`
+  or `#require` line.
+
+## Session-243 Notes (still valid)
 
 The tasks, contracts and paths are unchanged from session 241. Checked
 against the wave-1 code:
@@ -44,6 +158,7 @@ types touch SQLite.
 - `Sources/StriaCore/Import/OutlineExtractor.swift`
 - `Sources/StriaCore/Cache/PageImageCache.swift`
 - `Tests/StriaCoreTests/Imaging`
+- `Tests/StriaCoreTests/Support/TestDataRoot.swift` (session 245: P04-S1)
 - `impl-plans/active/stria-04-imaging-cache.md`
 
 ## sharedPaths
@@ -60,7 +175,8 @@ types touch SQLite.
 - `{path: "Sources/StriaCore/Models", intendedEdit: "read-only; models owned by P01"}`
 - `{path: "Sources/StriaCore/Errors/StriaError.swift", intendedEdit: "read-only"}`
 - `{path: "Sources/StriaCore/Paths/StriaPaths.swift", intendedEdit: "read-only"}`
-- `{path: "Tests/StriaCoreTests/Support", intendedEdit: "read-only; test helpers owned by P01"}`
+- `{path: "Tests/StriaCoreTests/Support", intendedEdit: "read-only except TestDataRoot.swift, which this plan owns in wave 1 (P04-S1)"}`
+- `{path: "Tests/StriaCoreTests/Support/TestDataRoot.swift", intendedEdit: "withTestDataRoot creates only the root directory (0700) before the body; signatures unchanged"}`
 
 ## Contracts
 
@@ -221,3 +337,7 @@ Generate PDFs with `SamplePDFFactory`.
 
 - Implemented all six P04 production contracts and the five imaging test suites in `Tests/StriaCoreTests/Imaging/P04ImagingTests.swift`. Isolated Swift 6 typechecking passed (`tmp/stria-v01-session-243/P04/logs/p04-source-typecheck.log`, exit 0); selected changed-file strict SwiftLint passed (`tmp/stria-v01-session-243/P04/logs/swiftlint.log`, exit 0); the P04 Swift file-length gate passed (`tmp/stria-v01-session-243/P04/logs/file-length.log`, exit 0).
 - Full `swift build` and `swift test --filter 'IdentityTests|InspectorTests|RenderCodecTests|OutlineTests|PageImageCacheTests'` both stop before completing module compilation/test discovery (exit 1). Diagnostics are confined to foreign shared-tree files owned by P03/P06: `Sources/StriaCore/Storage/StriaStore+Documents.swift`, `Sources/StriaCore/Storage/StoreSupport.swift`, `Sources/StriaCore/Storage/SQLiteConnection.swift`, and `Sources/StriaCore/CLI/CommandLineParser.swift`. Their complete logs are `tmp/stria-v01-session-243/P04/logs/swift-build-retry.log` and `tmp/stria-v01-session-243/P04/logs/imaging-tests.log`. Behavioral suite completion remains pending serial repair and verification; no foreign files were changed.
+
+### Session 245
+
+- (worker appends entries here; entries above are session-243 history)

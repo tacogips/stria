@@ -110,4 +110,4 @@ public enum GatewayProcessError: Error, Equatable, Sendable {
 }
 ```
 
-The `launchFailed(Int32)` case reports process launch failure. stria maps it to `ServiceError.unavailable` for the CLI vendors (`claude-code`, `codex`, `cursor`). P01 keeps all gateway types out of the StriaCore foundation contracts. The adapters belong to P05 and live in `Sources/StriaCore/Integration/` only.
+The `launchFailed(Int32)` case reports process launch failure inside the executor, but it never reaches the ACP client. `Sources/AgentGatewayAppCore/GatewayACPAgent.swift` (`prompt`, the `catch` around `task.value`) returns `stopReason: .cancelled` for cancellation, rethrows `GatewayRPCError` as `ACPError(code:message:)`, and rethrows every other error, `GatewayProcessError` included, as `ACPError.internalError(String(describing: error))`. stria therefore cannot match `launchFailed` by type. A launch failure surfaces as `ServiceError.failed(<redacted message>)` (`../specs/design-agent-integration.md#agent-gateway-integration`). P01 keeps all gateway types out of the StriaCore foundation contracts. The adapters belong to P05 and live in `Sources/StriaCore/Integration/` only.

@@ -1,12 +1,153 @@
 # P06 CLI Argument Parser, Usage, JSON Output Helpers, Config Key Get/Set
 
-**Status**: Ready (re-issued in session 243)
+**Status**: Ready (stabilization plan, re-issued in session 245)
 **planId**: P06
-**Wave**: 1 of the session-243 manifest
-**dependsOn**: none in this manifest (builds on completed P01, commit `2ea8582`)
+**Wave**: 1 of `impl-plans/active/stria-v01-session-245-dispatch.json` (stabilization wave)
+**dependsOn**: none in this manifest (builds on completed P01, commit `2ea8582`; the code under review is in commit `0082491`)
 **Design Reference**: `design-docs/specs/command.md#global-rules`, `#commands`; `design-docs/specs/design-agent-integration.md#config` (validation table); `design-docs/specs/architecture.md#implementation-rollout`
 
-## Session-243 Revision
+## Session-245 Stabilization (authoritative for this run)
+
+### Intent
+
+Commit `0082491` contains all P06 files and four suites, and no P06 test
+fails. A read-only audit found that every contract signature matches. It
+also found these gaps:
+
+- one correctness bug: the error-envelope fallback can emit invalid JSON;
+- one usage-text defect;
+- missing tests for rules this plan states.
+
+This run fixes those gaps and passes the review gates. The original sections
+below stay the baseline; where this section differs, this section wins.
+
+Follow the Common Execution Protocol and the session-245 Stabilization
+Protocol in `impl-plans/active/stria-00-overview.md`. Evidence logs go to
+`tmp/stria-v01-session-245/P06/`.
+
+### Current API (verified; keep these signatures; P09 depends on them)
+
+- `ParsedInvocation { home: String?; command: CLICommand }`.
+- `CLICommand` cases:
+  - `help(topic:)`, `version`
+  - `importPDF(path:noOCR:)`, `ocr(docId:pages:retryFailed:)`
+  - `list`, `show(docId:)`
+  - `pageImage(docId:page:output:)`, `pageText(docId:page:)`
+  - `search(query:docId:limit:)`
+  - `ask(question:docId:page:query:limit:)`
+  - `history(docId:page:limit:)`
+  - `configGet(key:)`, `configSet(key:value:)`
+  - `paths`
+- `CommandLineParser.parse(_:) throws(StriaError) -> ParsedInvocation` and
+  `PageListParser.parse(_:pageCount:) throws(StriaError) -> [Int]`.
+- `Usage.general` and `Usage.text(for:)`.
+- `CommandOutput { stdout; stderr; exitCode: Int32 }`, `JSONValue`, and
+  `CLIJSON.makeEncoder()`, `success(_:) throws -> CommandOutput`,
+  `failure(_:) -> CommandOutput`.
+- `ConfigKeyPath.keys`, `value(of:in:)` and `setting(_:to:in:)`.
+
+### Tasks
+
+**P06-S1. `CLIJSON.failure` always emits valid JSON.**
+
+- The current fallback builds the envelope by string interpolation, so a
+  message containing `"`, `\` or a newline would produce invalid JSON. It is
+  unreachable through the public API: `failure(_:)` only uses it when
+  `try? makeEncoder().encode(envelope)` returns nil, and encoding a `String`
+  message and an `ErrorCode` never fails.
+- Extract the fallback into an internal (not public) helper in `CLIJSON.swift`,
+  `static func fallbackEnvelope(code: ErrorCode, message: String) -> String`,
+  built with `JSONSerialization` (escapes quotes, backslashes, newlines).
+  `failure(_:)` uses it only when the encoder path fails. The public
+  signatures of `failure`, `success` and `makeEncoder` stay unchanged.
+- Tests: (1) in `CLIJSONTests`, keep the public-API test: a `failure` whose
+  message is `he said "hi" \ and \nnewline` produces `stderr` that parses with
+  `JSONSerialization`, and its `error.message` round-trips exactly. (2) Add a
+  direct test of `fallbackEnvelope` that must belong to the `CLIJSONTests`
+  suite, either inside `CLIJSONTests.swift` after switching that file's import
+  to `@testable import StriaCore` (no assertion is removed), or in a new file
+  `Tests/StriaCoreTests/CLIParsing/CLIJSONFallbackTests.swift` written as
+  `extension CLIJSONTests` with `@testable import StriaCore` (no new `@Suite`
+  type). The focused `--filter` must select it. Its output parses with
+  `JSONSerialization` and the same tricky message round-trips exactly.
+- Evidence: P06-S1 has no red log, because the old fallback is unreachable
+  through any API (test (1) already passes before the fix). Do not fabricate
+  one and do not report a blocker. Record "red not applicable: fallback
+  unreachable (encoder never fails for String/ErrorCode)" in the Progress Log.
+  Green evidence (both tests pass) is still required.
+
+**P06-S2. `CLIJSON.success` wraps encoder errors.**
+
+- An encoding failure throws `StriaError` with code `ioError`, so P09 maps
+  it to exit 1. It must not leak a raw `EncodingError`.
+- Test: `success(JSONValue.double(.nan))` throws a `StriaError` with code
+  `ioError`. `JSONEncoder` rejects NaN by default.
+
+**P06-S3. `Usage.text(for:)` returns every line of a command family.**
+
+- `page` returns both `page image` and `page text`.
+- `config` returns both `config get` and `config set`.
+- The general text lists `--help` / `-h`, `--version`, `--home <path>` and
+  `--json`.
+- The signatures must stay exactly as in `command.md`.
+- New suite `UsageTests` in
+  `Tests/StriaCoreTests/CLIParsing/UsageTests.swift`:
+  - `text(for: "page")` contains "page image" and "page text";
+  - `text(for: "config")` contains "config get" and "config set";
+  - `text(for: "nope") == Usage.general`;
+  - the general text contains "-h".
+
+**P06-S4. `ParserTests`: cover the remaining stated rules.**
+
+Add these cases:
+
+- `["ask","q","--doc","d","--page","2","--query","x y","--limit","3"]` -> `.ask(question: "q", docId: "d", page: 2, query: "x y", limit: 3)`
+- `["page","text","abc","2"]` -> `.pageText`
+- `["show","abc"]` -> `.show`
+- `["paths"]` -> `.paths`
+- `["config","get","ocr.model"]` -> `.configGet(key: "ocr.model")`
+- `["frobnicate"]` -> usageError
+- `["search","q","--doc","--limit"]` -> usageError (a value starting with `--`)
+- `["--home","a","--home","b","list"]` -> usageError
+- `["-h"]` -> `.help(topic: nil)`
+
+**P06-S5. `ConfigKeyPathTests`: cover the remaining stated rules.**
+
+Add these cases:
+
+- `value(of: "nope")` -> usageError
+- set `ocr.vendor` to `"cursor-api"` -> ok (the vendor stays valid in config)
+- set `ocr.apiKeyEnvironment`, `ocr.prompt` and `agent.systemPrompt` to
+  `"null"` -> each becomes nil
+
+### Non-goals (audit items deliberately not changed)
+
+- Positionals that start with a single `-` (for example `search "-foo"`)
+  stay `usageError`.
+- `Double(raw)` accepts hex and exponent forms. Values are still
+  range-validated.
+- `validate()` messages stay generic.
+- `--version` keeps priority over `--help`.
+- Message capitalisation stays as tested.
+
+### Test integrity
+
+No existing assertion may be removed or loosened. P06-S2 must show
+red-then-green evidence (`red-S2.log`). P06-S1 is exempt from red evidence
+(no `red-S1.log`): the fallback is unreachable through the public API, so its
+Progress Log entry records "red not applicable"; it still needs green evidence.
+
+### Done criteria (mechanically checkable)
+
+- `swift build --build-tests` exits 0.
+- `swift test --filter 'ParserTests|PageListTests|CLIJSONTests|ConfigKeyPathTests|UsageTests'`
+  exits 0 with 0 failures, run at the end of the run (`focused-final.log`).
+- `swiftlint lint Sources/StriaCore/CLI Sources/StriaCore/Config/ConfigKeyPath.swift Tests/StriaCoreTests/CLIParsing`
+  reports 0 violations.
+- `git diff 0082491 -- Tests/StriaCoreTests/CLIParsing` removes no
+  `#expect` or `#require` line.
+
+## Session-243 Notes (still valid)
 
 The tasks, contracts and paths are unchanged from session 241. Checked
 against the wave-1 code:
@@ -279,3 +420,7 @@ public enum CLIJSON {
   test target failure is the out-of-scope throwing assertion in
   `Tests/StriaCoreTests/Imaging/P04ImagingTests.swift:19`; the prior P05 signal
   6 was resolved by its owner after the earlier logged attempt.
+
+### Session 245
+
+- (worker appends entries here; entries above are session-243 history)

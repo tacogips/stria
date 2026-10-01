@@ -1,12 +1,28 @@
 # P11 SwiftUI App (StriaApp, product stria-app)
 
-**Status**: Ready (re-issued in session 243)
+**Status**: Ready (re-issued in session 245)
 **planId**: P11
-**Wave**: 4 of the session-243 manifest
+**Wave**: 4 of `impl-plans/active/stria-v01-session-245-dispatch.json`
 **dependsOn**: P10
 **Design Reference**: `design-docs/specs/design-app-ui.md` (all sections, including References and Commands and Shortcuts); `design-docs/specs/architecture.md#implementation-rollout`
 
-## Session-243 Revision
+## Session-245 Revision
+
+This plan is a new implementation; only the P01 stub
+`Sources/StriaApp/StriaAppMain.swift` exists. Its tasks, contracts and paths
+are unchanged.
+
+- Start only after wave 3 has joined green.
+- Follow the overview's Common Execution Protocol and session-245
+  Stabilization Protocol (rules S5-S7). Evidence logs go to
+  `tmp/stria-v01-session-245/P11/`.
+- This target has no test suite. The evidence is:
+  - `swift build --product stria-app`;
+  - the full `swift test` (no regressions);
+  - `swiftlint`;
+  - the manual checklist, or a recorded "not run: headless".
+
+## Session-243 Notes (still valid)
 
 The tasks, contracts and paths are unchanged from session 241; only the wave
 numbering moved (wave 5 became wave 4). `Sources/StriaApp/StriaAppMain.swift`
@@ -227,5 +243,7 @@ bindings, the PDFKit wrapper and startup.
 - [ ] Lint is clean.
 
 ## Progress Log
+
+### Session 245
 
 - (worker appends entries here)

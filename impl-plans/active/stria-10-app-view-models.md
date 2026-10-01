@@ -1,12 +1,30 @@
 # P10 App View Models (StriaCore/AppModel)
 
-**Status**: Ready (re-issued in session 243)
+**Status**: Ready (re-issued in session 245)
 **planId**: P10
-**Wave**: 3 of the session-243 manifest
+**Wave**: 3 of `impl-plans/active/stria-v01-session-245-dispatch.json`
 **dependsOn**: P07, P08
-**Design Reference**: `design-docs/specs/design-app-ui.md` (Window Structure, Library, Left Pane, Center Pane, Right Inspector, View Models); `design-docs/specs/design-agent-integration.md#ask` (scopes); `design-docs/specs/architecture.md#implementation-rollout`
+**Design Reference**: `design-docs/specs/design-app-ui.md` (Window Structure, Library, Left Pane, Center Pane, Right Inspector, View Models); `design-docs/specs/design-agent-integration.md#ask` (scopes); `design-docs/specs/architecture.md#package-layout`, `#testing-strategy`, `#implementation-rollout`
 
-## Session-243 Revision
+## Session-245 Revision
+
+No file of this plan exists yet; this plan is a new implementation. Its
+tasks, contracts and paths are unchanged.
+
+- The view models live in `StriaCore/AppModel`, and no new target is added
+  (`architecture.md#package-layout`).
+- Start only after wave 2 (P07 and P08) has joined green. P10 runs in
+  parallel with P09 (disjoint `writePaths`).
+- Follow the overview's Common Execution Protocol and session-245
+  Stabilization Protocol (rules S5-S7). Evidence logs go to
+  `tmp/stria-v01-session-245/P10/`.
+- `withTestDataRoot` now creates the temp root before the test body
+  (P04-S1).
+- A failed ask, including a CLI vendor that cannot be launched, surfaces as
+  `serviceFailed`. The transcript shows the persisted error message.
+  `serviceUnavailable` goes to `notice` only.
+
+## Session-243 Notes (still valid)
 
 The tasks, contracts and paths are unchanged from session 241; only the wave
 numbering moved (wave 4 became wave 3). P08's `AskRequest` has five fields
@@ -254,5 +272,7 @@ and OCR text set through `library.runOCR` with the fake OCR. Use
 - [ ] No UI framework imports in StriaCore.
 
 ## Progress Log
+
+### Session 245
 
 - (worker appends entries here)

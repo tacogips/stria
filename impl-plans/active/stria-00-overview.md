@@ -1,8 +1,8 @@
 # stria v0.1 Implementation Overview
 
-**Status**: Ready (re-issued in session 243)
-**Design Reference**: `design-docs/specs/architecture.md` (including `#implementation-rollout`), `design-docs/specs/design-storage.md`, `design-docs/specs/design-agent-integration.md`, `design-docs/specs/command.md`, `design-docs/specs/design-app-ui.md`, `design-docs/references/agent-gateway-c7f2697.md`, `design-docs/user-qa/no-riela-decision.md`
-**Dispatch manifest**: `impl-plans/active/stria-v01-session-243-dispatch.json` (replaces the session-241 manifest)
+**Status**: Ready (re-issued in session 245)
+**Design Reference**: `design-docs/specs/architecture.md` (including `#testing-strategy` and `#implementation-rollout`), `design-docs/specs/design-storage.md`, `design-docs/specs/design-agent-integration.md`, `design-docs/specs/command.md`, `design-docs/specs/design-app-ui.md`, `design-docs/references/agent-gateway-c7f2697.md`, `design-docs/user-qa/no-riela-decision.md`
+**Dispatch manifest**: `impl-plans/active/stria-v01-session-245-dispatch.json` (replaces `stria-v01-session-243-dispatch.json`, which is deleted)
 
 ## Purpose
 
@@ -27,19 +27,37 @@ The foundation contracts from P01 (`Paths/`, `Config/`, `Errors/`,
 `Library/StriaEnvironment.swift`, `Tests/StriaCoreTests/{Foundation,Support}`)
 are the baseline. No remaining plan redefines them.
 
-## Plans and Waves (session-243 manifest)
+## Plans and Waves (session-245 manifest)
 
-| Wave | planId | File | dependsOn |
-| --- | --- | --- | --- |
-| 1 | P03 | `stria-03-storage.md` | - |
-| 1 | P04 | `stria-04-imaging-cache.md` | - |
-| 1 | P05 | `stria-05-gateway-integration.md` | - |
-| 1 | P06 | `stria-06-cli-parser-config-keys.md` | - |
-| 2 | P07 | `stria-07-import-ocr.md` | P03, P04, P05 |
-| 2 | P08 | `stria-08-ask-search-history.md` | P03, P04, P05 |
-| 3 | P09 | `stria-09-cli-commands-smoke.md` | P05, P06, P07, P08 |
-| 3 | P10 | `stria-10-app-view-models.md` | P07, P08 |
-| 4 | P11 | `stria-11-app-ui.md` | P10 |
+Wave 1 consists of stabilization plans. The code for P03-P06 already exists
+in commit `0082491` but has not been accepted. Each plan:
+
+- fixes its failing tests by fixing behaviour;
+- closes the audited gaps against its original plan text;
+- passes the test-integrity and adversarial review gates.
+
+Waves 2-4 implement P07-P11. A wave starts only after the previous wave has
+joined and post-join verification is green.
+
+| Wave | planId | File | dependsOn | Kind |
+| --- | --- | --- | --- | --- |
+| 1 | P03 | `stria-03-storage.md` | - | stabilization |
+| 1 | P04 | `stria-04-imaging-cache.md` | - | stabilization (owns `Tests/StriaCoreTests/Support/TestDataRoot.swift`) |
+| 1 | P05 | `stria-05-gateway-integration.md` | - | stabilization |
+| 1 | P06 | `stria-06-cli-parser-config-keys.md` | - | stabilization |
+| 2 | P07 | `stria-07-import-ocr.md` | P03, P04, P05 | new |
+| 2 | P08 | `stria-08-ask-search-history.md` | P03, P04, P05 | new |
+| 3 | P09 | `stria-09-cli-commands-smoke.md` | P05, P06, P07, P08 | new |
+| 3 | P10 | `stria-10-app-view-models.md` | P07, P08 | new |
+| 4 | P11 | `stria-11-app-ui.md` | P10 | new |
+
+Known wave-1 failures at `0082491` (7 of 51 tests) and their owners:
+
+| Owner | Failing tests | Fix |
+| --- | --- | --- |
+| P04 | `IdentityTests`, `InspectorTests`, `OutlineTests`, `RenderCodecTests` | P04-S1: `withTestDataRoot` creates the root |
+| P03 | `SearchQueryBuilderTests.quotingTrigramsAndSnippets` | P03-S1: correct the cap case only |
+| P05 | `LiveRoutingTests.routesPDFTextLayerOffline` | P05-S1: NFKC in `pdf-text-layer` |
 
 All plans in a wave start at the same time, on the same branch and working
 directory. The `writePaths` of different plans are disjoint. A plan never
@@ -125,7 +143,65 @@ generated at test time in temp roots and are never committed.
 14. **No secrets.** Never print, log, store or commit secret values. Config
     and logs contain environment variable names only.
 
+## Session-245 Stabilization Protocol (all plans; supersedes rules 8 and 9 where they differ)
+
+- **S1. Evidence root.**
+  - Write every log to `tmp/stria-v01-session-245/<planId>/`.
+  - Run each command in the foreground, for example
+    `mkdir -p tmp/stria-v01-session-245/P03 && swift build --build-tests 2>&1 | tee tmp/stria-v01-session-245/P03/build-tests.log; echo "exit=${PIPESTATUS[0]}"`.
+  - Record the command, exit code and log path in your Progress Log.
+  - `tmp/` is gitignored and is never declared as a plan path.
+- **S2. Baseline first (wave-1 plans).**
+  - Before your first edit, run `swift build --build-tests` and your
+    plan's focused `swift test --filter` command.
+  - Save the logs as `baseline-build-tests.log` and `baseline-focused.log`.
+- **S3. Red-green evidence.**
+  - For every behaviour fix a plan names, run the new or affected test
+    before the code change and keep the failing log as
+    `red-<task>.log`.
+  - Run it again after the change and keep the passing log as
+    `green-<task>.log`.
+- **S4. Test integrity.**
+  - Never delete, skip, disable (`.disabled`, `withKnownIssue`,
+    `#if false`) or loosen an existing `#expect` or `#require`. The only
+    exception is the one named in the plan (P03-S1).
+  - Never change a test's input data to dodge a failure. For example,
+    keep "offline text" as it is.
+  - Never special-case test values in production code.
+  - Before finishing, run
+    `git diff 0082491 -- <your test dirs> | grep -E '^-[^-].*#(expect|require)'`
+    and paste the output into your Progress Log. It must be empty, or show
+    only the named exception.
+- **S5. Shared test target.** Every plan compiles into the one
+  `StriaCoreTests` target, so a parallel worker's half-finished file can
+  break your build.
+  - Finish only after `swift build --build-tests` exits 0 with your files.
+  - Then re-run your focused tests as the last action of your run
+    (`focused-final.log`).
+  - If the build fails only in files outside your `writePaths`, do not
+    edit them. Wait at least 2 minutes and re-run, up to 3 times.
+  - Only then record `blocked by foreign diagnostics: <file:line>` with the
+    log path.
+  - Never declare blocked on the first failure.
+- **S6. Paths.** Never declare or write `.build/`, dependency checkouts,
+  `dist/`, `release/`, `tmp/` (except your evidence logs), or any directory
+  that contains a nested `.git`. You may read
+  `.build/checkouts/agent-gateway` read-only.
+- **S7. Progress Log.**
+  - Append entries under the `### Session 245` heading of your plan's
+    `## Progress Log` only. Earlier entries are history.
+  - Each entry lists: pre- and post-hashes (rule 4), the tasks completed,
+    the evidence logs with exit codes, and any drift or blocker.
+
 ## Post-Join Serial Verification (run by reconciliation/review, not by workers)
+
+Session 245: write logs to `tmp/stria-v01-session-245/join/wave-<n>/` and run
+`swift build --build-tests` before `swift test`. Also run these checks after
+every wave:
+
+- `grep -rn "launchFailed" Sources` must print nothing (from wave 1 on);
+- `grep -rnE '^import (AgentGateway|AgentGatewayAppCore|ACP)$' Sources | grep -v '^Sources/StriaCore/Integration/'`
+  must print nothing.
 
 Run this after each wave joins, and once more at the end:
 
@@ -156,3 +232,20 @@ These checks apply after the named wave only:
   replaces `stria-v01-session-241-dispatch.json`. P05 no longer declares
   `.build/checkouts/agent-gateway`, Mode A is mandatory, and the
   `cursor-api` preflight was added. P09 no longer depends on P02.
+- 2026-10-02 (session 243 result): wave 2 code for P03-P06 was committed
+  unverified in `0082491`. `swift build` passed, swiftlint reported 0
+  violations, and `swift test` had 7 of 51 failing.
+- 2026-10-02 (session 245, Step 4): P03-P06 re-issued as stabilization plans
+  with audited gap tasks (P03-S1..S5, P04-S1..S4, P05-S1..S4,
+  P06-S1..S5). P07-P11 got verified-API notes. The Session-245
+  Stabilization Protocol was added.
+  `impl-plans/active/stria-v01-session-245-dispatch.json` replaces the
+  session-243 manifest.
+  Design corrections:
+  - the CLI-vendor launch failure is `failed`, because agent-gateway
+    c7f2697 wraps executor errors as `ACPError.internalError`;
+  - `locked` means `isLocked`; an owner-password-only PDF is accepted.
+
+### Session 245
+
+- (serial reconciliation appends entries here)

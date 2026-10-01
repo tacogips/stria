@@ -1,12 +1,49 @@
 # P09 CLI Command Execution, Executable, End-to-End Tests, Smoke Script
 
-**Status**: Ready (re-issued in session 243)
+**Status**: Ready (re-issued in session 245)
 **planId**: P09
-**Wave**: 3 of the session-243 manifest
+**Wave**: 3 of `impl-plans/active/stria-v01-session-245-dispatch.json`
 **dependsOn**: P05, P06, P07, P08
-**Design Reference**: `design-docs/specs/command.md` (all sections); `design-docs/specs/architecture.md#data-root`, `#implementation-rollout`; `design-docs/specs/design-agent-integration.md#run-records`, `#secrets`
+**Design Reference**: `design-docs/specs/command.md` (all sections); `design-docs/specs/architecture.md#data-root`, `#testing-strategy`, `#implementation-rollout`; `design-docs/specs/design-agent-integration.md#run-records`, `#secrets`
 
-## Session-243 Revision
+## Session-245 Revision
+
+No file of this plan exists yet; this plan is a new implementation. Its
+tasks, contracts and paths are unchanged. Start only after wave 2 (P07 and
+P08) has joined green. Follow the overview's Common Execution Protocol and
+session-245 Stabilization Protocol (rules S5-S7). Evidence logs go to
+`tmp/stria-v01-session-245/P09/`.
+
+### Changes to the test plan below
+
+**Root-absence tests.** `withTestDataRoot` now creates the temp root before
+the body (P04-S1). So the "`--help` and `--version` -> the temp root does not
+exist afterwards" test, and any other assertion that the data root was not
+created, must pass `--home <paths.root>/home`, a subdirectory that does not
+exist yet, and assert that this subdirectory does not exist afterwards. Do
+not assert on `paths.root` itself, which always exists.
+
+**Verified P06 API.** Use the `CLICommand` cases exactly as listed in
+`stria-06-cli-parser-config-keys.md` (Session-245 Stabilization, Current
+API):
+
+- `CLIJSON.success(_:)` throws `StriaError(ioError)` on an encoding failure
+  (P06-S2);
+- `CLIJSON.failure(_:)` always emits valid JSON (P06-S1);
+- `Usage.text(for:)` returns every line of a command family (P06-S3).
+
+**Verified P05 API.** `StriaEnvironment.liveServices(paths:config:)`
+matches the `ServiceFactory` shape.
+
+**Smoke script and NFKC.** The unique phrase `zebra quantum lattice` and
+`学習` reach the index through `pdf-text-layer`, which now NFKC-normalizes
+its text (P05-S1). Ligature glyphs in the generated PDFs therefore do not
+break the phrase search. Keep the phrase as specified.
+
+**Exit codes for launch failures.** A CLI vendor executable that cannot be
+launched gives exit 5 (`serviceFailed`), not 4. No test needs a real vendor.
+
+## Session-243 Notes (still valid)
 
 The tasks, contracts and paths are unchanged from session 241. Two things
 changed:
@@ -290,5 +327,7 @@ fakes.
   flow.
 
 ## Progress Log
+
+### Session 245
 
 - (worker appends entries here)

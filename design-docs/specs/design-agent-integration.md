@@ -41,11 +41,12 @@ Services throw `ServiceError`, which the coordinators handle as follows:
 
 - `unavailable(reason)`: a configuration problem, such as an unknown vendor,
   a missing model for an API vendor, `apiKeyEnvironment` unset or the named
-  variable missing, or the agent-gateway executable not found. It is detected
-  before any page is touched or any message is persisted. OCR: the run aborts
-  and pages stay `pending`. Ask: nothing is persisted. CLI exit 4.
-- `failed(message)`: the call itself failed (transport, vendor error, or a
-  stop reason other than end of turn). OCR: that page becomes `failed`. Ask:
+  variable missing, or `cursor-api` (no image input). It is detected before
+  any page is touched or any message is persisted. OCR: the run aborts and
+  pages stay `pending`. Ask: nothing is persisted. CLI exit 4.
+- `failed(message)`: the call itself failed (transport, vendor error, a CLI
+  vendor executable that cannot be launched, or a stop reason other than end
+  of turn). OCR: that page becomes `failed`. Ask:
   the failure is persisted as an assistant `error` message. CLI exit 5.
 
 Answers are aggregated in v0.1. There is no token streaming.
@@ -119,7 +120,13 @@ Default OCR prompt:
 
 `ocr.vendor = "pdf-text-layer"` is a reserved vendor implemented in
 `StriaCore` without agent-gateway. It returns `PDFPage.string` from the
-original PDF.
+original PDF, NFKC-normalized (`precomposedStringWithCompatibilityMapping`)
+before the usual post-processing. PDF text layers often carry typographic
+ligature glyphs (for example U+FB04 for "ffl", so "offline" comes out as
+"o\u{FB04}ine"). These are layout artifacts, not content, so `ocr_text`,
+`stria page text` and ask context must read as the plain letters. Text from
+model OCR is stored as returned. Only `search_text` is normalized
+(`design-storage.md#search`).
 
 It exists so the real `stria` binary can fill in OCR text offline during the
 CLI smoke run (the "test hook" in the acceptance criteria), and it is usable
@@ -235,10 +242,15 @@ Pre-call checks, which produce `unavailable` and make no call:
   (`../references/agent-gateway-c7f2697.md`). Config still accepts the value,
   so the error names the reason instead of failing config validation.
 
-CLI-backed vendors (`claude-code`, `codex`, `cursor`) use their own login,
-may leave `apiKeyEnvironment` null, and fail with `unavailable` when the
-gateway reports that the executable cannot be launched
-(`GatewayProcessError.launchFailed`).
+CLI-backed vendors (`claude-code`, `codex`, `cursor`) use their own login
+and may leave `apiKeyEnvironment` null. At the pinned revision,
+`GatewayACPAgent.prompt` rethrows every executor error, including
+`GatewayProcessError.launchFailed`, as `ACPError.internalError(String)`, so
+stria cannot tell a missing executable apart from other call failures
+without matching error strings. A CLI vendor whose executable cannot be
+launched therefore surfaces as `failed(<redacted message>)`: the OCR page
+becomes `failed` (retryable with `--retry-failed`), and an ask persists an
+assistant `error` message (CLI exit 5). stria does not match on error text.
 
 Implementation gate G1 (API confirmation) is done. The signatures, the
 `GatewayVendor` raw values, the `ACPStopReason` enum (`endTurn` is success)

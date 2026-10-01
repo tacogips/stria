@@ -1,12 +1,69 @@
 # P07 Import Coordinator, OCR Coordinator, Document Facade
 
-**Status**: Ready (re-issued in session 243)
+**Status**: Ready (re-issued in session 245)
 **planId**: P07
-**Wave**: 2 of the session-243 manifest
-**dependsOn**: P03, P04, P05
-**Design Reference**: `design-docs/specs/design-storage.md#document-identity`, `#import-pipeline`, `#expanded-png-cache`; `design-docs/specs/design-agent-integration.md#ocr`, `#run-records`; `design-docs/specs/command.md` (import, ocr, list, show, page image, page text semantics); `design-docs/specs/architecture.md#implementation-rollout`
+**Wave**: 2 of `impl-plans/active/stria-v01-session-245-dispatch.json`
+**dependsOn**: P03, P04, P05 (the session-245 stabilization wave)
+**Design Reference**: `design-docs/specs/design-storage.md#document-identity`, `#import-pipeline`, `#expanded-png-cache`; `design-docs/specs/design-agent-integration.md#ocr`, `#run-records`; `design-docs/specs/command.md` (import, ocr, list, show, page image, page text semantics); `design-docs/specs/architecture.md#testing-strategy`, `#implementation-rollout`
 
-## Session-243 Revision
+## Session-245 Revision
+
+No file of this plan exists yet; this plan is a new implementation. Its
+tasks, contracts and paths are unchanged. Start only after wave 1 (P03-P06
+stabilization) has joined with `swift build --build-tests` and `swift test`
+green. Follow the Common Execution Protocol and the session-245
+Stabilization Protocol in `impl-plans/active/stria-00-overview.md` (rules
+S5-S7 apply to every plan). Evidence logs go to `tmp/stria-v01-session-245/P07/`.
+
+### Verified APIs to call
+
+A read-only audit of `0082491` confirmed these. All `StriaStore` methods
+are actor-isolated and synchronous `throws`, so call them with
+`try await library.store.<method>`.
+
+- `StriaLibrary.open(environment:storeOptions:) throws`. Its init is
+  private. Properties: `environment`, `store`, `paths`.
+- Store, documents:
+  - `insertDocument(_ record: DocumentRecord)`
+  - `document(id:) -> DocumentRecord?`, `document(sha256:) -> DocumentRecord?`
+  - `markDocumentReady(id:outlineJSON:)`
+  - `listDocuments(order:) -> [DocumentRecord]`
+  - `ocrCounts(documentId:) -> OCRCounts`
+  - `setLastReadPage(documentId:page:)`, `markOpened(documentId:)`
+- Store, pages:
+  - `insertPage(documentId:pageNumber:image:)`
+  - `pageNumbers(documentId:) -> [Int]`, `pageNumbers(documentId:statuses:) -> [Int]`
+  - `pageInfo(documentId:page:) -> PageInfo?`, `pageInfos(documentId:)`
+  - `pageImage(documentId:page:) -> StoredPageImage?`
+  - `recordOCRSuccess(documentId:page:text:vendor:model:run:)`
+  - `recordOCRFailure(documentId:page:error:vendor:model:run:)`
+- `DocumentIdentity.sha256Hex(of:)` and `docId(sha256Hex:)`.
+- `PDFInspector.inspect(url:) -> PDFInspection { pageCount, title }`.
+- `PageRenderer.render(page:dpi:maxPixelDimension:) -> CGImage`.
+- `ImageCodec.encode(_:preferred:quality:) -> StoredPageImage`.
+- `OutlineExtractor.extract(from:)`, `encodeJSON(_:)` and `decodeJSON(_:)`.
+- `PageImageCache(paths:)`:
+  - `validCachedURL(docId:page:width:height:) -> URL?`
+  - `expand(docId:page:image:) -> URL`
+  - `write(image:to:)`
+- `RunLogWriter(paths:).append(_:) throws` and
+  `SecretRedactor.truncate(_:limit:)`.
+
+### Behaviour notes from the session-245 design corrections
+
+- `pdf-text-layer` now returns NFKC-normalized text (P05-S1).
+  `OCRTextPostProcessor.clean` still trims and strips fences for every
+  vendor.
+- A CLI vendor executable that cannot be launched surfaces as
+  `ServiceError.failed`, not `unavailable`. That page becomes `failed`, and
+  no special case is needed.
+- `withTestDataRoot` now creates the temp root (0700) before the test body
+  (P04-S1). `originals/`, `cache/` and `logs/` still do not exist until
+  production code creates them. Do not create them in tests unless a
+  fixture needs them, as the import tests do through `ensureDirectories` or
+  first use.
+
+## Session-243 Notes (still valid)
 
 The tasks, contracts and paths are unchanged from session 241; only the wave
 numbering moved (wave 3 became wave 2). Checked against the wave-1 code:
@@ -291,5 +348,7 @@ Use `withTestDataRoot`, `makeTestEnvironment`, `SamplePDFFactory` and
 - [ ] Import succeeds when OCR is unavailable.
 
 ## Progress Log
+
+### Session 245
 
 - (worker appends entries here)
