@@ -61,6 +61,10 @@ The first data-root use creates `config.json` with defaults. Inspect or edit set
 
 OCR and agent calls go through [agent-gateway](https://github.com/tacogips/agent-gateway). `ocr.vendor` and `agent.vendor` accept an agent-gateway vendor (`claude-code`, `codex`, `cursor`, `cursor-api`, `openai`, `anthropic`, `gemini`, `openrouter`). `ocr.vendor` also accepts `pdf-text-layer`, which reads the PDF's embedded text locally with no model call. If OCR is unavailable, for example because the API-key environment variable is unset, import still succeeds and pages stay pending so `stria ocr` can run them later.
 
+API vendors (`openai`, `anthropic`, `gemini`, `openrouter`) receive page images as image content. The CLI vendors (`claude-code`, `codex`, `cursor`) cannot receive image content through agent-gateway, so for them stria puts the absolute path of each page PNG under `cache/` in the prompt and tells the agent to open the file. The agent session runs in `cache/`, so the CLI agent needs permission to read files there. See [vendor image capability](design-docs/specs/design-agent-integration.md#vendor-image-capability).
+
+A gateway OCR reply that is empty, or that says no image was received, is recorded as a `failed` page with a fixed error instead of `done`, and `stria ocr <docId> --retry-failed` runs it again. With a gateway vendor, a truly blank page is therefore also `failed`; `pdf-text-layer` still stores blank pages as `done`. See [OCR reply check](design-docs/specs/design-agent-integration.md#ocr-reply-check) and [empty OCR replies](design-docs/user-qa/ocr-empty-reply.md).
+
 ## CLI for agents
 
 `stria [--home <path>] <command> ...` prints one JSON object on stdout for success and is intended primarily for agent tools. `--json` is accepted and has no effect; `--help` and `--version` never create the data root.

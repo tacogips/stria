@@ -19,6 +19,9 @@ public struct GatewayOCRService: OCRService {
       environment: environment,
       secretValue: preflight.secretValue
     )
+    if let reason = GatewayOCRReplyCheck.rejectionReason(for: text) {
+      throw ServiceError.failed(reason)
+    }
     return OCRResult(text: text)
   }
 }

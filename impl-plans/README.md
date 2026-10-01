@@ -8,11 +8,15 @@ Implementation plans translate design documents into actionable work.
 
 ## Status
 
-Active (session 247):
+There are no active plans.
+
+Completed after v0.1 (session 247):
 
 | planId | Plan |
 | --- | --- |
-| P12 | [`stria-12-cli-vendor-image-paths.md`](active/stria-12-cli-vendor-image-paths.md) (CLI vendor image paths and OCR reply check) |
+| P12 | [`stria-12-cli-vendor-image-paths.md`](completed/stria-12-cli-vendor-image-paths.md) (CLI vendor image paths and OCR reply check) |
+
+The session-247 dispatch manifest is kept with it as `completed/stria-session-247-dispatch.json`; the `planPath` value inside it records the original `impl-plans/active/` location.
 
 stria v0.1 is complete; its plans are in `impl-plans/completed/`:
 

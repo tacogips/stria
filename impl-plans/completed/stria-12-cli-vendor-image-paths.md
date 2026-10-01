@@ -1,6 +1,6 @@
 # P12 CLI Vendor Image Paths and OCR Reply Check
 
-**Status**: In Progress
+**Status**: Completed
 **planId**: P12
 **Wave**: 1 (single plan, no dependencies)
 **dependsOn**: none (builds on `main` at `8861227` plus the session-247 design update)
@@ -294,17 +294,31 @@ Shared (read-only): `design-docs/specs/design-agent-integration.md`,
 
 ## Completion Criteria
 
-- [ ] `GatewayPromptParts.rendered(_:for:)` exists with the pinned signature
+- [x] `GatewayPromptParts.rendered(_:for:)` exists with the pinned signature
       and text template. `GatewayPromptRunner.run` iterates its output.
-- [ ] `GatewayOCRReplyCheck` exists with the pinned reasons, the phrase
+- [x] `GatewayOCRReplyCheck` exists with the pinned reasons, the phrase
       lists and the 600-character limit. `GatewayOCRService.recognize` throws
       `ServiceError.failed(reason)` on rejection.
-- [ ] All test cases above exist and pass (V2).
-- [ ] V1-V7 meet their required evidence, recorded with numeric exitCode.
-- [ ] No file outside the write paths changed (V7).
-- [ ] Progress Log has pre- and post-hashes, verification records and any
+- [x] All test cases above exist and pass (V2).
+- [x] V1-V7 meet their required evidence, recorded with numeric exitCode.
+- [x] No file outside the write paths changed (V7).
+- [x] Progress Log has pre- and post-hashes, verification records and any
       drift notes.
 
 ## Progress Log
 
 - 2026-10-02: Plan created (session 247, Step 4).
+- 2026-10-02: Implemented P12. CLI prompt parts replace images in place with the pinned PNG path instruction; API prompt parts remain unchanged. Gateway OCR now rejects cleaned-empty and listed no-image replies with fixed reasons, while returning accepted raw replies. Added offline vendor-rendering, heuristic, and coordinator failure-path tests. Existing two `PromptPartsTests` cases were preserved unchanged. Shared design and support files remain read-only.
+- 2026-10-02: Pre-edit SHA-256 (new files were absent): `GatewayPromptParts.swift` `27a9ea9953cf3892bc676326477af393790adf657f41bb824656afb3a590c6ba`; `GatewayPromptRunner.swift` `a198acc3ed4f6e67fb93aa820dce9b0cda4b74c9981a675b060d52238282b09a`; `GatewayOCRReplyCheck.swift` absent; `GatewayOCRService.swift` `6ec6063041395d59ba87eee04cf769bc7a2d402d856a24c12cd56c74bc8004a6`; `PromptPartsTests.swift` `4226627e146e31879238b747a264efa090a2d85e1c50df7d14efa55ba3d9d3ae`; `OCRReplyCheckTests.swift` absent. Per-edit intentions are recorded under `tmp/stria-session-247/P12/edits/`.
+- 2026-10-02: Post-edit SHA-256: `GatewayPromptParts.swift` `6023391eba18894bb4a52ae8ba378987b6dc55baf607a9f3bd01f77b0afeea32`; `GatewayPromptRunner.swift` `8e6c70c5ad330bb9a193c0902ecae92b64132da0dbfcaed634b38432a628c4ca`; `GatewayOCRReplyCheck.swift` `4c59812ba29b316642fbb33db0eeac9ab7508bbbbbadd5606004ec1ab27f41bf`; `GatewayOCRService.swift` `e8379ccdabcd7f7b77697216b4bce5ee09bf919714fbdea83bed8435beda9268`; `PromptPartsTests.swift` `635cfb2d2521ff3acabf468a813e91d31cd9b185c3178c634456e9ac8d8ac8ef`; `OCRReplyCheckTests.swift` `f96d1549f5bc0ff8289ddf3e08a82de02363e40a762089082043cc5801b2599c`. No unexpected drift observed.
+- 2026-10-02: Completion criteria V1-V7 satisfied on the final source tree. Every verification was run in the foreground with `set -o pipefail`; complete logs are under `tmp/stria-session-247/P12/`.
+  - `swift build`: `{"exitCode":0,"log":"tmp/stria-session-247/P12/build.log"}`.
+  - `swift test --filter 'PromptPartsTests|OCRReplyCheckTests'`: `{"exitCode":0,"testsRun":9,"testsPassed":9,"failureCount":0,"log":"tmp/stria-session-247/P12/test-focused.log"}`.
+  - `swift test`: `{"exitCode":0,"testsRun":127,"testsPassed":127,"failureCount":0,"log":"tmp/stria-session-247/P12/test-all.log"}`.
+  - Changed-file strict lint (`xargs -0 swiftlint lint --strict --quiet --no-cache` using `tmp/stria-session-247/P12/changed-swift-files.nul`): `{"exitCode":0,"log":"tmp/stria-session-247/P12/swiftlint-changed.log"}`.
+  - `swiftlint`: `{"exitCode":0,"violations":0,"log":"tmp/stria-session-247/P12/swiftlint.log"}`.
+  - `bash scripts/cli-smoke.sh`: `{"exitCode":0,"outcome":"SMOKE OK","log":"tmp/stria-session-247/P12/cli-smoke.log"}`.
+  - `find Sources Tests -name '*.swift' -exec wc -l {} + | awk '$2 != "total" && $1 >= 1000'`: `{"exitCode":0,"outcome":"empty output","log":"tmp/stria-session-247/P12/swift-file-line-limit.txt"}`.
+  - `git status --porcelain=v1 --untracked-files=all`: `{"exitCode":0,"outcome":"only the six assigned Swift paths and this plan's Progress Log changed","log":"tmp/stria-session-247/P12/git-status-final-2.log"}`.
+- 2026-10-02: Step 6 implementation work is complete. Formal review and later workflow finalization remain downstream; they are not recorded as completed here.
+- 2026-10-02: Accepted. The step 7 adversarial review (comm-003293) and the test-integrity review accepted with no findings. The integration review (comm-003298) re-ran `swift build` (exitCode 0), `swift test` (exitCode 0, 127/127, `tmp/stria-session-247/P12/reconcile/test-all.log`), `swiftlint` (0 violations) and `scripts/cli-smoke.sh` (SMOKE OK, `tmp/stria-session-247/P12/reconcile/cli-smoke.log`). Step 7b browser E2E was skipped because there is no browser surface. Step 8 updated `README.md` and moved this plan and the session-247 dispatch manifest to `impl-plans/completed/`.

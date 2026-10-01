@@ -27,7 +27,7 @@ struct GatewayPromptRunner {
       _ = try await client.initialize()
       let session = try await client.newSession(ACPNewSessionRequest(cwd: cwd.path))
       var content = [ACPContentBlock]()
-      for part in parts {
+      for part in GatewayPromptParts.rendered(parts, for: vendor) {
         switch part {
         case let .text(text):
           content.append(.text(text))
