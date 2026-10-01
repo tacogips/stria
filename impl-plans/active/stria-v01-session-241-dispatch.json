@@ -1,0 +1,683 @@
+{
+  "taskId": "stria-v01-session-241",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "remote": "origin",
+  "originalHead": "ef9e32e121a930c7b424a0aaff66398376499f64",
+  "evidenceRoot": "tmp/stria-v01-session-241",
+  "evidenceLayout": "tmp/stria-v01-session-241/<planId>/attempt-<n>/ for per-plan, per-attempt logs; tmp/stria-v01-session-241/join/wave-<n>/ for post-join serial verification. Untracked (tmp/ is gitignored). The plan files also name tmp/verify/<planId>/; both locations are untracked scratch.",
+  "planIndexPath": "impl-plans/active/stria-00-overview.md",
+  "designDocPaths": [
+    "design-docs/specs/architecture.md",
+    "design-docs/specs/design-storage.md",
+    "design-docs/specs/design-agent-integration.md",
+    "design-docs/specs/command.md",
+    "design-docs/specs/design-app-ui.md",
+    "design-docs/user-qa/no-riela-decision.md",
+    "design-docs/user-qa/default-agent-config.md",
+    "design-docs/user-qa/app-distribution.md"
+  ],
+  "reviewContext": {
+    "issueReference": "No GitHub issue or draft PR. Inline workflowInput 'Design and implement stria: Swift PDF reader with OCR-indexed page store, agent chat pane, and agent-facing CLI (RAG)', workflowExecutionId opus-luna-design-and-implement-review-loop-session-241, intake accepted at step5-impl-plan-review communication comm-003157.",
+    "userProblem": "The repository is an ign SwiftPM scaffold still named KaibaViewer. The user wants stria: a macOS PDF reader that imports PDFs, keeps the original, stores every page as a compressed image BLOB in SQLite, OCRs each page through agent-gateway into searchable text, shows the PDF with smooth continuous vertical scrolling, a left table of contents pane and a right agent chat pane, persists all chats with per-page and per-PDF history, and exposes a JSON CLI that external AI agents use as a RAG backend (search OCR text across PDFs, then fetch page images).",
+    "requiredOutcomes": [
+      "Rename everything user-facing to stria: package stria, library StriaCore, executable product stria (StriaCLI), executable product stria-app (StriaApp), tests StriaCoreTests; README, AGENTS.md overview, mise.toml, scripts, packaging, .ign and release skills carry no KaibaViewer or kaiba-viewer string.",
+      "Data root ~/.local/stria, overridden by STRIA_HOME and the --home CLI flag, with stria.sqlite, originals/, cache/, config.json and logs/; tests and smoke runs use temp roots only.",
+      "Content-derived document id (first 16 hex chars of SHA-256); idempotent import; resumable interrupted import; idCollision on id clash with a different hash.",
+      "Import pipeline: copy original, render each page (150 DPI default, 4096 px cap), store HEIC (JPEG fallback) BLOBs in SQLite, then OCR per page through agent-gateway; import succeeds with pages pending or failed when OCR is unavailable; OCR is resumable, retryable and bounded in concurrency.",
+      "Expanded PNG cache at cache/<docId>/page-NNNN.png, written on app open, CLI page image, OCR and ask; valid files are not rewritten; never used for display.",
+      "SQLite schema v1 via system SQLite3 with user_version migrations, FTS5 trigram search over NFKC OCR text with a LIKE fallback (short queries and hosts without FTS5 trigram), chat threads and messages, agent_runs.",
+      "agent-gateway at revision c7f269753ec36aca92d429ec13316ba033128967 as the only AI library, behind OCRService and AgentService protocols, with fakes for tests; every call recorded in agent_runs and logs/agent-runs-YYYY-MM-DD.jsonl.",
+      "config.json with render, ocr and agent sections (vendor, model, apiKeyEnvironment name only, dpi, quality, concurrency, prompt overrides), created with defaults and editable through stria config get/set.",
+      "CLI stria with JSON output and stable exit codes: import, ocr, list, show, page image, page text, search, ask (--doc, --page, --query, --limit), history, config get/set, paths; agent-usage documentation in README and command.md.",
+      "macOS 14 SwiftUI app modelled on Preview, Skim, PDF Expert and AI-assistant readers: library home with import and progress; NavigationSplitView left pane (Contents, Thumbnails, Search); center PDFView with continuous vertical scroll, page field, Go to Page Cmd-Opt-G and last-read restore; right .inspector agent pane with scope picker, citation chips, Cmd-Return send and This page / This PDF history.",
+      "swift build, swift test (no network, no credentials), swiftlint, files under 1000 lines, and scripts/cli-smoke.sh with a temp STRIA_HOME all pass."
+    ],
+    "nonGoals": [
+      "No riela dependency, workflow files or riela data directory (design-docs/user-qa/no-riela-decision.md).",
+      "No modification of /Users/taco/gits/tacogips/agent-gateway and no local-path dependency.",
+      "No .app bundle, Info.plist, icon or signing for stria-app in v0.1; release scripts keep shipping the CLI binary only.",
+      "No streaming answers, per-call timeout or agent session reuse.",
+      "No document deletion and no migrations beyond v1.",
+      "No annotations, tabs or two-up display modes in the app.",
+      "No swift-argument-parser; CLI parsing extends the scaffold's hand-written style.",
+      "No Linux build: .github/workflows/linux-amd64-build.yml is removed."
+    ],
+    "constraints": [
+      "Follow AGENTS.md: English only, no emojis, Swift coding skill, every Swift file under 1000 lines, run swiftlint.",
+      "macOS 14+ only, Swift tools 6.0, Swift 6 language mode.",
+      "Workers write only their plan's writePaths and only the Progress Log of their own plan file; sharedPaths are read-only.",
+      "Workers make no git state changes (no add, commit, mv, stash, checkout, reset, switch, branch, worktree); commits happen in serial finalization.",
+      "Only P01 edits Package.swift and Package.resolved; no swift package update.",
+      "Tests and smoke runs never write to ~/.local/stria or into the repository tree outside tmp/.",
+      "No secret values are printed, logged, stored or committed; config holds env var names only.",
+      "Commit messages carry no AI tool attribution or co-authorship lines (repository policy).",
+      "Run verification commands in the foreground and keep complete logs with exit codes under the evidenceRoot."
+    ],
+    "designDecisionsAndRationale": [
+      "riela is dropped: the user said it is not needed, its manifest has a local path dependency SwiftPM rejects for revision pins, and it pulls heavy dependencies; per-call logging is covered by agent_runs plus JSONL logs.",
+      "HEIC at quality 0.75 with automatic JPEG fallback: about half of JPEG size for text pages, serving the save-disk requirement; PNG is produced only on expansion because vendors do not accept HEIC.",
+      "System SQLite3 with a thin wrapper and FTS5 trigram tokenizer: works for Japanese and English without a third-party package; the backend is probed once in migration 1 and recorded in meta, with a LIKE fallback.",
+      "Queries with any term shorter than 3 Unicode scalars use LIKE mode because FTS5 trigram phrases under 3 characters never match.",
+      "View models live in StriaCore/AppModel instead of a separate target so swift test covers app behaviour with the same store and fakes.",
+      "Gate G1 in P01 confirms agent-gateway signatures from the resolved checkout into design-docs/references/agent-gateway-c7f2697.md; if resolve or build fails, P05 uses Mode B (unavailable services) and pdf-text-layer still works.",
+      "pdf-text-layer is a local OCR vendor id that reads the PDF text layer, giving an offline path used by the smoke test.",
+      "Unavailable services persist nothing (no run record, pages stay pending); failed calls persist a run and an error message.",
+      "CLI ask always creates a new thread; --query replaces the question as the retrieval input and --limit caps context pages to 1...10."
+    ],
+    "intentionalTradeoffs": [
+      "All plans share one StriaCore module, so a wave worker's build can fail on another worker's in-progress file; such workers record 'blocked by foreign diagnostics' and post-join serial verification decides.",
+      "P01 writes temporary stubs Sources/StriaCLI/main.swift and Sources/StriaApp/StriaAppMain.swift that P09 and P11 replace in later waves; this is the only writePath overlap and the DAG orders it.",
+      "Default vendor anthropic with ANTHROPIC_API_KEY is applied pending user confirmation (design-docs/user-qa/default-agent-config.md).",
+      "stria-app ships only as a SwiftPM executable; a GUI launch outside a shell may miss API-key env vars, and the app then names the missing variable.",
+      "Cache expansion on open uses concurrency 2 and is cancelled when the reader closes, trading open-time completeness for responsiveness.",
+      "LIKE fallback search scores 0 and orders by document and page rather than relevance."
+    ],
+    "supportedEdgeCases": [
+      "Re-importing the same bytes returns alreadyImported true with no new rows; an interrupted rendering import resumes from the first missing page.",
+      "Non-PDF, locked or zero-page files fail with invalidPDF and leave no documents row or original copy.",
+      "OCR unavailable: import still succeeds, ocr status unavailable with the reason, pages stay pending, no agent_runs rows; CLI ocr exits 4.",
+      "OCR per-page failures are recorded (status failed, attempts incremented, error truncated to 2000 chars) and retried with --retry-failed or --pages.",
+      "Model output wrapped in a Markdown code fence is cleaned before storage.",
+      "Japanese 2-character queries (for example 学習) use LIKE mode; full-width text matches via NFKC; % and _ in queries are literal.",
+      "A newer database user_version fails with databaseTooNew without modifying the file.",
+      "Invalid config JSON or values fail with configInvalid and the file bytes are untouched; config set with an invalid value exits 2.",
+      "Run log append failure never fails OCR or ask; the CLI emits a stderr warning.",
+      "Cache files that are truncated or have the wrong pixel size are rewritten.",
+      "Rotated pages render with swapped dimensions; oversized pages are capped at maxPixelDimension.",
+      "--help and --version do not create the data root; --home beats STRIA_HOME.",
+      "Ask with no relevant pages exits 3 noRelevantPages, calls no model and persists nothing."
+    ],
+    "outOfScopeEdgeCases": [
+      "Password-protected PDFs that require a password to open (rejected as invalidPDF, no unlock flow).",
+      "Document deletion or cache garbage collection beyond 'cache/ is safe to delete'.",
+      "Schema downgrade or migrations beyond v1.",
+      "Streaming partial answers, per-call timeouts and cancellation of an in-flight model call.",
+      "Signed .app distribution and environment propagation for GUI launches outside a shell.",
+      "Linux or non-macOS builds.",
+      "Live vendor calls in tests; the agent-gateway call path is verified only by build and manual use."
+    ],
+    "sourcePaths": [
+      "AGENTS.md",
+      "design-docs/specs/architecture.md",
+      "design-docs/specs/design-storage.md",
+      "design-docs/specs/design-agent-integration.md",
+      "design-docs/specs/command.md",
+      "design-docs/specs/design-app-ui.md",
+      "design-docs/user-qa/no-riela-decision.md",
+      "design-docs/user-qa/default-agent-config.md",
+      "design-docs/user-qa/app-distribution.md",
+      "impl-plans/active/stria-00-overview.md",
+      "impl-plans/active/stria-01-foundation-contracts.md",
+      "impl-plans/active/stria-02-repo-rename-docs.md",
+      "impl-plans/active/stria-03-storage.md",
+      "impl-plans/active/stria-04-imaging-cache.md",
+      "impl-plans/active/stria-05-gateway-integration.md",
+      "impl-plans/active/stria-06-cli-parser-config-keys.md",
+      "impl-plans/active/stria-07-import-ocr.md",
+      "impl-plans/active/stria-08-ask-search-history.md",
+      "impl-plans/active/stria-09-cli-commands-smoke.md",
+      "impl-plans/active/stria-10-app-view-models.md",
+      "impl-plans/active/stria-11-app-ui.md"
+    ]
+  },
+  "postJoinVerification": {
+    "afterEveryWave": [
+      "swift build",
+      "swift test",
+      "swiftlint",
+      "find Sources Tests -name '*.swift' -exec wc -l {} + | awk '$2 != \"total\" && $1 >= 1000 {bad=1; print} END {exit bad}'"
+    ],
+    "afterWave1": [
+      "test -z \"$(grep -rIl -i kaiba --exclude-dir=.git --exclude-dir=tmp --exclude-dir=.build --exclude-dir=design-docs --exclude-dir=impl-plans .)\""
+    ],
+    "afterWave4": [
+      "scripts/cli-smoke.sh"
+    ],
+    "manualAfterWave5": "P11 manual UI checklist with STRIA_HOME=$(mktemp -d) swift run stria-app; record 'not run: headless' when no display is available."
+  },
+  "plans": [
+    {
+      "planId": "P01",
+      "planPath": "impl-plans/active/stria-01-foundation-contracts.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "Package.swift",
+        "Package.resolved",
+        "Sources/KaibaViewerCore",
+        "Sources/KaibaViewerCLI",
+        "Tests/KaibaViewerCoreTests",
+        "Sources/StriaCore/Version.swift",
+        "Sources/StriaCore/Paths/StriaPaths.swift",
+        "Sources/StriaCore/Config/StriaConfig.swift",
+        "Sources/StriaCore/Config/ConfigStore.swift",
+        "Sources/StriaCore/Errors/StriaError.swift",
+        "Sources/StriaCore/Models",
+        "Sources/StriaCore/Services/ServiceTypes.swift",
+        "Sources/StriaCore/OCR/OCRService.swift",
+        "Sources/StriaCore/Agent/AgentService.swift",
+        "Sources/StriaCore/Library/StriaEnvironment.swift",
+        "Sources/StriaCLI/main.swift",
+        "Sources/StriaApp/StriaAppMain.swift",
+        "Tests/StriaCoreTests/Support",
+        "Tests/StriaCoreTests/Foundation",
+        "design-docs/references/agent-gateway-c7f2697.md",
+        "impl-plans/active/stria-01-foundation-contracts.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "Sources/KaibaViewerCore", "intendedEdit": "delete the directory after moving Version.swift (scaffold rename)"},
+        {"path": "Sources/KaibaViewerCLI", "intendedEdit": "delete the directory (scaffold rename)"},
+        {"path": "Tests/KaibaViewerCoreTests", "intendedEdit": "delete the directory (scaffold rename)"},
+        {"path": "Sources/StriaCLI/main.swift", "intendedEdit": "temporary stub; P09 replaces it in wave 4"},
+        {"path": "Sources/StriaApp/StriaAppMain.swift", "intendedEdit": "temporary stub; P11 replaces it in wave 5"},
+        {"path": "impl-plans/active/stria-01-foundation-contracts.md", "intendedEdit": "append to the Progress Log section only"}
+      ],
+      "acceptanceCriteria": [
+        "Package.swift declares package stria with products StriaCore, stria and stria-app and the agent-gateway revision c7f269753ec36aca92d429ec13316ba033128967 pin (or the documented G1 failure with Mode B).",
+        "Package.resolved exists.",
+        "design-docs/references/agent-gateway-c7f2697.md records the confirmed agent-gateway API signatures and file locations, or the G1 failure evidence.",
+        "All shared contract types (StriaError, StriaPaths, StriaConfig, ConfigStore, Models, ServiceTypes, OCRService, AgentService, StriaEnvironment) compile with the exact names in the plan.",
+        "Foundation suites (PathsTests, ConfigTests, StriaErrorTests, SamplePDFTests) and test support pass; no test touches ~/.local/stria.",
+        "No kaiba string remains in Package.swift, Sources or Tests."
+      ],
+      "verification": [
+        "swift package resolve",
+        "swift build",
+        "swift test",
+        "swift test --filter 'PathsTests|ConfigTests|StriaErrorTests|SamplePDFTests'",
+        "swiftlint lint Sources Tests Package.swift",
+        "test -z \"$(grep -rn -i kaiba Package.swift Sources Tests)\"",
+        "test -f design-docs/references/agent-gateway-c7f2697.md",
+        "find Sources Tests -name '*.swift' -exec wc -l {} + | awk '$2 != \"total\" && $1 >= 1000 {bad=1; print} END {exit bad}'"
+      ]
+    },
+    {
+      "planId": "P02",
+      "planPath": "impl-plans/active/stria-02-repo-rename-docs.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "README.md",
+        "AGENTS.md",
+        "mise.toml",
+        "scripts/build-homebrew-release.sh",
+        "scripts/render-homebrew-formula.sh",
+        "scripts/build-homebrew-cask-release.sh",
+        "scripts/render-homebrew-cask.sh",
+        "scripts/release-homebrew-cask-local.sh",
+        "packaging/homebrew/README.md",
+        ".ign/ign-var.json",
+        ".ign/ign-files.json",
+        ".claude/skills/homebrew-release/SKILL.md",
+        ".claude/skills/macos-cask-release/SKILL.md",
+        ".claude/skills/apple-notarization-setup/SKILL.md",
+        ".codex/skills/homebrew-release/SKILL.md",
+        ".codex/skills/macos-cask-release/SKILL.md",
+        ".codex/skills/apple-notarization-setup/SKILL.md",
+        ".github/workflows/linux-amd64-build.yml",
+        "impl-plans/active/stria-02-repo-rename-docs.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": ".github/workflows/linux-amd64-build.yml", "intendedEdit": "delete the file (macOS-only product)"},
+        {"path": "impl-plans/active/stria-02-repo-rename-docs.md", "intendedEdit": "append to the Progress Log section only"}
+      ],
+      "acceptanceCriteria": [
+        "No kaiba strings remain in the P02 writePaths.",
+        "README.md has the description, requirements, build/test/lint/smoke, running, data root layout, configuration (env var names only), CLI for agents with Agent Usage steps, packaging and design-doc sections, in English with no emojis.",
+        "AGENTS.md changes only the Project Overview sentence and the Common Commands block (swift run stria --help, swift run stria-app).",
+        "mise.toml has run -> swift run stria, run:app and smoke tasks, and stria tap paths; other tasks and hooks unchanged.",
+        "Release scripts keep their logic, stay executable and pass bash -n; .ign JSON files are valid.",
+        ".github/workflows/linux-amd64-build.yml is removed and gitleaks.yml stays."
+      ],
+      "verification": [
+        "test -z \"$(grep -rIl -i kaiba --exclude-dir=.git --exclude-dir=tmp --exclude-dir=.build --exclude-dir=design-docs --exclude-dir=impl-plans --exclude-dir=Sources --exclude-dir=Tests --exclude=Package.swift .)\"",
+        "for f in scripts/*.sh; do bash -n \"$f\" || exit 1; done",
+        "/usr/bin/plutil -lint .ign/ign-var.json .ign/ign-files.json",
+        "mise tasks ls | grep -q 'run:app'",
+        "mise tasks ls | grep -qw 'smoke'",
+        "test -x scripts/build-homebrew-release.sh && test -x scripts/render-homebrew-formula.sh && test -x scripts/build-homebrew-cask-release.sh && test -x scripts/render-homebrew-cask.sh && test -x scripts/release-homebrew-cask-local.sh",
+        "test ! -e .github/workflows/linux-amd64-build.yml",
+        "test -f .github/workflows/gitleaks.yml"
+      ]
+    },
+    {
+      "planId": "P03",
+      "planPath": "impl-plans/active/stria-03-storage.md",
+      "wave": 2,
+      "dependsOn": ["P01"],
+      "writePaths": [
+        "Sources/StriaCore/Storage",
+        "Sources/StriaCore/Library/StriaLibrary.swift",
+        "Tests/StriaCoreTests/Storage",
+        "impl-plans/active/stria-03-storage.md"
+      ],
+      "sharedPaths": [
+        "Sources/StriaCore/Models",
+        "Sources/StriaCore/Errors/StriaError.swift",
+        "Sources/StriaCore/Paths/StriaPaths.swift",
+        "Sources/StriaCore/Library/StriaEnvironment.swift",
+        "Tests/StriaCoreTests/Support",
+        "Package.swift"
+      ],
+      "sharedPathNotes": [
+        {"path": "Sources/StriaCore/Models", "intendedEdit": "read-only; owned by P01"},
+        {"path": "Sources/StriaCore/Errors/StriaError.swift", "intendedEdit": "read-only; owned by P01"},
+        {"path": "Sources/StriaCore/Paths/StriaPaths.swift", "intendedEdit": "read-only; owned by P01"},
+        {"path": "Sources/StriaCore/Library/StriaEnvironment.swift", "intendedEdit": "read-only; owned by P01"},
+        {"path": "Tests/StriaCoreTests/Support", "intendedEdit": "read-only; test helpers owned by P01"},
+        {"path": "Package.swift", "intendedEdit": "read-only; owned by P01"},
+        {"path": "impl-plans/active/stria-03-storage.md", "intendedEdit": "append to the Progress Log section only"}
+      ],
+      "acceptanceCriteria": [
+        "SQLiteConnection, Migrations, StriaStore (+Documents, +Pages, +Search, +Chat), SearchQueryBuilder and StriaLibrary exist with the exact signatures in the plan.",
+        "Migration 1 creates the design-storage.md schema v1, probes FTS5 trigram and records search_backend in meta; a newer user_version fails with databaseTooNew without modifying the file.",
+        "Both search backends (fts5 and forced like) are tested, including Japanese, 2-character LIKE mode, cross-document, --doc filter, % and _ escaping and NFKC.",
+        "persistAskExchange inserts thread, agent_runs, then user and assistant messages in one foreign-key-safe transaction.",
+        "No list or info query reads the image BLOB.",
+        "Suites MigrationTests, DocumentStoreTests, PageStoreTests, SearchTests, SearchQueryBuilderTests, FuzzyRetrieveTests and ChatStoreTests pass."
+      ],
+      "verification": [
+        "swift build",
+        "swift test --filter 'MigrationTests|DocumentStoreTests|PageStoreTests|SearchTests|SearchQueryBuilderTests|FuzzyRetrieveTests|ChatStoreTests'",
+        "swiftlint lint Sources/StriaCore/Storage Sources/StriaCore/Library/StriaLibrary.swift Tests/StriaCoreTests/Storage",
+        "find Sources/StriaCore/Storage Sources/StriaCore/Library/StriaLibrary.swift Tests/StriaCoreTests/Storage -name '*.swift' -exec wc -l {} + | awk '$2 != \"total\" && $1 >= 1000 {bad=1; print} END {exit bad}'"
+      ]
+    },
+    {
+      "planId": "P04",
+      "planPath": "impl-plans/active/stria-04-imaging-cache.md",
+      "wave": 2,
+      "dependsOn": ["P01"],
+      "writePaths": [
+        "Sources/StriaCore/Import/DocumentIdentity.swift",
+        "Sources/StriaCore/Import/PDFInspector.swift",
+        "Sources/StriaCore/Import/PageRenderer.swift",
+        "Sources/StriaCore/Import/ImageCodec.swift",
+        "Sources/StriaCore/Import/OutlineExtractor.swift",
+        "Sources/StriaCore/Cache/PageImageCache.swift",
+        "Tests/StriaCoreTests/Imaging",
+        "impl-plans/active/stria-04-imaging-cache.md"
+      ],
+      "sharedPaths": [
+        "Sources/StriaCore/Models",
+        "Sources/StriaCore/Errors/StriaError.swift",
+        "Sources/StriaCore/Paths/StriaPaths.swift",
+        "Tests/StriaCoreTests/Support"
+      ],
+      "sharedPathNotes": [
+        {"path": "Sources/StriaCore/Models", "intendedEdit": "read-only; owned by P01"},
+        {"path": "Sources/StriaCore/Errors/StriaError.swift", "intendedEdit": "read-only; owned by P01"},
+        {"path": "Sources/StriaCore/Paths/StriaPaths.swift", "intendedEdit": "read-only; owned by P01"},
+        {"path": "Tests/StriaCoreTests/Support", "intendedEdit": "read-only; test helpers owned by P01"},
+        {"path": "impl-plans/active/stria-04-imaging-cache.md", "intendedEdit": "append to the Progress Log section only"}
+      ],
+      "acceptanceCriteria": [
+        "DocumentIdentity, PDFInspector, PageRenderer, ImageCodec, OutlineExtractor and PageImageCache compile with the exact signatures in the plan and touch no SQLite.",
+        "ImageCodec encodes HEIC and falls back to JPEG; the returned format is the one produced; decode round-trips keep width and height.",
+        "Rendering applies crop box, rotation, DPI scale and the maxPixelDimension cap.",
+        "Cache validity is checked via ImageIO properties without decoding pixels; invalid files are rewritten atomically; write(to:) never touches the cache.",
+        "Suites IdentityTests, InspectorTests, RenderCodecTests, OutlineTests and PageImageCacheTests pass."
+      ],
+      "verification": [
+        "swift build",
+        "swift test --filter 'IdentityTests|InspectorTests|RenderCodecTests|OutlineTests|PageImageCacheTests'",
+        "swiftlint lint Sources/StriaCore/Import/DocumentIdentity.swift Sources/StriaCore/Import/PDFInspector.swift Sources/StriaCore/Import/PageRenderer.swift Sources/StriaCore/Import/ImageCodec.swift Sources/StriaCore/Import/OutlineExtractor.swift Sources/StriaCore/Cache/PageImageCache.swift Tests/StriaCoreTests/Imaging",
+        "find Sources/StriaCore/Import Sources/StriaCore/Cache Tests/StriaCoreTests/Imaging -name '*.swift' -exec wc -l {} + | awk '$2 != \"total\" && $1 >= 1000 {bad=1; print} END {exit bad}'"
+      ]
+    },
+    {
+      "planId": "P05",
+      "planPath": "impl-plans/active/stria-05-gateway-integration.md",
+      "wave": 2,
+      "dependsOn": ["P01"],
+      "writePaths": [
+        "Sources/StriaCore/Integration",
+        "Sources/StriaCore/OCR/PDFTextLayerOCRService.swift",
+        "Tests/StriaCoreTests/Integration",
+        "impl-plans/active/stria-05-gateway-integration.md"
+      ],
+      "sharedPaths": [
+        "design-docs/references/agent-gateway-c7f2697.md",
+        "Sources/StriaCore/Services/ServiceTypes.swift",
+        "Sources/StriaCore/OCR/OCRService.swift",
+        "Sources/StriaCore/Agent/AgentService.swift",
+        "Sources/StriaCore/Library/StriaEnvironment.swift",
+        "Sources/StriaCore/Config/StriaConfig.swift",
+        "Sources/StriaCore/Models",
+        "Sources/StriaCore/Paths/StriaPaths.swift",
+        ".build/checkouts/agent-gateway"
+      ],
+      "sharedPathNotes": [
+        {"path": "design-docs/references/agent-gateway-c7f2697.md", "intendedEdit": "read-only; authoritative signatures written by P01; a leading 'G1 FAILED' selects Mode B"},
+        {"path": "Sources/StriaCore/Services/ServiceTypes.swift", "intendedEdit": "read-only; owned by P01"},
+        {"path": "Sources/StriaCore/OCR/OCRService.swift", "intendedEdit": "read-only; owned by P01"},
+        {"path": "Sources/StriaCore/Agent/AgentService.swift", "intendedEdit": "read-only; owned by P01"},
+        {"path": "Sources/StriaCore/Library/StriaEnvironment.swift", "intendedEdit": "read-only; P05 adds live/liveServices only through an extension in Integration/LiveServices.swift"},
+        {"path": "Sources/StriaCore/Config/StriaConfig.swift", "intendedEdit": "read-only; owned by P01"},
+        {"path": "Sources/StriaCore/Models", "intendedEdit": "read-only; owned by P01"},
+        {"path": "Sources/StriaCore/Paths/StriaPaths.swift", "intendedEdit": "read-only; owned by P01"},
+        {"path": ".build/checkouts/agent-gateway", "intendedEdit": "read-only source reference produced by swift package resolve"},
+        {"path": "impl-plans/active/stria-05-gateway-integration.md", "intendedEdit": "append to the Progress Log section only"}
+      ],
+      "acceptanceCriteria": [
+        "Mode A agent-gateway adapters (GatewayPromptRunner, GatewayOCRService, GatewayAgentService) are implemented with the reference-doc API names, or Mode B unavailable services when the reference doc starts with 'G1 FAILED'.",
+        "GatewayPreflight, prompt part ordering, SecretRedactor and the RunLogWriter JSONL format (exactly 12 sorted keys, explicit nulls, single O_APPEND write) are tested.",
+        "PDFTextLayerOCRService and LiveOCRService routing for vendor pdf-text-layer work offline.",
+        "StriaEnvironment.liveServices(paths:config:) and StriaEnvironment.live(paths:config:environment:) exist with the exact signatures.",
+        "No secret value can reach ServiceError messages, logs, prompt parts or output; agent-gateway imports are confined to Sources/StriaCore/Integration.",
+        "Suites PreflightTests, PromptPartsTests, RedactorTests, RunLogWriterTests, PDFTextLayerTests and LiveRoutingTests pass with no network."
+      ],
+      "verification": [
+        "swift build",
+        "swift test --filter 'PreflightTests|PromptPartsTests|RedactorTests|RunLogWriterTests|PDFTextLayerTests|LiveRoutingTests'",
+        "swiftlint lint Sources/StriaCore/Integration Sources/StriaCore/OCR/PDFTextLayerOCRService.swift Tests/StriaCoreTests/Integration",
+        "test -z \"$(grep -rnE '^import (AgentGateway|AgentGatewayAppCore|ACP)$' Sources | grep -v '^Sources/StriaCore/Integration/')\"",
+        "find Sources/StriaCore/Integration Sources/StriaCore/OCR/PDFTextLayerOCRService.swift Tests/StriaCoreTests/Integration -name '*.swift' -exec wc -l {} + | awk '$2 != \"total\" && $1 >= 1000 {bad=1; print} END {exit bad}'"
+      ]
+    },
+    {
+      "planId": "P06",
+      "planPath": "impl-plans/active/stria-06-cli-parser-config-keys.md",
+      "wave": 2,
+      "dependsOn": ["P01"],
+      "writePaths": [
+        "Sources/StriaCore/CLI/ParsedInvocation.swift",
+        "Sources/StriaCore/CLI/CommandLineParser.swift",
+        "Sources/StriaCore/CLI/PageListParser.swift",
+        "Sources/StriaCore/CLI/Usage.swift",
+        "Sources/StriaCore/CLI/CLIJSON.swift",
+        "Sources/StriaCore/Config/ConfigKeyPath.swift",
+        "Tests/StriaCoreTests/CLIParsing",
+        "impl-plans/active/stria-06-cli-parser-config-keys.md"
+      ],
+      "sharedPaths": [
+        "Sources/StriaCore/Errors/StriaError.swift",
+        "Sources/StriaCore/Config/StriaConfig.swift",
+        "Sources/StriaCore/Config/ConfigStore.swift",
+        "Sources/StriaCore/Version.swift"
+      ],
+      "sharedPathNotes": [
+        {"path": "Sources/StriaCore/Errors/StriaError.swift", "intendedEdit": "read-only; owned by P01"},
+        {"path": "Sources/StriaCore/Config/StriaConfig.swift", "intendedEdit": "read-only; owned by P01"},
+        {"path": "Sources/StriaCore/Config/ConfigStore.swift", "intendedEdit": "read-only; owned by P01"},
+        {"path": "Sources/StriaCore/Version.swift", "intendedEdit": "read-only; owned by P01"},
+        {"path": "impl-plans/active/stria-06-cli-parser-config-keys.md", "intendedEdit": "append to the Progress Log section only"}
+      ],
+      "acceptanceCriteria": [
+        "ParsedInvocation/CLICommand (including ask(question:docId:page:query:limit:)), CommandLineParser, PageListParser, Usage, CLIJSON (CommandOutput, JSONValue) and ConfigKeyPath exist with the exact signatures.",
+        "The parser is pure and reports usageError for unknown options, wrong positional counts, non-positive integers, --page without --doc and option values starting with --.",
+        "CLIJSON encodes sorted keys, unescaped slashes, explicit nulls and the error envelope with the mapped exit code.",
+        "ConfigKeyPath exposes exactly the 16 leaf keys and maps invalid set values to usageError.",
+        "Suites ParserTests, PageListTests, CLIJSONTests and ConfigKeyPathTests pass."
+      ],
+      "verification": [
+        "swift build",
+        "swift test --filter 'ParserTests|PageListTests|CLIJSONTests|ConfigKeyPathTests'",
+        "swiftlint lint Sources/StriaCore/CLI/ParsedInvocation.swift Sources/StriaCore/CLI/CommandLineParser.swift Sources/StriaCore/CLI/PageListParser.swift Sources/StriaCore/CLI/Usage.swift Sources/StriaCore/CLI/CLIJSON.swift Sources/StriaCore/Config/ConfigKeyPath.swift Tests/StriaCoreTests/CLIParsing",
+        "find Sources/StriaCore/CLI Sources/StriaCore/Config/ConfigKeyPath.swift Tests/StriaCoreTests/CLIParsing -name '*.swift' -exec wc -l {} + | awk '$2 != \"total\" && $1 >= 1000 {bad=1; print} END {exit bad}'"
+      ]
+    },
+    {
+      "planId": "P07",
+      "planPath": "impl-plans/active/stria-07-import-ocr.md",
+      "wave": 3,
+      "dependsOn": ["P03", "P04", "P05"],
+      "writePaths": [
+        "Sources/StriaCore/Import/ImportCoordinator.swift",
+        "Sources/StriaCore/OCR/OCRCoordinator.swift",
+        "Sources/StriaCore/OCR/OCRTextPostProcessor.swift",
+        "Sources/StriaCore/OCR/OCRDefaults.swift",
+        "Sources/StriaCore/Library/StriaLibrary+Import.swift",
+        "Sources/StriaCore/Library/StriaLibrary+OCR.swift",
+        "Sources/StriaCore/Library/StriaLibrary+Documents.swift",
+        "Sources/StriaCore/Library/LibraryResults.swift",
+        "Tests/StriaCoreTests/ImportOCR",
+        "impl-plans/active/stria-07-import-ocr.md"
+      ],
+      "sharedPaths": [
+        "Sources/StriaCore/Storage",
+        "Sources/StriaCore/Library/StriaLibrary.swift",
+        "Sources/StriaCore/Import/DocumentIdentity.swift",
+        "Sources/StriaCore/Import/PDFInspector.swift",
+        "Sources/StriaCore/Import/PageRenderer.swift",
+        "Sources/StriaCore/Import/ImageCodec.swift",
+        "Sources/StriaCore/Import/OutlineExtractor.swift",
+        "Sources/StriaCore/Cache/PageImageCache.swift",
+        "Sources/StriaCore/Integration/RunLogWriter.swift",
+        "Sources/StriaCore/Integration/SecretRedactor.swift",
+        "Sources/StriaCore/Models",
+        "Tests/StriaCoreTests/Support"
+      ],
+      "sharedPathNotes": [
+        {"path": "Sources/StriaCore/Storage", "intendedEdit": "read-only; owned by P03"},
+        {"path": "Sources/StriaCore/Library/StriaLibrary.swift", "intendedEdit": "read-only; owned by P03"},
+        {"path": "Sources/StriaCore/Import/DocumentIdentity.swift", "intendedEdit": "read-only; owned by P04"},
+        {"path": "Sources/StriaCore/Import/PDFInspector.swift", "intendedEdit": "read-only; owned by P04"},
+        {"path": "Sources/StriaCore/Import/PageRenderer.swift", "intendedEdit": "read-only; owned by P04"},
+        {"path": "Sources/StriaCore/Import/ImageCodec.swift", "intendedEdit": "read-only; owned by P04"},
+        {"path": "Sources/StriaCore/Import/OutlineExtractor.swift", "intendedEdit": "read-only; owned by P04"},
+        {"path": "Sources/StriaCore/Cache/PageImageCache.swift", "intendedEdit": "read-only; owned by P04"},
+        {"path": "Sources/StriaCore/Integration/RunLogWriter.swift", "intendedEdit": "read-only; owned by P05"},
+        {"path": "Sources/StriaCore/Integration/SecretRedactor.swift", "intendedEdit": "read-only; owned by P05"},
+        {"path": "Sources/StriaCore/Models", "intendedEdit": "read-only; owned by P01"},
+        {"path": "Tests/StriaCoreTests/Support", "intendedEdit": "read-only; owned by P01"},
+        {"path": "impl-plans/active/stria-07-import-ocr.md", "intendedEdit": "append to the Progress Log section only"}
+      ],
+      "acceptanceCriteria": [
+        "importEvents/importDocument, ocrEvents/runOCR and the document facade (listDocuments, document, summary, outline, originalURL, pageImage, pageText, expandAllPages, markOpened, setLastReadPage) exist with the exact signatures.",
+        "copied is emitted only after the documents row exists; a failed copy leaves no documents row.",
+        "Import succeeds when OCR is unavailable (status unavailable with reason, pages pending, no agent_runs rows); per-page failures give status partial.",
+        "The OCR state machine (.pending, .pendingAndFailed, .pages), the concurrency bound, fence cleanup, 2000-char error truncation, one agent_runs row and one JSONL line per call, and run-log-failure tolerance are tested.",
+        "Interrupted rendering imports resume; same-bytes re-import is idempotent; id collision fails with idCollision.",
+        "Suites ImportTests, OCRCoordinatorTests and DocumentsFacadeTests pass."
+      ],
+      "verification": [
+        "swift build",
+        "swift test --filter 'ImportTests|OCRCoordinatorTests|DocumentsFacadeTests'",
+        "swiftlint lint Sources/StriaCore/Import/ImportCoordinator.swift Sources/StriaCore/OCR/OCRCoordinator.swift Sources/StriaCore/OCR/OCRTextPostProcessor.swift Sources/StriaCore/OCR/OCRDefaults.swift Sources/StriaCore/Library/StriaLibrary+Import.swift Sources/StriaCore/Library/StriaLibrary+OCR.swift Sources/StriaCore/Library/StriaLibrary+Documents.swift Sources/StriaCore/Library/LibraryResults.swift Tests/StriaCoreTests/ImportOCR",
+        "find Sources/StriaCore/Import Sources/StriaCore/OCR Sources/StriaCore/Library Tests/StriaCoreTests/ImportOCR -name '*.swift' -exec wc -l {} + | awk '$2 != \"total\" && $1 >= 1000 {bad=1; print} END {exit bad}'"
+      ]
+    },
+    {
+      "planId": "P08",
+      "planPath": "impl-plans/active/stria-08-ask-search-history.md",
+      "wave": 3,
+      "dependsOn": ["P03", "P04", "P05"],
+      "writePaths": [
+        "Sources/StriaCore/Agent/AskModels.swift",
+        "Sources/StriaCore/Agent/AgentDefaults.swift",
+        "Sources/StriaCore/Agent/ContextSelector.swift",
+        "Sources/StriaCore/Agent/AskCoordinator.swift",
+        "Sources/StriaCore/Agent/CitationParser.swift",
+        "Sources/StriaCore/Library/StriaLibrary+Search.swift",
+        "Sources/StriaCore/Library/StriaLibrary+Ask.swift",
+        "Tests/StriaCoreTests/Ask",
+        "impl-plans/active/stria-08-ask-search-history.md"
+      ],
+      "sharedPaths": [
+        "Sources/StriaCore/Storage",
+        "Sources/StriaCore/Library/StriaLibrary.swift",
+        "Sources/StriaCore/Cache/PageImageCache.swift",
+        "Sources/StriaCore/Import/PageRenderer.swift",
+        "Sources/StriaCore/Import/ImageCodec.swift",
+        "Sources/StriaCore/Integration/RunLogWriter.swift",
+        "Sources/StriaCore/Integration/SecretRedactor.swift",
+        "Sources/StriaCore/Agent/AgentService.swift",
+        "Sources/StriaCore/Models",
+        "Tests/StriaCoreTests/Support"
+      ],
+      "sharedPathNotes": [
+        {"path": "Sources/StriaCore/Storage", "intendedEdit": "read-only; owned by P03"},
+        {"path": "Sources/StriaCore/Library/StriaLibrary.swift", "intendedEdit": "read-only; owned by P03"},
+        {"path": "Sources/StriaCore/Cache/PageImageCache.swift", "intendedEdit": "read-only; owned by P04"},
+        {"path": "Sources/StriaCore/Import/PageRenderer.swift", "intendedEdit": "read-only; used to build test fixtures"},
+        {"path": "Sources/StriaCore/Import/ImageCodec.swift", "intendedEdit": "read-only; used to build test fixtures"},
+        {"path": "Sources/StriaCore/Integration/RunLogWriter.swift", "intendedEdit": "read-only; owned by P05"},
+        {"path": "Sources/StriaCore/Integration/SecretRedactor.swift", "intendedEdit": "read-only; owned by P05"},
+        {"path": "Sources/StriaCore/Agent/AgentService.swift", "intendedEdit": "read-only; owned by P01"},
+        {"path": "Sources/StriaCore/Models", "intendedEdit": "read-only; owned by P01"},
+        {"path": "Tests/StriaCoreTests/Support", "intendedEdit": "read-only; owned by P01"},
+        {"path": "impl-plans/active/stria-08-ask-search-history.md", "intendedEdit": "append to the Progress Log section only"}
+      ],
+      "acceptanceCriteria": [
+        "AskModels (AskContext, AskRequest with retrievalQuery and limit, Citation, AskResponse, SearchResultItem, SearchResponse), AgentDefaults, ContextSelector, AskCoordinator and CitationParser exist with the exact signatures.",
+        "Context selection follows the plan table per scope with cap = limit ?? maxImages in 1...10 (usageError otherwise); retrievalQuery replaces the question for retrieval; the document anchor is always included.",
+        "Ask persists every exchange that reached a model, with the anchor on both messages and the run row first; failed calls persist an error message and throw serviceFailed.",
+        "serviceUnavailable and noRelevantPages persist nothing and noRelevantPages never calls the model.",
+        "Search, history and threadMessages facades exist; unknown documents throw documentNotFound.",
+        "Suites ContextSelectorTests, AskCoordinatorTests, SearchFacadeTests and CitationParserTests pass."
+      ],
+      "verification": [
+        "swift build",
+        "swift test --filter 'ContextSelectorTests|AskCoordinatorTests|SearchFacadeTests|CitationParserTests'",
+        "swiftlint lint Sources/StriaCore/Agent/AskModels.swift Sources/StriaCore/Agent/AgentDefaults.swift Sources/StriaCore/Agent/ContextSelector.swift Sources/StriaCore/Agent/AskCoordinator.swift Sources/StriaCore/Agent/CitationParser.swift Sources/StriaCore/Library/StriaLibrary+Search.swift Sources/StriaCore/Library/StriaLibrary+Ask.swift Tests/StriaCoreTests/Ask",
+        "find Sources/StriaCore/Agent Sources/StriaCore/Library Tests/StriaCoreTests/Ask -name '*.swift' -exec wc -l {} + | awk '$2 != \"total\" && $1 >= 1000 {bad=1; print} END {exit bad}'"
+      ]
+    },
+    {
+      "planId": "P09",
+      "planPath": "impl-plans/active/stria-09-cli-commands-smoke.md",
+      "wave": 4,
+      "dependsOn": ["P02", "P05", "P06", "P07", "P08"],
+      "writePaths": [
+        "Sources/StriaCore/CLI/StriaCommand.swift",
+        "Sources/StriaCore/CLI/CLIOutputModels.swift",
+        "Sources/StriaCore/CLI/Handlers",
+        "Sources/StriaCLI/main.swift",
+        "scripts/cli-smoke.sh",
+        "scripts/make-sample-pdf.swift",
+        "Tests/StriaCoreTests/CLI",
+        "impl-plans/active/stria-09-cli-commands-smoke.md"
+      ],
+      "sharedPaths": [
+        "Sources/StriaCore/CLI/ParsedInvocation.swift",
+        "Sources/StriaCore/CLI/CommandLineParser.swift",
+        "Sources/StriaCore/CLI/PageListParser.swift",
+        "Sources/StriaCore/CLI/Usage.swift",
+        "Sources/StriaCore/CLI/CLIJSON.swift",
+        "Sources/StriaCore/Config/ConfigKeyPath.swift",
+        "Sources/StriaCore/Library",
+        "Sources/StriaCore/Integration/LiveServices.swift",
+        "mise.toml"
+      ],
+      "sharedPathNotes": [
+        {"path": "Sources/StriaCLI/main.swift", "intendedEdit": "replace the P01 stub with the thin StriaCommand.run entry point (overview rule 12)"},
+        {"path": "Sources/StriaCore/CLI/ParsedInvocation.swift", "intendedEdit": "read-only; owned by P06"},
+        {"path": "Sources/StriaCore/CLI/CommandLineParser.swift", "intendedEdit": "read-only; owned by P06"},
+        {"path": "Sources/StriaCore/CLI/PageListParser.swift", "intendedEdit": "read-only; owned by P06"},
+        {"path": "Sources/StriaCore/CLI/Usage.swift", "intendedEdit": "read-only; owned by P06"},
+        {"path": "Sources/StriaCore/CLI/CLIJSON.swift", "intendedEdit": "read-only; owned by P06"},
+        {"path": "Sources/StriaCore/Config/ConfigKeyPath.swift", "intendedEdit": "read-only; owned by P06"},
+        {"path": "Sources/StriaCore/Library", "intendedEdit": "read-only; contains the P01, P03, P07 and P08 files"},
+        {"path": "Sources/StriaCore/Integration/LiveServices.swift", "intendedEdit": "read-only; owned by P05"},
+        {"path": "mise.toml", "intendedEdit": "read-only; owned by P02; its smoke task must call scripts/cli-smoke.sh"},
+        {"path": "impl-plans/active/stria-09-cli-commands-smoke.md", "intendedEdit": "append to the Progress Log section only"}
+      ],
+      "acceptanceCriteria": [
+        "StriaCommand.run(arguments:environment:homeDirectory:currentDirectory:services:) implements every command in command.md with the exact JSON key sets (explicit nulls) and exit codes.",
+        "ask maps --doc/--page to .page, --doc alone to .document(anchor: nil), neither to .library, and passes --query as retrievalQuery and --limit as limit unchanged; --limit 11 exits 2.",
+        "--help and --version do not create the data root; --home beats STRIA_HOME; the CLI never touches the real data root in tests.",
+        "main.swift is thin: it calls StriaCommand.run with live services, writes stdout and stderr, and exits with the code.",
+        "scripts/cli-smoke.sh (executable, set -euo pipefail, temp STRIA_HOME) imports two generated PDFs with --no-ocr, lists, expands a page image, OCRs via pdf-text-layer, finds the unique phrase in doc b page 2, runs a 2-char Japanese LIKE search and history, asserts ~/.local/stria was not created, and prints SMOKE OK.",
+        "Suites CLIEndToEndTests and CLICommandTests pass, covering fake OCR, search, ask and history."
+      ],
+      "verification": [
+        "swift build",
+        "swift test --filter 'CLIEndToEndTests|CLICommandTests'",
+        "bash -n scripts/cli-smoke.sh",
+        "test -x scripts/cli-smoke.sh",
+        "scripts/cli-smoke.sh",
+        "swift build --product stria && BIN=\"$(swift build --show-bin-path)/stria\" && W=\"$(mktemp -d)\" && export STRIA_HOME=\"$W/home\" && swift scripts/make-sample-pdf.swift \"$W/a.pdf\" a && \"$BIN\" import \"$W/a.pdf\" --no-ocr > \"$W/import.json\" && ID=\"$(/usr/bin/plutil -extract document.id raw -o - \"$W/import.json\")\" && \"$BIN\" list && \"$BIN\" page image \"$ID\" 1 && \"$BIN\" search 学習 && \"$BIN\" history && rm -rf \"$W\"",
+        "swiftlint lint Sources/StriaCore/CLI/StriaCommand.swift Sources/StriaCore/CLI/CLIOutputModels.swift Sources/StriaCore/CLI/Handlers Sources/StriaCLI/main.swift Tests/StriaCoreTests/CLI",
+        "find Sources/StriaCore/CLI Sources/StriaCLI Tests/StriaCoreTests/CLI -name '*.swift' -exec wc -l {} + | awk '$2 != \"total\" && $1 >= 1000 {bad=1; print} END {exit bad}'"
+      ]
+    },
+    {
+      "planId": "P10",
+      "planPath": "impl-plans/active/stria-10-app-view-models.md",
+      "wave": 4,
+      "dependsOn": ["P07", "P08"],
+      "writePaths": [
+        "Sources/StriaCore/AppModel",
+        "Tests/StriaCoreTests/AppModel",
+        "impl-plans/active/stria-10-app-view-models.md"
+      ],
+      "sharedPaths": [
+        "Sources/StriaCore/Library",
+        "Sources/StriaCore/Agent/AskModels.swift",
+        "Sources/StriaCore/Agent/CitationParser.swift",
+        "Sources/StriaCore/Import/OutlineExtractor.swift",
+        "Sources/StriaCore/Models",
+        "Tests/StriaCoreTests/Support"
+      ],
+      "sharedPathNotes": [
+        {"path": "Sources/StriaCore/Library", "intendedEdit": "read-only; facades owned by P03, P07 and P08"},
+        {"path": "Sources/StriaCore/Agent/AskModels.swift", "intendedEdit": "read-only; owned by P08"},
+        {"path": "Sources/StriaCore/Agent/CitationParser.swift", "intendedEdit": "read-only; owned by P08"},
+        {"path": "Sources/StriaCore/Import/OutlineExtractor.swift", "intendedEdit": "read-only; owned by P04"},
+        {"path": "Sources/StriaCore/Models", "intendedEdit": "read-only; owned by P01"},
+        {"path": "Tests/StriaCoreTests/Support", "intendedEdit": "read-only; owned by P01"},
+        {"path": "impl-plans/active/stria-10-app-view-models.md", "intendedEdit": "append to the Progress Log section only"}
+      ],
+      "acceptanceCriteria": [
+        "AppModel, LibraryViewModel, ReaderViewModel and AgentPaneViewModel exist as @MainActor @Observable classes with the APIs in the plan.",
+        "Library import progress, idempotent re-import selection, alerts and unavailable reasons are tested.",
+        "Reader page-field parsing and clamping, next/previous bounds, current outline node, last-read restore with debounced save and flush, search mode enter/exit, and cache expansion start/cancel are tested.",
+        "Agent pane scope descriptions, send ok/failed/unavailable handling (thread id generated before the first ask), citation pages and history selection are tested.",
+        "No SwiftUI import in StriaCore.",
+        "Suites LibraryViewModelTests, ReaderViewModelTests and AgentPaneViewModelTests pass."
+      ],
+      "verification": [
+        "swift build",
+        "swift test --filter 'LibraryViewModelTests|ReaderViewModelTests|AgentPaneViewModelTests'",
+        "swiftlint lint Sources/StriaCore/AppModel Tests/StriaCoreTests/AppModel",
+        "test -z \"$(grep -rn 'import SwiftUI' Sources/StriaCore)\"",
+        "find Sources/StriaCore/AppModel Tests/StriaCoreTests/AppModel -name '*.swift' -exec wc -l {} + | awk '$2 != \"total\" && $1 >= 1000 {bad=1; print} END {exit bad}'"
+      ]
+    },
+    {
+      "planId": "P11",
+      "planPath": "impl-plans/active/stria-11-app-ui.md",
+      "wave": 5,
+      "dependsOn": ["P10"],
+      "writePaths": [
+        "Sources/StriaApp",
+        "impl-plans/active/stria-11-app-ui.md"
+      ],
+      "sharedPaths": [
+        "Sources/StriaCore/AppModel",
+        "Sources/StriaCore/Library",
+        "Sources/StriaCore/Integration/LiveServices.swift",
+        "Sources/StriaCore/Config/ConfigStore.swift",
+        "Sources/StriaCore/Paths/StriaPaths.swift"
+      ],
+      "sharedPathNotes": [
+        {"path": "Sources/StriaApp", "intendedEdit": "directory owned by this plan; replaces the P01 stub StriaAppMain.swift (overview rule 12)"},
+        {"path": "Sources/StriaCore/AppModel", "intendedEdit": "read-only; owned by P10"},
+        {"path": "Sources/StriaCore/Library", "intendedEdit": "read-only"},
+        {"path": "Sources/StriaCore/Integration/LiveServices.swift", "intendedEdit": "read-only; owned by P05"},
+        {"path": "Sources/StriaCore/Config/ConfigStore.swift", "intendedEdit": "read-only; owned by P01"},
+        {"path": "Sources/StriaCore/Paths/StriaPaths.swift", "intendedEdit": "read-only; owned by P01"},
+        {"path": "impl-plans/active/stria-11-app-ui.md", "intendedEdit": "append to the Progress Log section only"}
+      ],
+      "acceptanceCriteria": [
+        "stria-app builds; StriaReaderApp starts with a regular activation policy, resolves the data root, loads config, opens the library and shows StartupErrorView on failure.",
+        "Every view, command and shortcut in the design-app-ui.md tables exists: library with import button, file importer and drop; NavigationSplitView left pane (Contents, Thumbnails, Search); PDFKitView with singlePageContinuous vertical autoScales; page field and Go to Page Cmd-Opt-G; inspector agent pane with scope picker, citation chips, Cmd-Return send, New Chat and This page / This PDF history.",
+        "No logic beyond bindings; programmatic navigation goes only through requestedPage and consumeRequestedPage.",
+        "swiftlint is clean for Sources/StriaApp and every file is under 1000 lines.",
+        "Manual UI checklist is run with a temp STRIA_HOME, or recorded as 'not run: headless'."
+      ],
+      "verification": [
+        "swift build --product stria-app",
+        "swift build",
+        "swift test",
+        "swiftlint lint Sources/StriaApp",
+        "find Sources/StriaApp -name '*.swift' -exec wc -l {} + | awk '$2 != \"total\" && $1 >= 1000 {bad=1; print} END {exit bad}'"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,182 @@
+# App UI (StriaApp)
+
+## Status
+
+Draft (stria v0.1). The layout follows existing macOS PDF readers instead of
+inventing new patterns. See [References](#references).
+
+## Scope
+
+`StriaApp` (product `stria-app`) contains only SwiftUI views, the PDFKit
+`NSViewRepresentable` wrapper, menu commands and app startup. All state and
+behaviour live in `StriaCore/AppModel/` view models (`@MainActor`,
+`@Observable`), so `swift test` covers them with fakes.
+
+The app runs as a SwiftPM executable with no bundle. Startup therefore calls
+`NSApplication.shared.setActivationPolicy(.regular)` and activates the app, so
+it gets a Dock icon, a menu bar and keyboard focus. The data root comes from
+`STRIA_HOME` or the default. The app has no `--home` flag.
+
+## Window Structure
+
+There is a single `WindowGroup` with a minimum size of 1100 x 700. `AppModel`
+holds `route: .library | .reader(docId)`, and the root view switches between
+two screens:
+
+1. **Library** (home): `LibraryView`.
+2. **Reader**, laid out as
+   `NavigationSplitView(sidebar: LeftPane, detail: PDFPane)` with
+   `.inspector(isPresented:)` for the agent pane.
+
+The reader toolbar contains:
+
+- leading: the built-in sidebar toggle, and a "Library" button that returns
+  home (`Cmd-Shift-L`);
+- principal: a page field showing `n of N` with previous and next buttons;
+- trailing: a `.searchable(placement: .toolbar)` search field and an
+  inspector toggle button.
+
+## Library (home)
+
+- A `List` of imported documents. Each row shows the title, page count, and
+  import or OCR progress: `Rendering 12/80`, `OCR 40/80`, the failed count,
+  or the OCR `unavailable` reason. Rows are ordered by `last_opened_at`
+  descending, then `imported_at` descending.
+- Import uses a toolbar "Import" button (`Cmd-O`) that opens `fileImporter`
+  (`UTType.pdf`, multiple selection), or PDF file URLs dropped onto the list.
+  - Each import runs in the background through `StriaLibrary.importDocument`
+    and streams `ImportEvent`s into its row.
+  - A row can be opened as soon as `copied(docId)` arrives. Reading uses the
+    original file, so it never waits for rendering or OCR.
+  - Importing the same file again selects the existing row.
+- To open a document, double-click the row or select it and press Return.
+  This sets `last_opened_at`, routes to the reader, and starts background
+  cache expansion of all pages.
+- Row context menu: "Run OCR" (pending pages) and "Retry Failed OCR".
+- Import errors (`invalidPDF`, IO) appear in an alert. A failed copy leaves
+  no row in the list.
+- An empty library shows the import button and a drop hint.
+
+## Reader: Left Pane (sidebar)
+
+A segmented picker at the top switches between **Contents** and
+**Thumbnails**. A third mode, **Search**, appears only while a search is
+active.
+
+- **Contents**: a tree from `outline_json`. While the document is still
+  `rendering`, the tree comes from the `OutlineExtractor` running on the open
+  `PDFDocument`. Clicking a node with a page navigates to it; nodes without a
+  page are not clickable. The current section is highlighted: it is the last
+  node, in document order, whose page is at or before the current page. If
+  the PDF has no outline, the mode shows the flat list "Page 1 ... Page N".
+- **Thumbnails**: a lazy list of page thumbnails rendered from the open
+  `PDFDocument` (`PDFPage.thumbnail(of:for:)`) for visible rows only, each
+  labelled with its page number. The current page is highlighted and kept
+  scrolled into view. Clicking a thumbnail navigates to that page.
+- **Search**: submitting the toolbar search field (Return) runs the shared
+  OCR search scoped to the open document (`design-storage.md#search`). The
+  results replace the previous mode. Each row shows the page number and the
+  snippet; clicking a row navigates to that page. When some pages are not yet
+  OCRed, a footer reads "N pages not yet OCRed". Clearing the search field
+  returns to the previous mode.
+
+## Reader: Center Pane (PDF)
+
+- The `PDFView` wrapper uses `displayMode = .singlePageContinuous`,
+  `displayDirection = .vertical` and `autoScales = true`. The document is
+  loaded from `originals/<docId>.pdf`. Continuous scrolling is the only mode,
+  so there is no paging mode.
+- Current page tracking: `.PDFViewPageChanged` updates
+  `ReaderViewModel.currentPage` (1-based).
+- Programmatic navigation (outline, thumbnail, search result, citation chip,
+  history entry, page field, Go to Page) sets
+  `ReaderViewModel.requestedPage`. The wrapper calls `go(to:)` and then clears
+  the request, which avoids feedback loops.
+- Page jump works three ways:
+  - the toolbar `n of N` field, committed with Return;
+  - Go > Go to Page... (`Cmd-Opt-G`), which opens a small sheet with a number
+    field;
+  - Go > Next Page and Previous Page (`Cmd-Opt-Down` / `Cmd-Opt-Up`) and the
+    toolbar buttons.
+  Non-numeric input is discarded, and numbers are clamped to `1...pageCount`.
+- Last-read restore: page changes are saved to `documents.last_read_page`,
+  debounced to 1 s and flushed when leaving the reader. On open, the reader
+  goes to `last_read_page`, or page 1.
+- On open, `ReaderViewModel.open(docId)` also starts background expansion of
+  all page images into the PNG cache. Expansion is cancelled when you switch
+  documents, and these PNGs are never displayed.
+
+## Reader: Right Inspector (agent pane)
+
+- Visibility: `.inspector(isPresented:)`, toggled from the toolbar button or
+  View > Show Agent (`Cmd-Opt-0`). The width can be adjusted, and the pane
+  is shown by default the first time.
+- Scope picker: "This page", "Nearby pages" or "Whole PDF"
+  (`design-agent-integration.md#ask`). A scope indicator line below it states
+  what the assistant will see, for example "Sees page 12",
+  "Sees pages 11-13", or "Sees up to 4 relevant pages of <title>, including
+  page 12".
+- Transcript: the active thread's messages.
+  - Assistant answers render citation chips. Every `[<docId> p.<page>]`
+    marker that matches the open document becomes a clickable chip labelled
+    `p. <page>` that navigates the PDF to that page. Markers for other
+    documents stay plain text.
+  - Failed answers appear as error messages, and they are persisted.
+- Suggested questions: an empty thread shows three fixed prompts: "Summarize
+  this page", "Explain the key terms on this page" and "What should I read
+  next to understand this?". Clicking one sends it.
+- Input: a multi-line text field. Send with the Send button or
+  `Cmd-Return`. Sending is disabled while a request is in flight, during
+  which a progress indicator shows. "New Chat" starts a new thread. A thread
+  is anchored to the page that was current at its first question.
+- `unavailable` errors (for example, a credential env var is unset) show an
+  inline notice naming the reason and are not persisted.
+- History: a segmented control switches between "This page" and "This PDF"
+  (`design-storage.md#chat-history-queries`). The list refreshes on page
+  change and after each answer. Selecting an entry opens its thread and jumps
+  to its anchor page.
+
+## Commands and Shortcuts
+
+Menu commands reach the focused reader through `focusedSceneValue(\.reader)`.
+Commands are disabled when no reader is focused.
+
+| Menu | Item | Shortcut |
+| --- | --- | --- |
+| File | Import PDF... | `Cmd-O` |
+| View | Show/Hide Sidebar (built-in `SidebarCommands`) | `Ctrl-Cmd-S` |
+| View | Show/Hide Agent | `Cmd-Opt-0` |
+| View | Library | `Cmd-Shift-L` |
+| Go | Go to Page... | `Cmd-Opt-G` |
+| Go | Next Page / Previous Page | `Cmd-Opt-Down` / `Cmd-Opt-Up` |
+| Agent | Send | `Cmd-Return` (in the input field) |
+| Agent | New Chat | `Cmd-Shift-N` |
+
+## View Models (StriaCore/AppModel)
+
+| Type | State | Tested behaviour |
+| --- | --- | --- |
+| `AppModel` | route, library, current reader | open routes to the reader and updates `last_opened_at`; back to library flushes the reading position |
+| `LibraryViewModel` | documents, per-document progress, alert | import events update rows; idempotent re-import selects the existing doc; OCR actions call the coordinator with the right selection; recents ordering |
+| `ReaderViewModel` | document, pageCount, currentPage, requestedPage, outline, currentOutlineNode, sidebarMode, searchResults, pageFieldText | jump parsing and clamping; next and previous bounds; current outline node; outline fallback; search mode enter and exit; last-read save and restore; open starts cache expansion and switching cancels it |
+| `AgentPaneViewModel` | scope, scopeDescription, input, transcript, inFlight, historyMode, history, notice | context pages per scope; scope indicator text; citation chip parsing; send persists via `FakeAgentService`; failed vs unavailable handling; history reload per mode and page |
+
+Visual details such as scroll smoothness, layout and thumbnail appearance
+are verified manually with `swift run stria-app`.
+
+## References
+
+Patterns adopted from existing readers:
+
+| Reader | Pattern adopted | Where in stria |
+| --- | --- | --- |
+| Apple Preview | Sidebar with a mode switcher (Table of Contents / Thumbnails); continuous scroll; Go > Go to Page (`Cmd-Opt-G`) as a small sheet; toolbar search field whose results list in the sidebar with page numbers; sidebar toggle in the toolbar | Left pane segmented modes, Search mode, Go menu, toolbar layout |
+| Skim (open-source macOS PDF reader) | Left pane segmented TOC / Thumbnails; search results temporarily replace the TOC in the left pane; a collapsible right side pane; toolbar page field showing `n of N` with previous and next; remembering the last-read page per document | Search mode replacing Contents until cleared; `n of N` field; `last_read_page` restore; collapsible inspector |
+| PDF Expert for Mac | Library / recents home showing previously opened documents; left sidebar tabs (Outline / Thumbnails / Search); minimal toolbar | Library home ordered by `last_opened_at`; three sidebar modes; small toolbar |
+| Adobe Acrobat AI Assistant pane, Zotero 7 reader side pane | Right-side chat pane with suggested questions; answers cite pages as clickable chips that scroll the PDF; a scope indicator for what the assistant sees | Agent inspector: suggested questions, citation chips, scope picker and indicator |
+| macOS 14 SwiftUI conventions (Xcode, Keynote, Preview inspectors) | `NavigationSplitView` sidebar plus `.inspector(isPresented:)` for the right pane; toolbar toggle buttons for both panes; `CommandMenu` and keyboard shortcuts through `focusedSceneValue`; `.searchable` in the toolbar | Reader window structure, Commands and Shortcuts table |
+
+Patterns deliberately not adopted in v0.1, because no accepted requirement
+needs them: annotation and highlight tools (Skim, PDF Expert), tabs and
+multiple windows per document (Preview, PDF Expert), and single-page or
+two-up display modes (Preview).
