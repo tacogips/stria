@@ -2,6 +2,8 @@
 
 Resolved by SwiftPM from `https://github.com/tacogips/agent-gateway.git`; checkout: `.build/checkouts/agent-gateway`. The package declares products `AgentGateway`, `AgentGatewayAppCore`, and `ACP` in `Package.swift`.
 
+This file is the API source of truth for stria implementation plans. The checkout is SwiftPM build output that contains a nested `.git`. Read it only when this file is insufficient, and never declare it, or any other path under `.build/`, in a plan's or dispatch manifest's `writePaths`, `sharedPaths` or `trackedPaths`.
+
 The declarations below are copied as API signatures only from that checkout.
 
 ## Vendor and defaults
@@ -108,4 +110,4 @@ public enum GatewayProcessError: Error, Equatable, Sendable {
 }
 ```
 
-The `launchFailed(Int32)` case reports process launch failure. P01 keeps all gateway types out of StriaCore; adapters belong to P05.
+The `launchFailed(Int32)` case reports process launch failure. stria maps it to `ServiceError.unavailable` for the CLI vendors (`claude-code`, `codex`, `cursor`). P01 keeps all gateway types out of the StriaCore foundation contracts. The adapters belong to P05 and live in `Sources/StriaCore/Integration/` only.

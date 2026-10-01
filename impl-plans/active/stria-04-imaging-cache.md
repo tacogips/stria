@@ -1,10 +1,27 @@
 # P04 Document Identity, PDF Inspection, Rendering, Image Codec, Outline, PNG Cache
 
-**Status**: Ready
+**Status**: Ready (re-issued in session 243)
 **planId**: P04
-**Wave**: 2
-**dependsOn**: P01
-**Design Reference**: `design-docs/specs/design-storage.md#document-identity`, `#import-pipeline` (steps 1, 5, 6), `#image-codec`, `#expanded-png-cache`
+**Wave**: 1 of the session-243 manifest
+**dependsOn**: none in this manifest (builds on completed P01, commit `2ea8582`)
+**Design Reference**: `design-docs/specs/design-storage.md#document-identity`, `#import-pipeline` (steps 1, 5, 6), `#image-codec`, `#expanded-png-cache`; `design-docs/specs/architecture.md#implementation-rollout`
+
+## Session-243 Revision
+
+The tasks, contracts and paths are unchanged from session 241. Checked
+against the wave-1 code:
+
+- `Sources/StriaCore/Models/PageModels.swift:StoredPageImage` and
+  `Models/DomainEnums.swift:ImageFormat` (`heic`, `jpeg`) exist;
+- `Models/DocumentModels.swift:OutlineNode` already encodes `page` as an
+  explicit null;
+- `Paths/StriaPaths.swift` has `cacheDirectory(docId:)` and
+  `cachedPage(docId:page:)` (the `page-%04d.png` format).
+
+Use these and do not redefine them. `Tests/StriaCoreTests/Support/SamplePDFFactory.swift:makePDF(at:pages:pageSize:)`
+generates the test PDFs. It writes no Title attribute, so the title test
+sets one through PDFKit, as written below. Generated PDFs and images live
+only in temp roots and are never committed.
 
 ## Intent and Context
 

@@ -1,10 +1,28 @@
 # P06 CLI Argument Parser, Usage, JSON Output Helpers, Config Key Get/Set
 
-**Status**: Ready
+**Status**: Ready (re-issued in session 243)
 **planId**: P06
-**Wave**: 2
-**dependsOn**: P01
-**Design Reference**: `design-docs/specs/command.md#global-rules`, `#commands`; `design-docs/specs/design-agent-integration.md#config` (validation table)
+**Wave**: 1 of the session-243 manifest
+**dependsOn**: none in this manifest (builds on completed P01, commit `2ea8582`)
+**Design Reference**: `design-docs/specs/command.md#global-rules`, `#commands`; `design-docs/specs/design-agent-integration.md#config` (validation table); `design-docs/specs/architecture.md#implementation-rollout`
+
+## Session-243 Revision
+
+The tasks, contracts and paths are unchanged from session 241. Checked
+against the wave-1 code:
+
+- `Sources/StriaCore/Config/StriaConfig.swift:StriaConfig.validate()` is
+  `throws(StriaError)` and throws `configInvalid` (`.config(_:)`), so the
+  `configInvalid -> usageError` mapping below is valid;
+- `KnownVendors.gateway` already includes `cursor-api`, and
+  `KnownVendors.pdfTextLayer` is `pdf-text-layer`;
+- `StriaConfig` has exactly 16 leaf keys (render 4, ocr 5, agent 7);
+- `Models/StriaDateFormat.swift:StriaDateFormat.string(from:)` is the date
+  encoder to use;
+- `Version.swift:Version.current` is `"0.1.0"`.
+
+`config set ocr.vendor cursor-api` stays valid (exit 0). The `cursor-api`
+image limitation is enforced by P05's preflight, not by this plan.
 
 ## Intent and Context
 

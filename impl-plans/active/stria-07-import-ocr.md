@@ -1,10 +1,31 @@
 # P07 Import Coordinator, OCR Coordinator, Document Facade
 
-**Status**: Ready
+**Status**: Ready (re-issued in session 243)
 **planId**: P07
-**Wave**: 3
+**Wave**: 2 of the session-243 manifest
 **dependsOn**: P03, P04, P05
-**Design Reference**: `design-docs/specs/design-storage.md#document-identity`, `#import-pipeline`, `#expanded-png-cache`; `design-docs/specs/design-agent-integration.md#ocr`, `#run-records`; `design-docs/specs/command.md` (import, ocr, list, show, page image, page text semantics)
+**Design Reference**: `design-docs/specs/design-storage.md#document-identity`, `#import-pipeline`, `#expanded-png-cache`; `design-docs/specs/design-agent-integration.md#ocr`, `#run-records`; `design-docs/specs/command.md` (import, ocr, list, show, page image, page text semantics); `design-docs/specs/architecture.md#implementation-rollout`
+
+## Session-243 Revision
+
+The tasks, contracts and paths are unchanged from session 241; only the wave
+numbering moved (wave 3 became wave 2). Checked against the wave-1 code:
+
+- `Sources/StriaCore/Models/ImportModels.swift` already defines
+  `ImportEvent` (`copied(docId:)`, `rendered(page:total:)`,
+  `ocr(OCRProgress)`, `finished(ImportResult)`, `failed(StriaError)`),
+  `ImportResult`, `ImportOCROutcome`, `ImportOCRStatus`, `OCRSelection`,
+  `OCRRunSummary` (with `unavailableReason`), `OCRFailure` and `OCREvent`.
+  Use them as-is;
+- `Library/StriaEnvironment.swift:StriaEnvironment.onRunLogFailure` and
+  `clock` exist;
+- `Tests/StriaCoreTests/Support/FakeOCRService.swift` supports
+  `script(docId:page:_:)`, `setDefault(_:)`, `setDelay(nanoseconds:)` and
+  `maxInFlight`. Its default text is `"text <docId> p<page>"`.
+
+An OCR call with vendor `cursor-api` surfaces as
+`ServiceError.unavailable` (P05 preflight). It is handled by the existing
+unavailable branch, so no special case is needed here.
 
 ## Intent and Context
 

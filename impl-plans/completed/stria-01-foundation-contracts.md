@@ -1,6 +1,6 @@
 # P01 Foundation: Rename, Package, agent-gateway Gate G1, Shared Contracts
 
-**Status**: Ready
+**Status**: Completed (commit `2ea8582`, session 241 wave 1; moved to `impl-plans/completed/` in session 243)
 **planId**: P01
 **Wave**: 1
 **dependsOn**: none

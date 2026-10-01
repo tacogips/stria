@@ -1,10 +1,30 @@
 # P03 SQLite Store, Migrations, Search, Chat and Agent Runs
 
-**Status**: Ready
+**Status**: Ready (re-issued in session 243)
 **planId**: P03
-**Wave**: 2
-**dependsOn**: P01
-**Design Reference**: `design-docs/specs/design-storage.md` (all sections); `design-docs/specs/design-agent-integration.md#ocr` (state machine), `#persistence`
+**Wave**: 1 of the session-243 manifest
+**dependsOn**: none in this manifest (builds on completed P01, commit `2ea8582`)
+**Design Reference**: `design-docs/specs/design-storage.md` (all sections); `design-docs/specs/design-agent-integration.md#ocr` (state machine), `#persistence`; `design-docs/specs/architecture.md#implementation-rollout`
+
+## Session-243 Revision
+
+The tasks, contracts and paths are unchanged from session 241. Checked
+against the wave-1 code: the models this plan consumes exist with the
+names used below:
+
+- `Sources/StriaCore/Models/DocumentModels.swift:DocumentRecord`, `OCRCounts`;
+- `Models/PageModels.swift:PageInfo`, `StoredPageImage`, `PageRef`;
+- `Models/ChatModels.swift:ChatMessageRecord`, `NewChatThread`, `AskExchange`;
+- `Models/RunModels.swift:AgentRunRecord`;
+- `Models/SearchModels.swift:SearchHit`, `SearchOutcome`;
+- `Models/DomainEnums.swift:SearchBackend`, `MatchMode`, `DocumentOrder`;
+- `Models/StriaDateFormat.swift:StriaDateFormat`;
+- `Errors/StriaError.swift` static constructors such as `.database(_:)`,
+  `.databaseTooNew(_:)` and `.usage(_:)`.
+
+Use these models as-is and never redefine them. Declared paths are
+repository source paths only; no `.build/`, `tmp/` or nested-`.git` path is
+declared.
 
 ## Intent and Context
 

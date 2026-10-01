@@ -2,7 +2,9 @@
 
 ## Status
 
-Draft (stria v0.1 design). Replaces the ign scaffold description.
+Accepted (stria v0.1 design, commit `72246dd`). Replaces the ign scaffold
+description. Wave 1 is implemented; see
+[Implementation Rollout](#implementation-rollout).
 
 ## Overview
 
@@ -163,9 +165,45 @@ Required test coverage:
 | Secrets | error redaction replaces the resolved value; no secret value appears in config, DB, logs or JSON output |
 | View models | jump parsing and clamping; current outline node; last-read restore; scope indicator; citation chip parsing; history modes |
 
+## Implementation Rollout
+
+Status: wave 1 is done in commit `2ea8582`. It covers P01 (foundation
+contracts: `Paths/`, `Config/`, `Errors/`, `Models/`, the `OCRService` and
+`AgentService` protocols, `StriaEnvironment`, test fakes and the sample PDF
+factory) and P02 (the rename below). The remaining plans P03-P11 build on
+those contracts and do not redefine them. Their dependency order is:
+
+| Plan | Scope | Depends on |
+| --- | --- | --- |
+| P03 | `Storage/` (SQLite wrapper, migration 1, search backend, queries), `StriaLibrary` core | P01 |
+| P04 | `Import/` renderer and image codec, `Cache/` | P01 |
+| P05 | `Integration/` (gateway services, run recorder, redaction), `pdf-text-layer` | P01 |
+| P06 | `CLI/` parser, JSON encoding, exit codes, config keys | P01 |
+| P07 | Import and OCR coordinators (`StriaLibrary` extensions) | P03, P04, P05 |
+| P08 | Search, ask retrieval and coordinator, history (`StriaLibrary` extensions) | P03, P04, P05 |
+| P09 | CLI command handlers, `main.swift`, smoke script | P05, P06, P07, P08 |
+| P10 | `AppModel/` view models | P07, P08 |
+| P11 | `StriaApp` SwiftUI views and PDFKit wrapper | P10 |
+
+Rules for every plan and dispatch manifest:
+
+- `writePaths`, `sharedPaths` and `trackedPaths` list only repository source
+  paths (`Sources/`, `Tests/`, `scripts/`, `design-docs/`, `impl-plans/`,
+  `README.md`, `Package.swift`, `mise.toml`, `.swiftlint.yml`). They never
+  list `.build/` or anything under it (including
+  `.build/checkouts/agent-gateway`), other build outputs (`dist/`), `tmp/`,
+  or any directory that contains a nested `.git`. The agent-gateway API is
+  referenced through `../references/agent-gateway-c7f2697.md`.
+- Within one wave, plans have disjoint `writePaths`. A file that two plans
+  need (for example `Tests/StriaCoreTests/Support/`) has one owner per wave.
+- Declared paths stay small: each file is at most 8 MB and the total at most
+  64 MB. Test PDFs and page images are generated at test time in temp
+  directories and are never committed.
+
 ## Rename and Repository Changes
 
-Every `KaibaViewer` / `kaiba-viewer` name becomes `stria`:
+Done in wave 1 (`2ea8582`). Every `KaibaViewer` / `kaiba-viewer` name became
+`stria`:
 
 - `Package.swift`, `Sources/`, `Tests/`; `Command.swift` becomes `StriaCommand`
 - README.md, plus the AGENTS.md project overview and commands

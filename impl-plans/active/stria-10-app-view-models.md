@@ -1,10 +1,19 @@
 # P10 App View Models (StriaCore/AppModel)
 
-**Status**: Ready
+**Status**: Ready (re-issued in session 243)
 **planId**: P10
-**Wave**: 4
+**Wave**: 3 of the session-243 manifest
 **dependsOn**: P07, P08
-**Design Reference**: `design-docs/specs/design-app-ui.md` (Window Structure, Library, Left Pane, Center Pane, Right Inspector, View Models); `design-docs/specs/design-agent-integration.md#ask` (scopes)
+**Design Reference**: `design-docs/specs/design-app-ui.md` (Window Structure, Library, Left Pane, Center Pane, Right Inspector, View Models); `design-docs/specs/design-agent-integration.md#ask` (scopes); `design-docs/specs/architecture.md#implementation-rollout`
+
+## Session-243 Revision
+
+The tasks, contracts and paths are unchanged from session 241; only the wave
+numbering moved (wave 4 became wave 3). P08's `AskRequest` has five fields
+(`question`, `context`, `retrievalQuery`, `limit`, `threadId`), and the app
+always passes `retrievalQuery: nil, limit: nil`. A `serviceUnavailable`
+error, for example from vendor `cursor-api`, goes to `notice` and persists
+nothing.
 
 ## Intent and Context
 

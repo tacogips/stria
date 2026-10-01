@@ -1,23 +1,44 @@
 # P09 CLI Command Execution, Executable, End-to-End Tests, Smoke Script
 
-**Status**: Ready
+**Status**: Ready (re-issued in session 243)
 **planId**: P09
-**Wave**: 4
-**dependsOn**: P02, P05, P06, P07, P08
-**Design Reference**: `design-docs/specs/command.md` (all sections); `design-docs/specs/architecture.md#data-root`; `design-docs/specs/design-agent-integration.md#run-records`, `#secrets`
+**Wave**: 3 of the session-243 manifest
+**dependsOn**: P05, P06, P07, P08
+**Design Reference**: `design-docs/specs/command.md` (all sections); `design-docs/specs/architecture.md#data-root`, `#implementation-rollout`; `design-docs/specs/design-agent-integration.md#run-records`, `#secrets`
+
+## Session-243 Revision
+
+The tasks, contracts and paths are unchanged from session 241. Two things
+changed:
+
+- The dependency on P02 is dropped: P02 is completed (commit `2ea8582`).
+- The wave number moved (wave 4 became wave 3).
+
+Checked against the wave-1 code:
+
+- `mise.toml` already has `[tasks.smoke]` running `scripts/cli-smoke.sh`, so
+  this plan only has to create that script;
+- `Sources/StriaCLI/main.swift` is the 7-line P01 stub that this plan
+  replaces;
+- `Paths/StriaPaths.swift:StriaPaths.resolve(homeFlag:environment:homeDirectory:currentDirectory:)`
+  is the resolver to call;
+- `Config/ConfigStore.swift:ConfigStore.loadOrCreate(paths:)` and
+  `save(_:paths:)` exist;
+- `Errors/StriaError.swift:StriaError.exitCode` gives the exit code mapping.
 
 ## Intent and Context
 
 `stria` is a JSON-only tool for AI agents. This plan connects the parser
 (P06) to the library facades (P07, P08), implements the exact JSON shapes
 and exit codes, replaces the stub `main.swift`, and adds the smoke script
-that the acceptance criteria and `mise run smoke` (task added by P02) run.
+that the acceptance criteria and `mise run smoke` (the existing task in
+`mise.toml`) run.
 
 ## Non-goals
 
 - No new library behaviour. Use the P07 and P08 facades only.
 - No human-readable output, except `--help` and `--version`.
-- Do not edit `mise.toml` (P02 owns it).
+- Do not edit `mise.toml`: its `smoke` task already exists.
 
 ## writePaths
 
@@ -56,7 +77,7 @@ that the acceptance criteria and `mise run smoke` (task added by P02) run.
 - `{path: "Sources/StriaCore/Config/ConfigKeyPath.swift", intendedEdit: "read-only"}`
 - `{path: "Sources/StriaCore/Library", intendedEdit: "read-only; contains the P03, P07 and P08 files"}`
 - `{path: "Sources/StriaCore/Integration/LiveServices.swift", intendedEdit: "read-only"}`
-- `{path: "mise.toml", intendedEdit: "read-only; owned by P02; its smoke task must call scripts/cli-smoke.sh"}`
+- `{path: "mise.toml", intendedEdit: "read-only; its existing smoke task already calls scripts/cli-smoke.sh"}`
 
 ## Contracts
 

@@ -229,26 +229,34 @@ Pre-call checks, which produce `unavailable` and make no call:
 - the vendor is not a `GatewayVendor` raw value;
 - the vendor is an API vendor (`openai`, `anthropic`, `gemini`, `openrouter`,
   `cursor-api`) and `model` or `apiKeyEnvironment` is null;
-- the named environment variable is unset or empty.
+- the named environment variable is unset or empty;
+- the vendor is `cursor-api`. At the pinned revision `cursor-api` rejects
+  gateway image inputs, and every OCR and ask call sends at least one image
+  (`../references/agent-gateway-c7f2697.md`). Config still accepts the value,
+  so the error names the reason instead of failing config validation.
 
 CLI-backed vendors (`claude-code`, `codex`, `cursor`) use their own login,
 may leave `apiKeyEnvironment` null, and fail with `unavailable` when the
-gateway reports that the executable cannot be launched.
+gateway reports that the executable cannot be launched
+(`GatewayProcessError.launchFailed`).
 
-Implementation gate G1 runs before any adapter code is written. Run `swift
-package resolve` and read `.build/checkouts/agent-gateway` to confirm:
+Implementation gate G1 (API confirmation) is done. The signatures, the
+`GatewayVendor` raw values, the `ACPStopReason` enum (`endTurn` is success)
+and the per-vendor image support are recorded in
+`../references/agent-gateway-c7f2697.md`. That file is the API source of truth
+for implementers. `gatewayImageContentBlocks([.filePath(...)])` converts files
+to inline base64 blocks itself, so the adapter always passes `.filePath`.
 
-- the signatures above;
-- the `GatewayVendor` raw values;
-- the stop-reason enum;
-- that `.filePath` image input is supported for every vendor. If a vendor
-  only accepts inline data, the adapter uses `.data(mimeType: "image/png",
-  base64:)` for that vendor.
-
-Then `swift build` the package in Swift 6 mode. Signature differences are
-absorbed inside `Integration/` only. If the package cannot be resolved or
-built, that is a blocker reported with the command, exit code and log path. In
-that case `StriaEnvironment.live` falls back to services that throw
+If the adapter fails to compile against the pinned revision, the implementer
+may read `.build/checkouts/agent-gateway` after `swift package resolve`, but
+only read-only. That checkout is SwiftPM build output with a nested `.git`, so
+no plan or dispatch manifest may declare it (or anything under `.build/`) in
+`writePaths`, `sharedPaths` or `trackedPaths`
+(`architecture.md#implementation-rollout`). Signature differences are
+absorbed inside `Integration/` only, and the reference file is updated to
+match. If the package cannot be resolved or built, that is a blocker reported
+with the command, exit code and log path. In that case
+`StriaEnvironment.live` falls back to services that throw
 `unavailable("agent-gateway integration unavailable: ...")`, so import,
 `--no-ocr`, `pdf-text-layer`, search, page image, history and the reader
 still work. No local-path dependency is added without user approval.

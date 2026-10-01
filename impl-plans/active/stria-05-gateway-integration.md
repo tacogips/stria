@@ -1,10 +1,26 @@
 # P05 agent-gateway Adapters, Live Services, pdf-text-layer, Redaction, Run Log Writer
 
-**Status**: Ready
+**Status**: Ready (re-issued in session 243)
 **planId**: P05
-**Wave**: 2
-**dependsOn**: P01
-**Design Reference**: `design-docs/specs/design-agent-integration.md#service-boundary`, `#run-records`, `#pdf-text-layer-local-service`, `#prompt`, `#agent-gateway-integration`, `#secrets`; `design-docs/references/agent-gateway-c7f2697.md` (written by P01, authoritative for signatures)
+**Wave**: 1 of the session-243 manifest
+**dependsOn**: none in this manifest (builds on completed P01, commit `2ea8582`)
+**Design Reference**: `design-docs/specs/design-agent-integration.md#service-boundary`, `#run-records`, `#pdf-text-layer-local-service`, `#prompt`, `#agent-gateway-integration` (including the pre-call checks), `#secrets`; `design-docs/specs/architecture.md#implementation-rollout`; `design-docs/references/agent-gateway-c7f2697.md` (authoritative for signatures)
+
+## Session-243 Revision
+
+- The session-241 fanout failed because this plan declared
+  `.build/checkouts/agent-gateway` as a sharedPath. That entry is removed.
+  No path under `.build/` may be declared, in this plan or in its Progress
+  Log requests (`design-docs/specs/architecture.md#implementation-rollout`).
+- Gate G1 is done. `design-docs/references/agent-gateway-c7f2697.md` holds
+  the confirmed API and does not start with "G1 FAILED", and P01 already
+  built the package with the dependency. **Mode A is therefore mandatory.**
+  The old Mode B (the `UnavailableOCRService` / `UnavailableAgentService`
+  fallbacks) is dropped.
+- The design adds a pre-call check: vendor `cursor-api` is `unavailable`,
+  because it rejects gateway image inputs at c7f2697.
+- `GatewayProcessError.launchFailed` is the confirmed executable-launch
+  error.
 
 ## Intent and Context
 
@@ -21,12 +37,16 @@ credentials. Every gateway-touching function is therefore split into:
   ordering, redaction;
 - a thin call part that is not tested.
 
-**Mode selection.** If the P01 reference doc starts with "G1 FAILED", use
-Mode B: do not import agent-gateway modules, and make the live services
-return `UnavailableOCRService` / `UnavailableAgentService`, which throw
-`ServiceError.unavailable("agent-gateway integration unavailable: <reason from doc>")`.
-`pdf-text-layer` routing still works in Mode B. Otherwise use Mode A (the
-normal case).
+Existing code to imitate:
+
+- `Sources/StriaCore/Services/ServiceTypes.swift:ServiceSettings`,
+  `ServiceError` (use them as-is);
+- `Sources/StriaCore/Config/StriaConfig.swift:KnownVendors` (`gateway`,
+  `pdfTextLayer`, `apiKeyVendors`);
+- `Sources/StriaCore/Paths/StriaPaths.swift:StriaPaths.runLog(for:)`,
+  `ensureDirectories()` (0700 directories);
+- `Tests/StriaCoreTests/Support/TestDataRoot.swift:withTestDataRoot` and
+  `SamplePDFFactory.makePDF(at:pages:)` for tests.
 
 ## Non-goals
 
@@ -34,7 +54,10 @@ normal case).
   and P08 own those).
 - No streaming, no per-call timeout, no session reuse.
 - No riela.
-- Do not modify `Package.swift`.
+- No Mode B or unavailable fallback services.
+- Do not modify `Package.swift`, `Package.resolved` or
+  `Sources/StriaCore/Config/StriaConfig.swift`. `cursor-api` stays a valid
+  config value; only the preflight rejects it.
 
 ## writePaths
 
@@ -53,7 +76,7 @@ normal case).
 - `Sources/StriaCore/Config/StriaConfig.swift`
 - `Sources/StriaCore/Models`
 - `Sources/StriaCore/Paths/StriaPaths.swift`
-- `.build/checkouts/agent-gateway`
+- `Tests/StriaCoreTests/Support`
 
 ## sharedPathNotes
 
@@ -68,7 +91,7 @@ normal case).
 - `{path: "Sources/StriaCore/Config/StriaConfig.swift", intendedEdit: "read-only"}`
 - `{path: "Sources/StriaCore/Models", intendedEdit: "read-only"}`
 - `{path: "Sources/StriaCore/Paths/StriaPaths.swift", intendedEdit: "read-only"}`
-- `{path: ".build/checkouts/agent-gateway", intendedEdit: "read-only source reference produced by swift package resolve"}`
+- `{path: "Tests/StriaCoreTests/Support", intendedEdit: "read-only; test helpers owned by completed P01"}`
 
 ## Files and Contracts
 
@@ -82,10 +105,15 @@ normal case).
 
 **`Integration/GatewayPreflight.swift`**
 
-- `struct PreflightResult { vendor: <GatewayVendor in Mode A, String in Mode B>, secretValue: String? }`.
+- `struct PreflightResult { vendor: GatewayVendor, secretValue: String? }`.
 - `static func check(_ settings: ServiceSettings, environment: [String: String]) throws(ServiceError) -> PreflightResult`
-  throws `unavailable` with a message naming the problem when:
+  throws `unavailable` with a message naming the problem. Check in this
+  order and stop at the first failure:
   - the vendor is not a `GatewayVendor` raw value: "unknown vendor <v>";
+  - the vendor is `cursor-api` (`GatewayVendor.cursorAPI`):
+    "vendor cursor-api does not support image input". Check this before the
+    model and key checks, so the reason is stable whatever the other
+    settings are;
   - the vendor is in `KnownVendors.apiKeyVendors` and `model` is nil:
     "model is required for vendor <v>";
   - the vendor is in `KnownVendors.apiKeyVendors` and `apiKeyEnvironment`
@@ -108,7 +136,7 @@ normal case).
      `.image(pngPath)`;
   3. `.text(question)`.
 
-**`Integration/GatewayPromptRunner.swift`** (Mode A only; not unit-tested)
+**`Integration/GatewayPromptRunner.swift`** (not unit-tested; it needs a real vendor)
 
 - `func run(settings:systemPrompt:parts:cwd:environment:) async throws ->
   String`, following `design-agent-integration.md#agent-gateway-integration`
@@ -118,19 +146,28 @@ normal case).
   2. `GatewayACPAgent(defaults:executor: ProductionGatewayExecutor(environment:))`;
   3. `ACPClientConnection.inProcess(agent:)`;
   4. `initialize`, then `newSession(cwd: paths.cache path)`;
-  5. `promptCollecting` with the text blocks plus
-     `gatewayImageContentBlocks([.filePath(url.path)])`. Use
-     `.data(mimeType: "image/png", base64:)` for vendors the reference doc
-     says ignore `.filePath`;
-  6. a stop reason other than end of turn becomes
-     `ServiceError.failed("stop reason: <r>")`.
+  5. `promptCollecting` with the prompt parts in order: `.text(s)` becomes
+     `ACPContentBlock.text(s)`, and `.image(url)` becomes the blocks from
+     `try gatewayImageContentBlocks([.filePath(url.path)])`. Always use
+     `.filePath`, because `gatewayImageContentBlocks` already reads the file
+     and inlines it as base64 for every supported vendor;
+  6. a `result.response.stopReason` other than `.endTurn` becomes
+     `ServiceError.failed("stop reason: <rawValue>")`. On `.endTurn`,
+     return `result.messageText`.
 - Map errors:
-  - the reference doc's executable-launch error (if one exists) becomes
-    `unavailable("vendor executable could not be launched: <redacted>")`;
-  - any other thrown error becomes `failed(SecretRedactor.redact(String(describing: error), secrets: [secretValue]))`.
-- Use the exact API names from the reference doc. If they differ from the
-  design's names, follow the reference doc and note the difference in the
-  Progress Log.
+  - `GatewayProcessError.launchFailed` (when it surfaces typed) becomes
+    `unavailable("vendor executable could not be launched: <vendor>")`. If
+    the in-process ACP layer wraps it so it cannot be matched by type, map
+    it to `failed` and record that in the Progress Log. Do not match on
+    error strings;
+  - any other thrown error, including a throw from
+    `gatewayImageContentBlocks`, becomes
+    `failed(SecretRedactor.redact(String(describing: error), secrets: [secretValue].compactMap { $0 }))`.
+- Use the exact API names from the reference doc. If the compiler rejects a
+  name, read the matching file under the SwiftPM checkout read-only (see
+  Pitfalls), follow the real signature, and record the difference in the
+  Progress Log for the serial step to copy into the reference doc. Do not
+  edit the reference doc yourself.
 
 **`Integration/GatewayOCRService.swift`**
 
@@ -155,12 +192,12 @@ normal case).
 
 **`Integration/LiveServices.swift`**
 
-- `struct LiveOCRService: OCRService`: routes to `PDFTextLayerOCRService`
-  when `request.settings.vendor == KnownVendors.pdfTextLayer`, otherwise to
-  `GatewayOCRService` (or the unavailable service in Mode B). Routing is per
-  request, so a config change takes effect without a rebuild.
-- `UnavailableOCRService` and `UnavailableAgentService` (both modes; used
-  in Mode B).
+- `struct LiveOCRService: OCRService` (`init(paths:environment:)`): routes to
+  `PDFTextLayerOCRService` when `request.settings.vendor ==
+  KnownVendors.pdfTextLayer`, otherwise to `GatewayOCRService`. Routing is
+  per request, so a config change takes effect without a rebuild.
+- The agent side needs no router: `liveServices` returns
+  `GatewayAgentService` directly.
 - Extension on `StriaEnvironment`:
 
   ```
@@ -196,7 +233,18 @@ normal case).
 - One agent, connection and session per call. Do not cache them in
   properties, because concurrent OCR tasks would share a session.
 - Keep agent-gateway imports confined to `Integration/` files. No other
-  StriaCore folder imports them.
+  StriaCore folder imports them. `OCR/PDFTextLayerOCRService.swift` imports
+  only Foundation and PDFKit.
+- Never declare `.build/`, `.build/checkouts/agent-gateway`, `tmp/` or any
+  path containing a nested `.git` in this plan's paths or in Progress Log
+  requests. You may *read* `.build/checkouts/agent-gateway/Sources/...`
+  after `swift package resolve`, and only when the reference doc does not
+  answer a compile error. Never write there.
+- Do not "fix" `cursor-api` by removing it from `KnownVendors` or config
+  validation. The design keeps it as a valid config value
+  (`design-agent-integration.md`, pre-call checks).
+- `PDFPage.string` can be nil for image-only pages. Return `""` (a valid,
+  empty `done` result), not an error.
 
 ## Tests (`Tests/StriaCoreTests/Integration/`)
 
@@ -210,6 +258,9 @@ No network calls.
 - anthropic, ANTHROPIC_API_KEY missing from the injected env -> unavailable whose message contains "ANTHROPIC_API_KEY"
 - anthropic with env {ANTHROPIC_API_KEY: "sk-test-123"} -> passes, `secretValue` "sk-test-123"
 - claude-code with model nil and key nil -> passes
+- cursor-api with model "m", apiKeyEnvironment "CURSOR_API_KEY" and env {CURSOR_API_KEY: "x"} -> unavailable whose message contains "cursor-api" and "image"
+- claude-code with apiKeyEnvironment "FOO_KEY" and FOO_KEY missing -> unavailable naming "FOO_KEY"
+- the secret value never appears in any thrown message (assert across all cases above)
 
 `PromptPartsTests`:
 
@@ -237,24 +288,38 @@ No network calls.
 `LiveRoutingTests`:
 
 - `LiveOCRService` with settings vendor `pdf-text-layer` -> returns the text layer, with no gateway call
-- in Mode B, a gateway vendor -> unavailable
+- `LiveOCRService` with settings vendor `cursor-api` and an injected env -> `ServiceError.unavailable` from preflight; no process is launched (preflight throws before the runner)
+- `StriaEnvironment.live(paths:config:environment:)` -> `paths` and `config` equal the inputs
 
 ## Verification
 
+Run each command in the foreground with `2>&1 | tee <log>`, then record the
+command, exit code and log path in the Progress Log.
+
 - `swift build` -> exit 0 (`tmp/verify/P05/build.log`)
-- `swift test --filter` for the suites above -> pass (`tmp/verify/P05/test.log`)
+- `swift test --filter 'PreflightTests|PromptPartsTests|RedactorTests|RunLogWriterTests|PDFTextLayerTests|LiveRoutingTests'`
+  -> all pass, 0 failures (`tmp/verify/P05/test.log`)
 - `swiftlint lint Sources/StriaCore/Integration Sources/StriaCore/OCR/PDFTextLayerOCRService.swift Tests/StriaCoreTests/Integration`
-  -> exit 0
-- `grep -rn "import AgentGateway\|import ACP\|import AgentGatewayAppCore" Sources | grep -v "Sources/StriaCore/Integration/"`
+  -> exit 0, 0 violations (`tmp/verify/P05/lint.log`)
+- `grep -rnE '^import (AgentGateway|AgentGatewayAppCore|ACP)$' Sources | grep -v '^Sources/StriaCore/Integration/'`
   -> no output
+- `grep -rn 'UnavailableOCRService\|UnavailableAgentService' Sources` -> no
+  output (Mode B is dropped)
+- `grep -n '\.build' impl-plans/active/stria-05-gateway-integration.md`
+  -> only prose in Session-243 Revision and Pitfalls, and no entry under
+  `## writePaths`, `## sharedPaths` or `## sharedPathNotes`
+- `find Sources/StriaCore/Integration Sources/StriaCore/OCR/PDFTextLayerOCRService.swift Tests/StriaCoreTests/Integration -name '*.swift' -exec wc -l {} + | awk '$2 != "total" && $1 >= 1000 {bad=1; print} END {exit bad}'`
+  -> exit 0
 
 ## Done Criteria
 
-- [ ] Mode A (or the documented Mode B) is implemented.
-- [ ] Preflight, prompt-part ordering, redaction and the JSONL format are
-  tested.
+- [ ] The Mode A adapters are implemented with the reference-doc API names,
+  and no Mode B types exist.
+- [ ] Preflight (including `cursor-api`), prompt-part ordering, redaction
+  and the JSONL format are tested.
 - [ ] The live factory exists with the exact signatures.
 - [ ] No secret value can reach any output.
+- [ ] No `.build` path is declared anywhere in this plan.
 
 ## Progress Log
 

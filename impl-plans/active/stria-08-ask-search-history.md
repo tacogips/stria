@@ -1,10 +1,28 @@
 # P08 Ask (RAG), Search Facade, History Facade, Citation Parser
 
-**Status**: Ready
+**Status**: Ready (re-issued in session 243)
 **planId**: P08
-**Wave**: 3
+**Wave**: 2 of the session-243 manifest
 **dependsOn**: P03, P04, P05
-**Design Reference**: `design-docs/specs/design-agent-integration.md#ask` (context selection, prompt, persistence), `#run-records`; `design-docs/specs/design-storage.md#search`, `#fuzzy-retrieval-ask`, `#chat-history-queries`; `design-docs/specs/command.md` (search, ask, history); `design-docs/specs/design-app-ui.md#reader-right-inspector-agent-pane` (citation chips)
+**Design Reference**: `design-docs/specs/design-agent-integration.md#ask` (context selection, prompt, persistence), `#run-records`; `design-docs/specs/design-storage.md#search`, `#fuzzy-retrieval-ask`, `#chat-history-queries`; `design-docs/specs/command.md` (search, ask, history); `design-docs/specs/design-app-ui.md#reader-right-inspector-agent-pane` (citation chips); `design-docs/specs/architecture.md#implementation-rollout`
+
+## Session-243 Revision
+
+The tasks, contracts and paths are unchanged from session 241; only the wave
+numbering moved (wave 3 became wave 2). Checked against the wave-1 code:
+
+- `Sources/StriaCore/Agent/AgentService.swift` already defines
+  `ContextPage`, `ChatTurn`, `AgentRequest` (with `systemPrompt: String`,
+  non-optional) and `AgentAnswer`;
+- `Models/ChatModels.swift:AskExchange` and `NewChatThread` are the
+  persistence inputs for `StriaStore.persistAskExchange` (P03);
+- `Tests/StriaCoreTests/Support/FakeAgentService.swift` records `requests`,
+  supports `enqueue(_:)`, and by default answers
+  `"answer [<docId> p.<page>]"` for the first context page.
+
+Use these as-is. An ask with vendor `cursor-api` surfaces as
+`ServiceError.unavailable` (P05 preflight). It goes through the existing
+unavailable branch and persists nothing.
 
 ## Intent and Context
 

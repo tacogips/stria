@@ -1,10 +1,19 @@
 # P11 SwiftUI App (StriaApp, product stria-app)
 
-**Status**: Ready
+**Status**: Ready (re-issued in session 243)
 **planId**: P11
-**Wave**: 5
+**Wave**: 4 of the session-243 manifest
 **dependsOn**: P10
-**Design Reference**: `design-docs/specs/design-app-ui.md` (all sections, including References and Commands and Shortcuts)
+**Design Reference**: `design-docs/specs/design-app-ui.md` (all sections, including References and Commands and Shortcuts); `design-docs/specs/architecture.md#implementation-rollout`
+
+## Session-243 Revision
+
+The tasks, contracts and paths are unchanged from session 241; only the wave
+numbering moved (wave 5 became wave 4). `Sources/StriaApp/StriaAppMain.swift`
+is the 10-line P01 stub (`@main struct StriaReaderApp`), which this plan
+replaces. Keep the type name `StriaReaderApp`. `StriaEnvironment.live`
+comes from P05 (`Sources/StriaCore/Integration/LiveServices.swift`); there
+are no unavailable fallback services.
 
 ## Intent and Context
 
