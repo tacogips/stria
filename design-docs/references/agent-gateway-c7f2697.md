@@ -99,7 +99,9 @@ public enum GatewayClientImageInput: Equatable, Sendable {
 public func gatewayImageContentBlocks(_ images: [GatewayClientImageInput]) throws -> [ACPContentBlock]
 ```
 
-`gatewayImageContentBlocks` reads and validates `.filePath`, converts the bytes to inline base64 ACP image blocks, and retains the file URI. Gateway API serialization supports those images for `openai`, `anthropic`, `gemini`, and `openrouter`; `cursor-api` explicitly rejects gateway image inputs. CLI vendor requests use ACP image blocks.
+`gatewayImageContentBlocks` reads and validates `.filePath`, converts the bytes to inline base64 ACP image blocks, and retains the file URI. Gateway API serialization supports those images for `openai`, `anthropic`, `gemini`, and `openrouter`; `cursor-api` explicitly rejects gateway image inputs.
+
+CLI vendors (`GatewayVendor.isCLI`, public in `Sources/AgentGateway/GatewayProtocol.swift`: `claude-code`, `codex`, `cursor`) drop images without an error. `GatewayACPAgent` (`Sources/AgentGatewayAppCore/GatewayACPAgent.swift`) joins ACP text blocks with `"\n\n"` into `GatewayExecuteParams.prompt`, moves image blocks into `GatewayExecuteParams.images`, and sets `workingDirectory` to the session `cwd`. `GatewayExecution.executeCLI` (`Sources/AgentGatewayAppCore/GatewayExecution.swift`) launches the CLI with the prompt text and that working directory, and never reads `images`. stria therefore passes CLI vendors the PNG paths as prompt text instead (`../specs/design-agent-integration.md#vendor-image-capability`). This was confirmed read-only against `.build/checkouts/agent-gateway` and by a manual `claude-code` run that read an image path given in the prompt text.
 
 `Sources/AgentGatewayAppCore/GatewayProcessContracts.swift` declares the process-launch error:
 

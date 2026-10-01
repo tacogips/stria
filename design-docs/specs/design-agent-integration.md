@@ -46,7 +46,8 @@ Services throw `ServiceError`, which the coordinators handle as follows:
   pages stay `pending`. Ask: nothing is persisted. CLI exit 4.
 - `failed(message)`: the call itself failed (transport, vendor error, a CLI
   vendor executable that cannot be launched, or a stop reason other than end
-  of turn). OCR: that page becomes `failed`. Ask:
+  of turn), or a gateway OCR reply was rejected by the OCR reply check
+  (`#ocr-reply-check`). OCR: that page becomes `failed`. Ask:
   the failure is persisted as an assistant `error` message. CLI exit 5.
 
 Answers are aggregated in v0.1. There is no token streaming.
@@ -95,7 +96,9 @@ any     --unavailable--> unchanged (run aborted before the first call)
 
 Each page gets one attempt per run. A retry is an explicit later run. Text
 post-processing: trim the text, and strip one surrounding Markdown code fence
-if the model added one. An empty result is a valid `done` with empty text.
+if the model added one. For `pdf-text-layer`, an empty result is a valid
+`done` with empty text. For gateway vendors, an empty or "no image received"
+reply is `failed` (`#ocr-reply-check`).
 
 ### Execution
 
@@ -115,6 +118,52 @@ Default OCR prompt:
 > English or both. Preserve reading order and line breaks. Output only the
 > transcribed text with no commentary, headings or code fences. If the page
 > has no text, output nothing.
+
+### OCR reply check
+
+`GatewayOCRService` checks every reply before returning it. A rejected
+reply throws `ServiceError.failed(<reason>)`. `OCRCoordinator` does not
+change: it already records `failed` through `recordOCRFailure`, so
+`--retry-failed` runs the page again. `PDFTextLayerOCRService` and the test
+fakes are not checked.
+
+The check is one pure function, called from `recognize`. It takes the raw
+reply text and returns either a rejection reason or nothing:
+
+1. Clean the reply with `OCRTextPostProcessor.clean` (the same
+   post-processing the coordinator applies). If the result is empty, reject
+   it with `OCR reply was empty; the page image may not have reached the
+   model`.
+2. Otherwise lowercase the cleaned text and replace U+2019 with `'`. If the
+   text is at most 600 characters long and contains one of the phrases
+   below, reject it with `OCR reply says no page image was received; the
+   agent did not read the page image`.
+3. Otherwise accept the reply. The service returns the raw reply unchanged,
+   and the coordinator post-processes it as before.
+
+Phrases (substring match):
+
+- English: `don't see an image`, `don't see any image`, `do not see an
+  image`, `do not see any image`, `no image attached`, `no image was
+  attached`, `no image has been attached`, `image wasn't attached`, `image
+  was not attached`, `no image was provided`, `no image provided`, `no image
+  was received`, `didn't receive an image`, `did not receive an image`,
+  `haven't received an image`, `have not received an image`, `can't see the
+  image`, `cannot see the image`, `unable to see the image`.
+- Japanese: `画像が添付されていません`, `画像が添付されていない`,
+  `画像が見当たりません`, `画像が見当たらない`, `画像が届いていません`,
+  `画像を受け取っていません`, `画像が確認できません`.
+
+The 600-character limit and the full-phrase list keep false positives low.
+A real page that only says "no image attached" in a short text is still
+rejected. That page stays `failed` and can be read with `stria page image`.
+The rejection reasons are fixed strings. They never quote the reply,
+because run records must not contain OCR text.
+
+The default prompt asks the model to output nothing for a page without
+text, so such pages now become `failed` with the "empty" reason on gateway
+vendors. The issue asks for this behavior. Whether to keep it is recorded in
+`../user-qa/ocr-empty-reply.md`.
 
 ### `pdf-text-layer` local service
 
@@ -171,7 +220,9 @@ The user prompt is a sequence of content blocks:
    starts a new thread.
 2. For each context page, a text block `Document "<title>" (<docId>) page
    <page>` followed by the OCR text (or "OCR text not available"), then the
-   page's image block.
+   page image. API vendors receive it as an image block. CLI vendors receive
+   a text block with the PNG path instead
+   (`#vendor-image-capability`).
 3. A text block with the question.
 
 ### Persistence
@@ -219,9 +270,11 @@ The API at that revision, as stated in the intake, is used only inside
 3. `ACPClientConnection.inProcess(agent:)` returns `(client, server)`.
 4. `client.initialize()`, then
    `client.newSession(ACPNewSessionRequest(cwd: <root>/cache))`.
-5. `client.promptCollecting(ACPPromptRequest(sessionId:prompt:))`. The prompt
-   is text blocks plus `gatewayImageContentBlocks([.filePath(<absolute PNG
-   path>)])` for each image.
+5. `client.promptCollecting(ACPPromptRequest(sessionId:prompt:))`. The
+   prompt parts are first rendered for the vendor
+   (`#vendor-image-capability`). Each remaining `.text` part becomes a text
+   block, and each remaining `.image` part becomes
+   `gatewayImageContentBlocks([.filePath(<absolute PNG path>)])`.
 6. On success, the result's `messageText` is the answer. A
    `response.stopReason` other than end of turn is `failed("stop reason:
    <reason>")`. A thrown error is `failed(<redacted message>)`.
@@ -230,6 +283,66 @@ Each call creates its own agent, connection and session. Sessions are never
 reused, so concurrent OCR pages cannot cross-talk. The session `cwd` is the
 data root's `cache/` directory, which already contains the PNGs. stria writes
 nothing else there.
+
+### Vendor image capability
+
+At the pinned revision, `GatewayACPAgent` turns ACP image blocks into
+`GatewayExecuteParams.images`. Only the API vendors (`openai`, `anthropic`,
+`gemini`, `openrouter`) send them to the model. The CLI vendors
+(`GatewayVendor.isCLI`: `claude-code`, `codex`, `cursor`) run as
+subprocesses that receive only the joined prompt text and the working
+directory, and they drop the images without an error
+(`../references/agent-gateway-c7f2697.md#image-inputs-and-process-errors`).
+`cursor-api` is still rejected by preflight.
+
+Rule: one pure function,
+`GatewayPromptParts.rendered(_ parts: [PromptPart], for vendor:
+GatewayVendor) -> [PromptPart]`, decides how images are delivered.
+`GatewayPromptRunner` calls it before it builds ACP blocks, so OCR and ask
+share it.
+
+| Vendor | Rendering |
+| --- | --- |
+| `vendor.isCLI == false` | Parts returned unchanged. Images go as ACP image blocks |
+| `vendor.isCLI == true` | Each `.image(url)` is replaced at the same position by `.text` containing the absolute PNG path and a read-the-file instruction. The output contains no `.image` part |
+
+The CLI text for an image is:
+
+```
+Page image file: <url.path>
+Open and read this PNG file with your file-reading tool before answering. Use what it shows as the page image this request refers to.
+```
+
+- OCR and ask use the same wording. The text around it already says what to
+  do with the image: the OCR prompt says to transcribe it, and the ask
+  context block names the document page.
+- `url.path` is absolute. Every image is expanded by `PageImageCache` under
+  `paths.cache`, which derives from the standardized data root. The ACP
+  session also rejects a non-absolute `cwd`. Paths come from the data root,
+  never from user prompt text.
+- `cwd` stays `paths.cache` for every vendor, so the PNGs are inside the CLI
+  agent's working directory.
+- `agent_runs.imageCount` does not change. The image is still supplied, by
+  path instead of by block.
+- If a CLI agent still does not read the file (tool permissions or a
+  sandbox), the OCR reply check marks the page `failed`. Ask has no reply
+  check, and the answer is persisted as returned.
+
+Offline tests (no network, no vendor process):
+
+- `rendered` with `claude-code`, `codex` and `cursor`, for both `ocrParts`
+  and `agentParts`: no `.image` part remains, and each image's absolute path
+  and the read-the-file instruction appear in a `.text` part at the image's
+  position.
+- `rendered` with `openai`, `anthropic`, `gemini` and `openrouter`: the
+  output equals the input.
+- The reply check rejects an empty reply, a whitespace-only reply, an empty
+  fenced reply, and English and Japanese "no image" replies. It accepts
+  normal page text, and a reply longer than 600 characters that contains a
+  phrase.
+- `OCRCoordinator` with a fake that throws the reply check's `failed`
+  reason: the page ends `failed` with that error and an `agent_runs` row
+  with status `failed`, not `done`.
 
 Pre-call checks, which produce `unavailable` and make no call:
 

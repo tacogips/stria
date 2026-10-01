@@ -8,7 +8,13 @@ Implementation plans translate design documents into actionable work.
 
 ## Status
 
-No plans are active. stria v0.1 is complete; its plans are in `impl-plans/completed/`:
+Active (session 247):
+
+| planId | Plan |
+| --- | --- |
+| P12 | [`stria-12-cli-vendor-image-paths.md`](active/stria-12-cli-vendor-image-paths.md) (CLI vendor image paths and OCR reply check) |
+
+stria v0.1 is complete; its plans are in `impl-plans/completed/`:
 
 | planId | Plan |
 | --- | --- |
