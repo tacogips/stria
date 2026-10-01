@@ -1,6 +1,6 @@
 # P07 Import Coordinator, OCR Coordinator, Document Facade
 
-**Status**: Ready (re-issued in session 245)
+**Status**: Completed (session 245; accepted by the test-integrity and adversarial gates and the post-join integration review comm-003268; moved to `impl-plans/completed/` in session 245 Step 8)
 **planId**: P07
 **Wave**: 2 of `impl-plans/active/stria-v01-session-245-dispatch.json`
 **dependsOn**: P03, P04, P05 (the session-245 stabilization wave)
@@ -351,4 +351,52 @@ Use `withTestDataRoot`, `makeTestEnvironment`, `SamplePDFFactory` and
 
 ### Session 245
 
-- (worker appends entries here)
+- Step 6 implementation completed for P07. Pre-edit hashes and per-edit
+  behavior intentions are preserved in `tmp/stria-v01-session-245/P07/`.
+  The plan file pre-hash was recorded as
+  `ba911eb8147486d638ed9203113f10680cae559890f41deef9d29a512de6d737`.
+- Added import, OCR and document facade implementations plus 11 tests across
+  `ImportTests`, `OCRCoordinatorTests` and `DocumentsFacadeTests`. Verified
+  copy-before-row failure behavior, row-before-`copied`, event ordering,
+  interrupted-render resume, same-byte idempotency, id collision, OCR
+  unavailable and partial outcomes, status selection/retry/explicit rerun,
+  bounded concurrency, run-row/JSONL counts, error truncation, fence cleanup,
+  logging failure tolerance, search indexing, PNG cache behavior and document
+  metadata updates.
+- Done Criteria status: all four criteria are met by the implementation and
+  focused test evidence. The facade methods use the signatures in this plan.
+- `swift build --build-tests`: exit 0,
+  `tmp/stria-v01-session-245/P07/build-tests-final.log`.
+- `swift test --skip-build --filter 'ImportTests|OCRCoordinatorTests|DocumentsFacadeTests'`:
+  the first run exposed two test-fixture assertion failures because the fake
+  retained its scripted failure; after setting the retry result to success,
+  11 tests across all 3 suites passed (exit 0),
+  `tmp/stria-v01-session-245/P07/focused-tests-2.log`. Final source verification
+  is recorded separately after this log update.
+- Exact changed-file SwiftLint manifest:
+  `tmp/stria-v01-session-245/P07/changed-swift-files.nul`;
+  `swiftlint lint --strict --quiet --no-cache` through that manifest passed
+  (exit 0), `tmp/stria-v01-session-245/P07/swiftlint-strict-final.log`.
+  The first lint attempt found one prompt-line length issue, which was fixed
+  while preserving its concatenated value; its final rerun is clean.
+- P07 Swift line-count gate passed (all below 1000):
+  `tmp/stria-v01-session-245/P07/line-count.log`. Removed assertion count is
+  zero; the P07 test directory was absent from the WIP baseline and the new
+  tests are additions: `tmp/stria-v01-session-245/P07/test-integrity.log`.
+- Initial shared build hit only P08's in-progress `AskCoordinator.swift`
+  diagnostic; after the required wait, the combined build passed. Its initial
+  log is `implementation-build-1.log`; successful retry is
+  `implementation-build-2.log`.
+- Final P07 source/plan hashes are written to
+  `tmp/stria-v01-session-245/P07/post-edit-hashes.txt` after the final plan
+  update. No files outside P07 `writePaths` were edited; shared paths were
+  read-only.
+- 2026-10-02 (session 245, Step 8 serial finalization): accepted by the
+  test-integrity and adversarial gates and the post-join integration review
+  (comm-003268). Combined-tree evidence in
+  `tmp/stria-v01-session-245/join/wave-5/`: `swift build --build-tests` exit 0
+  (`build-tests.log`), `swift test` 120 tests in 36 suites exit 0
+  (`swift-test-full.log`), `scripts/cli-smoke.sh` SMOKE OK exit 0
+  (`cli-smoke.log`). Moved to `impl-plans/completed/`. The Done Criteria
+  checkboxes are kept as authored (intent snapshot); this entry records that
+  they are met.

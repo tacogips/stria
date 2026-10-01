@@ -1,8 +1,8 @@
 # stria v0.1 Implementation Overview
 
-**Status**: Ready (re-issued in session 245)
+**Status**: Completed (session 245; all plans P01-P11 accepted; moved to `impl-plans/completed/` in session 245 Step 8)
 **Design Reference**: `design-docs/specs/architecture.md` (including `#testing-strategy` and `#implementation-rollout`), `design-docs/specs/design-storage.md`, `design-docs/specs/design-agent-integration.md`, `design-docs/specs/command.md`, `design-docs/specs/design-app-ui.md`, `design-docs/references/agent-gateway-c7f2697.md`, `design-docs/user-qa/no-riela-decision.md`
-**Dispatch manifest**: `impl-plans/active/stria-v01-session-245-dispatch.json` (replaces `stria-v01-session-243-dispatch.json`, which is deleted)
+**Dispatch manifest**: `impl-plans/completed/stria-v01-session-245-dispatch.json` (originally `impl-plans/active/`; replaces `stria-v01-session-243-dispatch.json`, which is deleted)
 
 ## Purpose
 
@@ -21,6 +21,15 @@ step updates it, for example to move plans to `impl-plans/completed/`.
 | --- | --- | --- |
 | P01 | `impl-plans/completed/stria-01-foundation-contracts.md` | `2ea8582` |
 | P02 | `impl-plans/completed/stria-02-repo-rename-docs.md` | `2ea8582` |
+| P03 | `impl-plans/completed/stria-03-storage.md` | session 245 Step 9 |
+| P04 | `impl-plans/completed/stria-04-imaging-cache.md` | session 245 Step 9 |
+| P05 | `impl-plans/completed/stria-05-gateway-integration.md` | session 245 Step 9 |
+| P06 | `impl-plans/completed/stria-06-cli-parser-config-keys.md` | session 245 Step 9 |
+| P07 | `impl-plans/completed/stria-07-import-ocr.md` | session 245 Step 9 |
+| P08 | `impl-plans/completed/stria-08-ask-search-history.md` | session 245 Step 9 |
+| P09 | `impl-plans/completed/stria-09-cli-commands-smoke.md` | session 245 Step 9 |
+| P10 | `impl-plans/completed/stria-10-app-view-models.md` | session 245 Step 9 |
+| P11 | `impl-plans/completed/stria-11-app-ui.md` | session 245 Step 9 |
 
 The foundation contracts from P01 (`Paths/`, `Config/`, `Errors/`,
 `Models/`, `Services/`, `OCR/OCRService.swift`, `Agent/AgentService.swift`,
@@ -249,3 +258,12 @@ These checks apply after the named wave only:
 ### Session 245
 
 - (serial reconciliation appends entries here)
+- 2026-10-02 (session 245, Step 8 serial finalization): P03-P11 accepted by
+  the test-integrity and adversarial gates and the post-join integration
+  review (comm-003268). Final combined-tree evidence in
+  `tmp/stria-v01-session-245/join/wave-5/`: `swift build --build-tests`
+  exit 0, `swift test` 120 tests in 36 suites exit 0, `scripts/cli-smoke.sh`
+  SMOKE OK exit 0. The P11 manual UI checklist is recorded as "not run:
+  headless". P03-P11, this overview and the session-245 dispatch manifest
+  moved to `impl-plans/completed/`; `impl-plans/active/` is empty. README.md
+  now documents the app, CLI options, exit codes and the smoke test.

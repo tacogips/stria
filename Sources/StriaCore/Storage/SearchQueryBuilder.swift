@@ -48,7 +48,7 @@ enum SearchQueryBuilder {
   }
 
   static func swiftSnippet(text: String, term: String) -> String {
-    guard !term.isEmpty, let match = text.range(of: term, options: [.caseInsensitive, .diacriticInsensitive]) else { return String(text.prefix(80)) }
+    guard !term.isEmpty, let match = text.range(of: term, options: [.caseInsensitive]) else { return String(text.prefix(80)) }
     let lower = text.index(match.lowerBound, offsetBy: -40, limitedBy: text.startIndex) ?? text.startIndex
     let upper = text.index(match.upperBound, offsetBy: 40, limitedBy: text.endIndex) ?? text.endIndex
     let prefix = String(text[lower..<match.lowerBound])

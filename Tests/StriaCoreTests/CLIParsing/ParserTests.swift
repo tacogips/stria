@@ -39,4 +39,24 @@ import Testing
       #expect(error.message == "Unknown option --foo for search")
     }
   }
+
+  @Test func parsesRemainingCommandForms() throws {
+    #expect(try CommandLineParser.parse(["ask", "q", "--doc", "d", "--page", "2", "--query", "x y", "--limit", "3"]).command == .ask(question: "q", docId: "d", page: 2, query: "x y", limit: 3))
+    #expect(try CommandLineParser.parse(["page", "text", "abc", "2"]).command == .pageText(docId: "abc", page: 2))
+    #expect(try CommandLineParser.parse(["show", "abc"]).command == .show(docId: "abc"))
+    #expect(try CommandLineParser.parse(["paths"]).command == .paths)
+    #expect(try CommandLineParser.parse(["config", "get", "ocr.model"]).command == .configGet(key: "ocr.model"))
+    #expect(try CommandLineParser.parse(["-h"]).command == .help(topic: nil))
+  }
+
+  @Test func rejectsRemainingMalformedInvocations() {
+    for args in [["frobnicate"], ["search", "q", "--doc", "--limit"], ["--home", "a", "--home", "b", "list"]] {
+      do {
+        _ = try CommandLineParser.parse(args)
+        Issue.record("Expected usageError for \(args)")
+      } catch {
+        #expect(error.code == .usageError)
+      }
+    }
+  }
 }

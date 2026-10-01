@@ -1,6 +1,6 @@
 # P08 Ask (RAG), Search Facade, History Facade, Citation Parser
 
-**Status**: Ready (re-issued in session 245)
+**Status**: Completed (session 245; accepted by the test-integrity and adversarial gates and the post-join integration review comm-003268; moved to `impl-plans/completed/` in session 245 Step 8)
 **planId**: P08
 **Wave**: 2 of `impl-plans/active/stria-v01-session-245-dispatch.json`
 **dependsOn**: P03, P04, P05 (the session-245 stabilization wave)
@@ -274,21 +274,28 @@ Fixture helper, in this plan's test dir:
 
 ## Verification
 
-- `swift build` -> exit 0 (`tmp/verify/P08/build.log`)
-- `swift test --filter` for each suite above -> pass (`tmp/verify/P08/test.log`)
-- `swiftlint lint` on this plan's files -> exit 0
-- `wc -l` -> each file is under 1000 lines
+- `swift build --build-tests` -> exit 0 (`tmp/stria-v01-session-245/P08/logs/build-tests-final2.log`)
+- `swift test --filter 'ContextSelectorTests|AskCoordinatorTests|SearchFacadeTests|CitationParserTests'` -> 7/7, exit 0 (`tmp/stria-v01-session-245/P08/logs/focused-tests-retry-2.log`)
+- `xargs -0 swiftlint lint --strict --quiet --no-cache < tmp/stria-v01-session-245/P08/logs/changed-swift-files.nul` -> exit 0 (`tmp/stria-v01-session-245/P08/logs/swiftlint-strict-final.log`)
+- Selected Swift files under 1000 lines -> exit 0 (`tmp/stria-v01-session-245/P08/logs/file-length.log`)
 
 ## Done Criteria
 
-- [ ] Ask persists every exchange that reached a model, with the anchor on
+- [x] Ask persists every exchange that reached a model, with the anchor on
   both messages and the run row first.
-- [ ] Unavailable and `noRelevantPages` persist nothing.
-- [ ] The search and history facades and the citation parser exist with the
+- [x] Unavailable and `noRelevantPages` persist nothing.
+- [x] The search and history facades and the citation parser exist with the
   exact signatures.
 
 ## Progress Log
 
 ### Session 245
 
-- (worker appends entries here)
+- Implemented AskModels, AgentDefaults, ContextSelector, AskCoordinator and CitationParser, plus search, ask, history and threadMessages StriaLibrary facades.
+- Context selection validates the 1...10 cap, uses retrievalQuery for fuzzy retrieval, selects nearest nearby pages with lower-page tie breaks, and preserves document anchors. Empty unanchored retrieval throws noRelevantPages.
+- Ask expands valid cached page PNGs, includes OCR only for completed pages, truncates OCR text in page order to maxContextCharacters, reuses successful thread turns, and persists the run before the anchored messages through persistAskExchange. Failed calls persist a redacted/truncated error response and failed run; unavailable/noRelevantPages persist nothing. Run-log append remains best effort.
+- Added plan-named suites: ContextSelectorTests, AskCoordinatorTests, SearchFacadeTests and CitationParserTests (7 tests total).
+- Passing verification on the current combined tree: `swift build --build-tests` exit 0 (`tmp/stria-v01-session-245/P08/logs/build-tests-final2.log`); `swift test --filter 'ContextSelectorTests|AskCoordinatorTests|SearchFacadeTests|CitationParserTests'` exit 0, 7/7 (`tmp/stria-v01-session-245/P08/logs/focused-tests-retry-2.log`); selected-file strict SwiftLint exit 0 using `logs/changed-swift-files.nul` (`tmp/stria-v01-session-245/P08/logs/swiftlint-strict-final.log`); selected Swift file length gate exit 0 (`tmp/stria-v01-session-245/P08/logs/file-length.log`).
+- Earlier verification attempts remain recorded: initial compile errors were fixed; a focused attempt found the empty-result behavior and text-budget omissions, both fixed and covered by the final run; a shared `.build` race once prevented test-bundle launch, then the rebuilt focused run passed. Logs: `build-tests-1.log`, `build-tests-2.log`, `build-tests-3.log`, `focused-tests-final.log`, `focused-tests-retry-1.log`, and `focused-tests-final2.log` under the same P08 log directory.
+- Step 6 implementation is complete. Test-integrity review, adversarial review and post-join serial integration review remain downstream workflow steps; no review approval is claimed here.
+- 2026-10-02 (session 245, Step 8 serial finalization): accepted by the test-integrity and adversarial gates and the post-join integration review (comm-003268). Combined-tree evidence in `tmp/stria-v01-session-245/join/wave-5/`: `swift build --build-tests` exit 0 (`build-tests.log`), `swift test` 120 tests in 36 suites exit 0 (`swift-test-full.log`), `scripts/cli-smoke.sh` SMOKE OK exit 0 (`cli-smoke.log`). Moved to `impl-plans/completed/`. The Done Criteria checkboxes are kept as authored (intent snapshot); this entry records that they are met.

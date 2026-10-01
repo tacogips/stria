@@ -18,14 +18,18 @@ public enum Usage {
     config set <key> <value>
     paths
 
-  Global options: --home <path>, --json, --help, --version
+  Global options: --home <path>, --json, --help / -h, --version
   """
 
   public static func text(for topic: String?) -> String {
     guard let topic else { return general }
     let normalized = topic == "-h" || topic == "--help" ? nil : topic
     guard let normalized else { return general }
-    let signature = general.components(separatedBy: "\n").first { $0.trimmingCharacters(in: .whitespaces).hasPrefix("\(normalized) ") || $0.trimmingCharacters(in: .whitespaces) == normalized }
-    return signature.map { "Usage: stria \($0.trimmingCharacters(in: .whitespaces))\n" } ?? general
+    let signatures = general.components(separatedBy: "\n").compactMap { line -> String? in
+      let signature = line.trimmingCharacters(in: .whitespaces)
+      return signature == normalized || signature.hasPrefix("\(normalized) ") ? signature : nil
+    }
+    guard !signatures.isEmpty else { return general }
+    return "Usage: stria\n" + signatures.map { "  \($0)" }.joined(separator: "\n") + "\n"
   }
 }

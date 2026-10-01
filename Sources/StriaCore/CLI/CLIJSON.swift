@@ -75,7 +75,12 @@ public enum CLIJSON {
   }
 
   public static func success<T: Encodable>(_ value: T) throws -> CommandOutput {
-    let data = try makeEncoder().encode(value)
+    let data: Data
+    do {
+      data = try makeEncoder().encode(value)
+    } catch {
+      throw StriaError.io("Could not encode command output: \(error)")
+    }
     guard let json = String(data: data, encoding: .utf8) else {
       throw StriaError.io("Could not encode command output as UTF-8")
     }
@@ -85,7 +90,16 @@ public enum CLIJSON {
   public static func failure(_ error: StriaError) -> CommandOutput {
     let envelope = ErrorEnvelope(error: ErrorBody(code: error.code, message: error.message))
     let data = try? makeEncoder().encode(envelope)
-    let json = data.flatMap { String(data: $0, encoding: .utf8) } ?? "{\"error\":{\"code\":\"\(error.code.rawValue)\",\"message\":\"\(error.message)\"}}"
+    let json = data.flatMap { String(data: $0, encoding: .utf8) } ?? fallbackEnvelope(code: error.code, message: error.message)
     return CommandOutput(stdout: "", stderr: json + "\n", exitCode: error.exitCode)
+  }
+
+  static func fallbackEnvelope(code: ErrorCode, message: String) -> String {
+    let object = ["error": ["code": code.rawValue, "message": message]]
+    guard let data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]),
+          let json = String(data: data, encoding: .utf8) else {
+      return "{}"
+    }
+    return json
   }
 }

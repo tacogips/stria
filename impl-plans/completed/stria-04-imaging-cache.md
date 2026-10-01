@@ -1,6 +1,6 @@
 # P04 Document Identity, PDF Inspection, Rendering, Image Codec, Outline, PNG Cache
 
-**Status**: Ready (stabilization plan, re-issued in session 245)
+**Status**: Completed (session 245; accepted by the test-integrity and adversarial gates and the post-join integration review comm-003268; moved to `impl-plans/completed/` in session 245 Step 8)
 **planId**: P04
 **Wave**: 1 of `impl-plans/active/stria-v01-session-245-dispatch.json` (stabilization wave)
 **dependsOn**: none in this manifest (builds on completed P01, commit `2ea8582`; the code under review is in commit `0082491`)
@@ -340,4 +340,11 @@ Generate PDFs with `SamplePDFFactory`.
 
 ### Session 245
 
-- (worker appends entries here; entries above are session-243 history)
+- P04-S1: `withTestDataRoot` creates only its unique root with POSIX mode `0700`, before the body; it keeps deferred cleanup and unchanged signatures. The red run failed as expected on absent-root fixtures (`logs/red-S1.log`, exit 1, 6 tests / 5 failures); after the helper change, the green run passed (`logs/green-S1.log`, exit 0, 7 tests / 0 failures).
+- P04-S2: the identity fixture now copies the original bytes and XOR-flips the last byte; all original `#expect` assertions remain.
+- P04-S3: cache tests now check stored width and height, PNG signature `89 50 4E 47`, and cache directory permissions `0700`, while preserving invalid-cache rewrite and explicit-write coverage.
+- P04-S4: inspector tests cover user-password locked rejection and owner-password-only acceptance. The host probe reports `PDFDocument.isLocked == true` for the generated user-password fixture (`logs/host-locked-capability.log`, exit 0); the test's locked assertion ran and passed.
+- P04 done criteria: contracts compile, JPEG fallback is covered by the existing codec contract, cache validity uses image properties without decoding, and all assigned suites pass. `swift build --build-tests` passed (`logs/build-build-tests.log`, exit 0); first-use tests passed 7/7 (`logs/first-use-tests.log`); strict changed-file SwiftLint passed for the two Swift files (`logs/swiftlint-changed-files.log`); assertion-removal and Swift file-length gates passed (`logs/assertion-removal-gate.log`, `logs/swift-file-length-gate.log`). Final focused P04 suite evidence is recorded after this progress update in `logs/focused-final.log`.
+- Implementation self-check found no removed assertions or unowned edits. Formal test-integrity/adversarial review and serial finalization remain downstream workflow steps.
+- Resume verification reran the combined-tree build and assigned behavior after the Step 6 output flagged the expected pre-change red run: `swift build --build-tests` passed (`logs/resume-build-build-tests.log`, exit 0), the P04 focused suites passed 9/9 (`logs/resume-focused-final.log`), and the first-use suites passed 7/7 (`logs/resume-first-use-tests.log`). Exact changed-file strict SwiftLint passed (`logs/resume-swiftlint-changed-files.log`); assertion preservation and the 1000-line gate passed (`logs/resume-assertion-integrity.log`, `logs/resume-file-length.log`). Formal reviews and serial integration remain downstream.
+- 2026-10-02 (session 245, Step 8 serial finalization): accepted by the test-integrity and adversarial gates and the post-join integration review (comm-003268). Combined-tree evidence in `tmp/stria-v01-session-245/join/wave-5/`: `swift build --build-tests` exit 0 (`build-tests.log`), `swift test` 120 tests in 36 suites exit 0 (`swift-test-full.log`), `scripts/cli-smoke.sh` SMOKE OK exit 0 (`cli-smoke.log`). Moved to `impl-plans/completed/`. The Done Criteria checkboxes are kept as authored (intent snapshot); this entry records that they are met.

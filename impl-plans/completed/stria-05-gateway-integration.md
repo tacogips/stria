@@ -1,6 +1,6 @@
 # P05 agent-gateway Adapters, Live Services, pdf-text-layer, Redaction, Run Log Writer
 
-**Status**: Ready (stabilization plan, re-issued in session 245)
+**Status**: Completed (session 245; accepted by the test-integrity and adversarial gates and the post-join integration review comm-003268; moved to `impl-plans/completed/` in session 245 Step 8)
 **planId**: P05
 **Wave**: 1 of `impl-plans/active/stria-v01-session-245-dispatch.json` (stabilization wave)
 **dependsOn**: none in this manifest (builds on completed P01, commit `2ea8582`; the code under review is in commit `0082491`)
@@ -462,4 +462,7 @@ command, exit code and log path in the Progress Log.
   `GatewayACPAgent.prompt` wraps `GatewayProcessError` as
   `ACPError.internalError`, so the `launchFailed` mapping is unreachable.
   The design and the reference doc have been corrected; see P05-S2.
-- (worker appends entries here)
+- 2026-10-02 Step 6 stabilization: P05-S1 now compatibility-normalizes only `PDFTextLayerOCRService` output; `LiveRoutingTests.routesPDFTextLayerOffline` assertion stayed unchanged. Red/green logs: `tmp/stria-v01-session-245/P05/red-S1.log` (exit 1, expected ligature failure) and `tmp/stria-v01-session-245/P05/green-S1.log` (exit 0, 3 tests passed). P05-S2 removed the unreachable `GatewayProcessError.launchFailed` mapping; remaining non-ServiceError errors still redact `secretValue` and map to `.failed`. P05-S3 added ligature, page-99, and blank-page cases. P05-S4 added secret-leak coverage across unavailable preflight cases and the full-settings `cursor-api` rejection.
+- Build/test evidence: `swift build --build-tests` passed (exit 0; `tmp/stria-v01-session-245/P05/build-tests.log`). The six focused suites passed 20/20 with no network (`tmp/stria-v01-session-245/P05/attempt-2-focused-check.log`); a final rerun is recorded as `focused-final.log`. Selected changed-file SwiftLint passed with zero diagnostics (`changed-swift-files.nul`, `swiftlint-changed.log`). Static gates passed: no `launchFailed` in Sources, gateway imports confined to Integration, no Mode B services, no gateway text normalization, no removed `#expect`/`#require`, and all selected Swift files under 1000 lines (logs in this evidence directory).
+- Session-245 stabilization completion criteria: P05-S1 through S4 and all plan verification criteria are satisfied. No gateway API signature differences were found; formal integrity/adversarial review and serial integration acceptance remain downstream.
+- 2026-10-02 (session 245, Step 8 serial finalization): accepted by the test-integrity and adversarial gates and the post-join integration review (comm-003268). Combined-tree evidence in `tmp/stria-v01-session-245/join/wave-5/`: `swift build --build-tests` exit 0 (`build-tests.log`), `swift test` 120 tests in 36 suites exit 0 (`swift-test-full.log`), `scripts/cli-smoke.sh` SMOKE OK exit 0 (`cli-smoke.log`). Moved to `impl-plans/completed/`. The Done Criteria checkboxes are kept as authored (intent snapshot); this entry records that they are met. The live agent-gateway call path is verified by build only; tests use fakes offline.

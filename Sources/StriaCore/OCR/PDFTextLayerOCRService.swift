@@ -13,6 +13,6 @@ public struct PDFTextLayerOCRService: OCRService {
           let page = document.page(at: request.page - 1) else {
       throw ServiceError.failed("page not available")
     }
-    return OCRResult(text: page.string ?? "")
+    return OCRResult(text: (page.string ?? "").precomposedStringWithCompatibilityMapping)
   }
 }

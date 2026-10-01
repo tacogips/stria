@@ -13,9 +13,9 @@ extension StriaStore {
   }
 
   public func fuzzyRetrieve(question: String, documentId: String?, limit: Int) throws -> [PageRef] {
-    guard (1...100).contains(limit) else { throw StriaError.usage("Search limit must be between 1 and 100") }
     let query = SearchQueryBuilder.trigrams(question: question)
     if query.trigrams.isEmpty && query.shortTokens.isEmpty { return [] }
+    guard (1...100).contains(limit) else { throw StriaError.usage("Search limit must be between 1 and 100") }
     if query.trigrams.isEmpty { return try fuzzyShortLike(tokens: query.shortTokens, documentId: documentId, limit: limit) }
     if searchBackend == .fts5 {
       let expression = SearchQueryBuilder.ftsMatchExpression(terms: query.trigrams).replacingOccurrences(of: " AND ", with: " OR ")

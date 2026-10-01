@@ -1,6 +1,6 @@
 # P06 CLI Argument Parser, Usage, JSON Output Helpers, Config Key Get/Set
 
-**Status**: Ready (stabilization plan, re-issued in session 245)
+**Status**: Completed (session 245; accepted by the test-integrity and adversarial gates and the post-join integration review comm-003268; moved to `impl-plans/completed/` in session 245 Step 8)
 **planId**: P06
 **Wave**: 1 of `impl-plans/active/stria-v01-session-245-dispatch.json` (stabilization wave)
 **dependsOn**: none in this manifest (builds on completed P01, commit `2ea8582`; the code under review is in commit `0082491`)
@@ -423,4 +423,61 @@ public enum CLIJSON {
 
 ### Session 245
 
-- (worker appends entries here; entries above are session-243 history)
+- Implemented P06-S1..S5. `CLIJSON.failure` now uses an internal
+  `JSONSerialization` fallback; `success` wraps encoder errors as `StriaError.io`.
+  Usage topics list all matching command forms and general help includes `-h`.
+  Added the required parser, config-key, usage, and JSON edge-case coverage.
+- P06-S1 red evidence is not applicable: `fallbackEnvelope` was unreachable
+  through the public API before this change because encoding a String and an
+  ErrorCode does not fail. Direct fallback and public failure green tests pass.
+  P06-S2 red-then-green: `red-S2.log` records raw `EncodingError` for NaN;
+  `green-S2.log` records the wrapped `.ioError` and all five CLIJSON tests passing.
+- Pre/post SHA-256: CLIJSON.swift
+  `abe93b9ea23f904f8d270edf1805e846a2e50c7a81789e2f8262f9e6b92507b4` ->
+  `19d0a24f8f0c820aff1e0baebb86e8299ca644535f3f40863c63cdc5ff17d534`;
+  Usage.swift `85b2484a412e176beb5995bda91db9b1dd4bbb2f8d592f10f7111d25a914a` ->
+  `5e57de850b786f5296ff29f39dbdce3726c539ad608770971da8079c9023ad18`;
+  CLIJSONTests.swift
+  `b5bbaf6c869393b23069f94ccc480890e3914da465496aa6478728f74d2ea91c` ->
+  `fb7e415d5bc9ba97071c53c52ff13cba460e83463d0b31f6b852fbdac4702b98`;
+  ParserTests.swift
+  `eda7ca01fb985c8b3b6fa9a7421536ee4389571156ac3858849469e10d82e72b` ->
+  `61467bf97843469129c36ab9e516a710bc2d0eaf5f344feb5508d1519343a678`;
+  ConfigKeyPathTests.swift
+  `f921211b45126bd827ea09093fdb00a3a8090cd7ad6926d9788a209a6ad8e6d3` ->
+  `930a64573e6e3fbd1e06d8857e41d02d55fa2951f058a3e140fbd322628bbefb`;
+  UsageTests.swift was added (pre-state absent), post-hash
+  `f1c22ac393423c1b5f45aa146fefa0b49bb2da242bb93e83371212bde2e705ea`.
+- Verification before final focused rerun: `swift build --build-tests` exit 0
+  (`build-tests.log`); `swift test --filter 'ParserTests|PageListTests|CLIJSONTests|ConfigKeyPathTests|UsageTests'`
+  exit 0, 21 tests, 0 failures (`focused-check.log`); strict changed-file
+  SwiftLint exit 0 (`swiftlint-strict-changed.log`); test-integrity check exit 0
+  with no removed assertions (`test-integrity.log`); Swift line-count gate exit 0,
+  all files below 1000 lines (`line-count.log`).
+- Baseline: `swift build --build-tests` exit 0 on clean rerun
+  (`baseline-build-tests-rerun.log`); focused suites passed 10 tests
+  (`baseline-focused.log`). The first baseline build completed compilation but
+  its shell wrapper exited 1 because zsh reserves `status`; it is retained in
+  `baseline-build-tests.log` and superseded by the clean rerun.
+- Completion status: all P06 API, task and listed test criteria are implemented
+  and green. No existing assertion was removed or loosened. Post-join formal
+  integrity/adversarial review and serial finalization remain downstream.
+- Final verification: `swift test --filter 'ParserTests|PageListTests|CLIJSONTests|ConfigKeyPathTests|UsageTests'`
+  exit 0, 21 tests, 0 failures (`focused-final.log`); `git diff --check` exit 0
+  (`diff-check.log`). The final source hashes are recorded in
+  `final-file-hashes.log`; plan post-hash is recorded by finalization evidence.
+- Step 6 current-tree rerun: snapshot comparison matched all P06 implementation
+  inputs; `swift build --build-tests` exit 0; strict SwiftLint on the six changed
+  Swift files exit 0; assertion-removal, <1000-line and `git diff --check` gates
+  exit 0; final focused P06 filter passed 21 tests with 0 failures. Logs and
+  exit files: `tmp/stria-v01-session-245/P06/step6-rerun/`. No source changes
+  were needed. Formal review and serial finalization remain downstream.
+- 2026-10-02 (session 245, Step 8 serial finalization): accepted by the
+  test-integrity and adversarial gates and the post-join integration review
+  (comm-003268). Combined-tree evidence in
+  `tmp/stria-v01-session-245/join/wave-5/`: `swift build --build-tests` exit 0
+  (`build-tests.log`), `swift test` 120 tests in 36 suites exit 0
+  (`swift-test-full.log`), `scripts/cli-smoke.sh` SMOKE OK exit 0
+  (`cli-smoke.log`). Moved to `impl-plans/completed/`. The Done Criteria
+  checkboxes are kept as authored (intent snapshot); this entry records that
+  they are met.

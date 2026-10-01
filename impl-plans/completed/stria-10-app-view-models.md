@@ -1,6 +1,6 @@
 # P10 App View Models (StriaCore/AppModel)
 
-**Status**: Ready (re-issued in session 245)
+**Status**: Completed (session 245; accepted by the test-integrity and adversarial gates and the post-join integration review comm-003268; moved to `impl-plans/completed/` in session 245 Step 8)
 **planId**: P10
 **Wave**: 3 of `impl-plans/active/stria-v01-session-245-dispatch.json`
 **dependsOn**: P07, P08
@@ -275,4 +275,8 @@ and OCR text set through `library.runOCR` with the fake OCR. Use
 
 ### Session 245
 
-- (worker appends entries here)
+- Implemented `AppModel`, `LibraryViewModel`, `ReaderViewModel` and `AgentPaneViewModel` in `Sources/StriaCore/AppModel/`; added 11 behavioral tests across the three named suites in `Tests/StriaCoreTests/AppModel/`. Coverage includes streamed import progress/idempotent selection/alerts/OCR unavailability/retry, recents and route lifecycle, page parsing/clamps/bounds, outline selection, last-read restore/flush, search mode, expansion start/cancel, scope descriptions, successful/failed/unavailable asks, citations and history selection.
+- P10 implementation checks pass on the current combined tree: `swift build --build-tests` (exit 0, `tmp/stria-v01-session-245/P10/build-tests-shared-retry-1.log`); `swift test --filter 'LibraryViewModelTests|ReaderViewModelTests|AgentPaneViewModelTests'` (11 tests, 3 suites, 0 failures, exit 0, `tmp/stria-v01-session-245/P10/focused-final.log`); selected-file strict SwiftLint (exit 0, `tmp/stria-v01-session-245/P10/swiftlint-strict-final-2.log`); no `import SwiftUI` under `Sources/StriaCore` (exit 0, `tmp/stria-v01-session-245/P10/no-swiftui-final.log`); file-length gate (exit 0, `tmp/stria-v01-session-245/P10/line-count-final.log`). Changed Swift paths are recorded as NUL-delimited entries in `tmp/stria-v01-session-245/P10/changed-swift-files.nul`.
+- A final shared-target compile briefly found a P09 CLI test macro diagnostic while that file was changing; it cleared after the required settle period, and the successful full build above compiled that test file.
+- Review gates and combined-tree serial integration checks remain with downstream workflow steps; this entry records implementation evidence only.
+- 2026-10-02 (session 245, Step 8 serial finalization): accepted by the test-integrity and adversarial gates and the post-join integration review (comm-003268). Combined-tree evidence in `tmp/stria-v01-session-245/join/wave-5/`: `swift build --build-tests` exit 0 (`build-tests.log`), `swift test` 120 tests in 36 suites exit 0 (`swift-test-full.log`), no `import SwiftUI` in StriaCore (`no-swiftui-in-core.log`). Moved to `impl-plans/completed/`. The Done Criteria checkboxes are kept as authored (intent snapshot); this entry records that they are met.

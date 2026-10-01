@@ -1,6 +1,6 @@
 # P11 SwiftUI App (StriaApp, product stria-app)
 
-**Status**: Ready (re-issued in session 245)
+**Status**: Completed (session 245; accepted by the test-integrity and adversarial gates and the post-join integration review comm-003268; moved to `impl-plans/completed/` in session 245 Step 8; manual UI checklist recorded as "not run: headless")
 **planId**: P11
 **Wave**: 4 of `impl-plans/active/stria-v01-session-245-dispatch.json`
 **dependsOn**: P10
@@ -246,4 +246,11 @@ bindings, the PDFKit wrapper and startup.
 
 ### Session 245
 
-- (worker appends entries here)
+- Implemented the StriaApp startup, library, reader split view, TOC/search/thumbnails sidebar, continuous PDFKit view, page controls and sheet, agent inspector/history, and focused Go/View/File commands in `Sources/StriaApp/`.
+- `swift build --product stria-app` passed on final sources (exit 0; `tmp/stria-v01-session-245/P11/build-app-final.log`).
+- `swift build --build-tests` passed on final sources (exit 0; `tmp/stria-v01-session-245/P11/build-tests-final.log`); `swift test` passed, 120 tests in 36 suites (exit 0; `tmp/stria-v01-session-245/P11/swift-test-final.log`).
+- Strict selected-file SwiftLint passed for all P11 Swift files using `changed-swift-files.nul` (exit 0; `tmp/stria-v01-session-245/P11/swiftlint-final.log`); the line-count gate passed (exit 0; `tmp/stria-v01-session-245/P11/line-count-final.log`).
+- The build, required UI surfaces/commands, bindings-only view scope, and lint completion criteria are complete. Interactive visual behavior remains unverified under the manual checklist disposition below.
+- Manual UI checklist: not run: headless / no accessible interactive UI surface for the SwiftPM executable in this execution context; details in `tmp/stria-v01-session-245/P11/manual-ui-checklist.txt`.
+- Formal test-integrity/adversarial review and post-join integration review remain downstream workflow steps; no review approval is claimed here.
+- 2026-10-02 (session 245, Step 8 serial finalization): accepted by the test-integrity and adversarial gates and the post-join integration review (comm-003268). Combined-tree evidence in `tmp/stria-v01-session-245/join/wave-5/`: `swift build --product stria-app` exit 0 (`build-app.log`), `swift test` 120 tests in 36 suites exit 0 (`swift-test-full.log`). Moved to `impl-plans/completed/`. The Done Criteria checkboxes are kept as authored (intent snapshot); this entry records that they are met. The manual UI checklist stays "not run: headless", which the plan allows. A user should confirm interactively with `STRIA_HOME=$(mktemp -d) swift run stria-app`: plain Return in the agent composer sends (the design says Send or Cmd-Return), the current-section outline highlight, and last-read page restore.

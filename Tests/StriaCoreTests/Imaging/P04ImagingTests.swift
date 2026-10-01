@@ -13,7 +13,9 @@ struct IdentityTests {
       let changed = paths.root.appendingPathComponent("changed.pdf")
       try Data("same bytes".utf8).write(to: first)
       try Data("same bytes".utf8).write(to: copy)
-      try Data("different".utf8).write(to: changed)
+      var changedBytes = try Data(contentsOf: first)
+      changedBytes[changedBytes.index(before: changedBytes.endIndex)] ^= 0x01
+      try changedBytes.write(to: changed)
 
       let firstHash = try DocumentIdentity.sha256Hex(of: first)
       let copyHash = try DocumentIdentity.sha256Hex(of: copy)
@@ -52,6 +54,27 @@ struct InspectorTests {
       document.documentAttributes = [PDFDocumentAttribute.titleAttribute: "  Report  "]
       #expect(document.write(to: titled))
       #expect(try PDFInspector.inspect(url: titled).title == "Report")
+    }
+  }
+
+  @Test func rejectsLockedPDFAndAcceptsOwnerPasswordOnlyPDF() async throws {
+    try await withTestDataRoot { paths in
+      let locked = paths.root.appendingPathComponent("locked.pdf")
+      let ownerOnly = paths.root.appendingPathComponent("owner-only.pdf")
+      try writeEncryptedPDF(at: locked, userPassword: "user-secret", ownerPassword: "owner-secret")
+      try writeEncryptedPDF(at: ownerOnly, ownerPassword: "owner-secret")
+
+      if PDFDocument(url: locked)?.isLocked == true {
+        do {
+          _ = try PDFInspector.inspect(url: locked)
+          Issue.record("PDFInspector accepted a PDF that PDFKit reports as locked")
+        } catch let error as StriaError {
+          #expect(error.code == .invalidPDF)
+        }
+      }
+
+      let inspection = try PDFInspector.inspect(url: ownerOnly)
+      #expect(inspection.pageCount == 1)
     }
   }
 }
@@ -131,6 +154,10 @@ struct PageImageCacheTests {
       let url = try cache.expand(docId: "doc", page: 1, image: image)
       #expect(url == paths.cachedPage(docId: "doc", page: 1))
       #expect(ImageCodec.pixelSize(ofImageAt: url)?.width == image.width)
+      #expect(ImageCodec.pixelSize(ofImageAt: url)?.height == image.height)
+      #expect(try Data(contentsOf: url).prefix(4) == Data([0x89, 0x50, 0x4E, 0x47]))
+      let cacheAttributes = try FileManager.default.attributesOfItem(atPath: url.deletingLastPathComponent().path)
+      #expect((cacheAttributes[.posixPermissions] as? NSNumber)?.intValue == 0o700)
       #expect(cache.validCachedURL(docId: "doc", page: 1, width: image.width, height: image.height) == url)
 
       try Data().write(to: url)
@@ -165,4 +192,19 @@ private func sampleImage(width: Int, height: Int) throws -> CGImage {
 
 private func pngData(width: Int, height: Int) throws -> Data {
   try ImageCodec.pngData(sampleImage(width: width, height: height))
+}
+
+private func writeEncryptedPDF(at url: URL, userPassword: String? = nil, ownerPassword: String) throws {
+  guard let consumer = CGDataConsumer(url: url as CFURL) else { throw StriaError.io("Could not create encrypted test PDF consumer") }
+  var mediaBox = CGRect(x: 0, y: 0, width: 612, height: 792)
+  var auxiliaryInfo: [CFString: Any] = [kCGPDFContextOwnerPassword: ownerPassword]
+  if let userPassword {
+    auxiliaryInfo[kCGPDFContextUserPassword] = userPassword
+  }
+  guard let context = CGContext(consumer: consumer, mediaBox: &mediaBox, auxiliaryInfo as CFDictionary) else {
+    throw StriaError.io("Could not create encrypted test PDF context")
+  }
+  context.beginPDFPage(nil)
+  context.endPDFPage()
+  context.closePDF()
 }

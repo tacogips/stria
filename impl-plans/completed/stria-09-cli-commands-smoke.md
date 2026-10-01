@@ -1,6 +1,6 @@
 # P09 CLI Command Execution, Executable, End-to-End Tests, Smoke Script
 
-**Status**: Ready (re-issued in session 245)
+**Status**: Completed (session 245; accepted by the test-integrity and adversarial gates and the post-join integration review comm-003268; moved to `impl-plans/completed/` in session 245 Step 8)
 **planId**: P09
 **Wave**: 3 of `impl-plans/active/stria-v01-session-245-dispatch.json`
 **dependsOn**: P05, P06, P07, P08
@@ -330,4 +330,10 @@ fakes.
 
 ### Session 245
 
-- (worker appends entries here)
+- Implemented the `StriaCommand.run` dispatcher, JSON output models with explicit null encoding, command handlers, and thin `StriaCLI/main.swift`. Ask maps page/document/library scopes and forwards retrieval query and limit unchanged.
+- Added exact output-key/error-envelope tests and the fake OCR/search/ask/history end-to-end flow. Added CoreGraphics/CoreText three-page fixture generation and executable temp-root smoke script.
+- P09 criteria status: all command JSON key sets and exit-code cases covered; main is thin; smoke succeeds with an isolated `STRIA_HOME`; end-to-end flow covers fake OCR, search, ask and persisted history.
+- Final verification: `swift build --build-tests` exit 0 (`tmp/stria-v01-session-245/P09/build-final.log`); `swift test --filter 'CLIEndToEndTests|CLICommandTests'` 6 passed, 0 failed, exit 0 (`tmp/stria-v01-session-245/P09/focused-final.log`); `scripts/cli-smoke.sh` prints `SMOKE OK`, exit 0 (`tmp/stria-v01-session-245/P09/smoke-final-3.log`); strict selected-file SwiftLint exit 0 (`tmp/stria-v01-session-245/P09/swiftlint-final-2.log`); shell syntax, executable-bit and Swift line-count gates exit 0 (`bash-syntax-final-2.log`, `executable-final-2.log`, `line-count-final-2.log`). Selected Swift paths are captured in `changed-swift-files.nul`.
+- Combined-tree final rerun: an initial `swift build --build-tests` surfaced a transient P10 `LibraryViewModel.swift` Swift 6 sending-risk diagnostic (`build-final-2.log`, exit 1). After the required two-minute wait, retry passed (`build-foreign-retry-1.log`, exit 0); the last focused CLI run passed 6/6 (`focused-final-3.log`, exit 0). Current-source SwiftLint and line-count checks also pass (`swiftlint-current.log`, `line-count-current.log`).
+- Formal test-integrity/adversarial reviews and post-join serial integration verification remain downstream workflow steps.
+- 2026-10-02 (session 245, Step 8 serial finalization): accepted by the test-integrity and adversarial gates and the post-join integration review (comm-003268). Combined-tree evidence in `tmp/stria-v01-session-245/join/wave-5/`: `swift build --build-tests` exit 0 (`build-tests.log`), `swift test` 120 tests in 36 suites exit 0 (`swift-test-full.log`), `scripts/cli-smoke.sh` SMOKE OK exit 0 (`cli-smoke.log`). Moved to `impl-plans/completed/`. The Done Criteria checkboxes are kept as authored (intent snapshot); this entry records that they are met.

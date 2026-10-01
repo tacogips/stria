@@ -40,11 +40,6 @@ struct GatewayPromptRunner {
         throw ServiceError.failed("stop reason: \(result.response.stopReason.rawValue)")
       }
       return result.messageText
-    } catch let error as GatewayProcessError {
-      if case .launchFailed = error, [GatewayVendor.claudeCode, .codex, .cursor].contains(vendor) {
-        throw .unavailable("vendor executable could not be launched: \(vendor.rawValue)")
-      }
-      throw .failed(SecretRedactor.redact(String(describing: error), secrets: [secretValue].compactMap { $0 }))
     } catch let error as ServiceError {
       throw error
     } catch {
