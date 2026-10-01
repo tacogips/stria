@@ -3,8 +3,8 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
-artifact_name="kaiba-viewer"
-github_repository="tacogips/kaiba-viewer"
+artifact_name="stria"
+github_repository="tacogips/stria"
 
 usage() {
   cat <<EOF
@@ -89,7 +89,7 @@ release_notes="Signed, notarized, and stapled macOS DMG archives for the Homebre
 if ! gh release view "$release_tag" --repo "$github_repository" >/dev/null 2>&1; then
   gh release create "$release_tag" \
     --repo "$github_repository" \
-    --title "KaibaViewer $release_tag" \
+    --title "stria $release_tag" \
     --notes "$release_notes"
 fi
 
@@ -101,4 +101,4 @@ printf '\nRendered tap cask: %s\n' "$tap_cask_file"
 printf 'Review, commit, and push the tap change from the tap repository.\n'
 printf 'Then install with:\n'
 printf '  brew tap tacogips/homebrew-tap\n'
-printf '  brew install --cask kaiba-viewer\n'
+printf '  brew install --cask stria\n'

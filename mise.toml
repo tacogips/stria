@@ -32,7 +32,15 @@ run = "swift build"
 
 [tasks.run]
 description = "Run the executable"
-run = "swift run kaiba-viewer"
+run = "swift run stria"
+
+[tasks."run:app"]
+description = "Run the SwiftUI app"
+run = "swift run stria-app"
+
+[tasks.smoke]
+description = "Run the CLI smoke test with a temp data root"
+run = "scripts/cli-smoke.sh"
 
 [tasks.test]
 description = "Run Swift tests"
@@ -61,7 +69,7 @@ if [ "$#" -eq 0 ]; then
   echo "usage: mise run homebrew:tap-formula -- <version>" >&2
   exit 2
 fi
-scripts/render-homebrew-formula.sh "$1" "../homebrew-tap/Formula/kaiba-viewer.rb"
+scripts/render-homebrew-formula.sh "$1" "../homebrew-tap/Formula/stria.rb"
 '''
 
 [tasks."build:homebrew-cask"]
@@ -79,7 +87,7 @@ if [ "$#" -eq 0 ]; then
   echo "usage: mise run homebrew:tap-cask -- <version>" >&2
   exit 2
 fi
-scripts/render-homebrew-cask.sh "$1" "../homebrew-tap/Casks/kaiba-viewer.rb"
+scripts/render-homebrew-cask.sh "$1" "../homebrew-tap/Casks/stria.rb"
 '''
 
 [tasks."release:homebrew-cask-local"]

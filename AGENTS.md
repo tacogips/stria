@@ -16,7 +16,7 @@ You (the LLM model) must include a paraphrase or summary of the user's instructi
 
 ## Project Overview
 
-This is `KaibaViewer`, a Swift Package Manager project with mise-managed tools and tasks, Homebrew formula packaging, and optional signed Homebrew Cask packaging.
+This is `stria`, a macOS PDF reader with an OCR-indexed SQLite page store, an agent chat pane and an agent-facing JSON CLI, built with Swift Package Manager, mise-managed tools and tasks, Homebrew formula packaging, and optional signed Homebrew Cask packaging.
 
 ## Development Environment
 
@@ -32,7 +32,8 @@ This is `KaibaViewer`, a Swift Package Manager project with mise-managed tools a
 mise run build
 mise run test
 mise run lint
-swift run kaiba-viewer --help
+swift run stria --help
+swift run stria-app
 ```
 
 ## Swift Code Development

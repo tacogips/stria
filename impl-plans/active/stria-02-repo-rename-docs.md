@@ -169,4 +169,8 @@ PDFKit, SwiftUI and ImageIO and is macOS-only. Keep `gitleaks.yml`.
 
 ## Progress Log
 
+- 2026-10-01 P02 audit follow-up: removed the deleted Linux build workflow from `.ign/ign-files.json`; retained the gitleaks entry. Final checks passed: both ign JSON files parse via `python3 -m json.tool`, the scoped Kaiba scan is empty, and gitleaks exists while the Linux workflow is absent from the ign manifest. Logs: `ign_json_final.log`, `kaiba_scan_final.log`, and `gitleaks_retained_final.log` in `tmp/stria-v01-session-241/P02/`.
+
+- 2026-10-01 P02 implementation: renamed the assigned README, AGENTS overview/commands, mise tasks and tap paths, release scripts/docs/skills, and ign variables/file list to stria; removed the Linux build workflow and retained gitleaks. README now documents requirements, build/test/lint/smoke, running, the data root, configuration safety, agent CLI commands and usage, packaging, and design docs. Plan checks passed: no Kaiba matches in scanned non-Swift paths; all shell scripts pass `bash -n`; `run:app` and `smoke` tasks are listed; all five release scripts remain executable; Linux workflow absent and gitleaks workflow present. `/usr/bin/plutil -lint` rejected JSON input on this host (exit 1); both ign files passed `python3 -m json.tool` (exit 0). Complete command logs are under `tmp/stria-v01-session-241/P02/` (`kaiba_scan.log`, `bash_syntax.log`, `ign_json.log`, `ign_json_fallback.log`, `mise_run_app.log`, `mise_smoke.log`, `script_modes.log`, `linux_workflow_removed.log`, `gitleaks_retained.log`).
+
 - (worker appends entries here)

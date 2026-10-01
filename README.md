@@ -1,83 +1,70 @@
-# KaibaViewer
+# stria
 
-Kaiba Viewer Swift application
+stria is a macOS PDF reader with an OCR-indexed SQLite page store, continuous PDF reading, an agent chat pane, and a JSON CLI that lets external agents search documents and retrieve page images.
 
-## Development
+## Requirements
 
-```bash
-mise install
+- macOS 14 or later
+- Swift 6 toolchain: run `mise install`
+
+## Build, test, lint and smoke
+
+```sh
 mise run build
 mise run test
-swift run kaiba-viewer --help
+mise run lint
+mise run smoke
 ```
 
-The package uses Swift Package Manager with:
+## Running
 
-- Library target: `KaibaViewerCore`
-- Executable target: `KaibaViewerCLI`
-- Installed executable: `kaiba-viewer`
-
-Swift target names and type names must be valid Swift identifiers. If the project
-name contains hyphens, keep `PROJECT_NAME` and `EXECUTABLE_NAME` hyphenated as
-needed, but use identifier-safe values such as `AppCore`, `AppCLI`, and
-`AppCommand` for Swift module/type variables.
-
-## Homebrew Formula
-
-Build local formula archives:
-
-```bash
-mise run build:homebrew -- darwin-arm64 darwin-x64
+```sh
+swift run stria --help
+swift run stria-app
 ```
 
-Render a formula after both platform archives exist:
+## Data root
 
-```bash
-mise run homebrew:formula -- 0.1.0
-```
+The default data root is `~/.local/stria`. `STRIA_HOME` overrides it, and the CLI `--home <path>` option takes precedence over the environment variable. The root contains:
 
-Render directly into the default sibling tap checkout:
+- `stria.sqlite`: documents, compressed page images, OCR text, chat history and agent runs
+- `originals/`: byte-identical imported PDFs
+- `cache/`: expanded `page-NNNN.png` files for OCR and agent tools; safe to delete
+- `config.json`: render, OCR and agent settings
+- `logs/`: per-call JSONL records without secrets or page image data
 
-```bash
-mise run homebrew:tap-formula -- 0.1.0
-```
+## Configuration
 
-Install from the tap after the formula is published:
+The first data-root use creates `config.json` with defaults. Inspect or edit settings with `stria config get` and `stria config set <key> <value>`. Configuration stores API-key environment variable names, never secret values. See [default agent configuration](design-docs/user-qa/default-agent-config.md).
 
-```bash
-brew tap tacogips/homebrew-tap
-brew install kaiba-viewer
-```
+## CLI for agents
 
-## Homebrew Cask
+`stria` emits JSON for successful commands and is intended primarily for agent tools:
 
-The Cask workflow builds signed, notarized, and stapled macOS DMG artifacts.
-Apple signing credentials must stay local and must not be committed.
+- `stria import <pdf> [--no-ocr]`: import a PDF and optionally run OCR
+- `stria ocr <docId> [--pages <list>] [--retry-failed]`: run or retry page OCR
+- `stria list`: list imported PDFs and OCR progress
+- `stria show <docId>`: show document metadata and outline
+- `stria page image <docId> <page>`: expand and return a page image path
+- `stria page text <docId> <page>`: return page OCR text
+- `stria search <query> [--doc <docId>] [--limit <n>]`: search OCR text across PDFs or within one PDF
+- `stria ask <question> [--doc <docId>] [--page <n>]`: retrieve context and ask the configured agent
+- `stria history [--doc <docId>] [--page <n>]`: read saved conversations
+- `stria config get/set`: inspect or edit configuration
+- `stria paths`: print resolved data-root paths
 
-Check the build plan:
+### Agent Usage
 
-```bash
-mise run build:homebrew-cask -- --dry-run darwin-arm64 darwin-x64
-```
+1. Run `stria search "<key phrase>"` to find matching document IDs and page numbers. Add `--doc <docId>` to narrow the search.
+2. Run `stria page image <docId> <page>` for a matching page and read the PNG at the returned path. `stria page text` can also return its OCR text.
+3. Answer using the retrieved page and cite the document ID and page. Use `stria show <docId>` to inspect its outline.
 
-Build with local signing credentials:
+Alternatively, `stria ask "<question>"` performs retrieval and answering with the configured agent and saves the conversation.
 
-```bash
-kinko exec --env APPLE_SIGNING_IDENTITY,APPLE_ID,APPLE_PASSWORD,APPLE_TEAM_ID -- \
-  mise run build:homebrew-cask -- darwin-arm64 darwin-x64
-```
+## Packaging
 
-Render a Cask:
+Homebrew formula and cask paths use the name `stria`. Release packaging currently ships the CLI binary only. Run the app with `swift run stria-app`; app-bundle distribution is not part of v0.1. See [Homebrew packaging](packaging/homebrew/README.md) and [app distribution](design-docs/user-qa/app-distribution.md).
 
-```bash
-mise run homebrew:cask -- 0.1.0
-```
+## Design docs
 
-For a tagged release, build, upload, and render the tap Cask:
-
-```bash
-kinko exec --env APPLE_SIGNING_IDENTITY,APPLE_ID,APPLE_PASSWORD,APPLE_TEAM_ID -- \
-  mise run release:homebrew-cask-local -- v0.1.0
-```
-
-See `packaging/homebrew/README.md` and `.claude/skills/` (Claude Code) or `.codex/skills/` (Codex) for release workflows.
+Architecture, storage, agent integration, CLI and app UI designs are in [`design-docs/specs/`](design-docs/specs/).

@@ -9,7 +9,7 @@ Use this skill for Formula releases installed with:
 
 ```bash
 brew tap tacogips/homebrew-tap
-brew install kaiba-viewer
+brew install stria
 ```
 
 Use `.codex/skills/macos-cask-release/SKILL.md` for signed and notarized Cask
@@ -28,8 +28,8 @@ The default Swift formula contract is macOS-only:
 
 | Homebrew platform | Release asset |
 | --- | --- |
-| macOS Apple Silicon | `kaiba-viewer-<version>-darwin-arm64.tar.gz` |
-| macOS Intel | `kaiba-viewer-<version>-darwin-x64.tar.gz` |
+| macOS Apple Silicon | `stria-<version>-darwin-arm64.tar.gz` |
+| macOS Intel | `stria-<version>-darwin-x64.tar.gz` |
 
 Do not add Linux assets unless the project has a reviewed Swift Linux runtime
 contract.
@@ -62,7 +62,7 @@ For a custom tap path:
 
 ```bash
 version="$(tr -d '[:space:]' < VERSION)"
-scripts/render-homebrew-formula.sh "$version" /path/to/homebrew-tap/Formula/kaiba-viewer.rb
+scripts/render-homebrew-formula.sh "$version" /path/to/homebrew-tap/Formula/stria.rb
 ```
 
 ## Publishing Notes
@@ -72,7 +72,7 @@ exist:
 
 ```bash
 version="$(tr -d '[:space:]' < VERSION)"
-gh release view "v${version}" --repo tacogips/kaiba-viewer
+gh release view "v${version}" --repo tacogips/stria
 ```
 
 If publishing is explicitly requested:
@@ -80,9 +80,9 @@ If publishing is explicitly requested:
 ```bash
 version="$(tr -d '[:space:]' < VERSION)"
 gh release upload "v${version}" \
-  "dist/homebrew/kaiba-viewer-${version}-darwin-arm64.tar.gz" \
-  "dist/homebrew/kaiba-viewer-${version}-darwin-x64.tar.gz" \
-  --repo tacogips/kaiba-viewer \
+  "dist/homebrew/stria-${version}-darwin-arm64.tar.gz" \
+  "dist/homebrew/stria-${version}-darwin-x64.tar.gz" \
+  --repo tacogips/stria \
   --clobber
 ```
 
@@ -91,11 +91,11 @@ gh release upload "v${version}" \
 From the tap checkout:
 
 ```bash
-ruby -c Formula/kaiba-viewer.rb
-brew audit --strict kaiba-viewer || brew audit --strict --formula kaiba-viewer
-brew install tacogips/homebrew-tap/kaiba-viewer
-kaiba-viewer --version
-brew test tacogips/homebrew-tap/kaiba-viewer
+ruby -c Formula/stria.rb
+brew audit --strict stria || brew audit --strict --formula stria
+brew install tacogips/homebrew-tap/stria
+stria --version
+brew test tacogips/homebrew-tap/stria
 ```
 
 If online audit fails because of local GitHub credentials or rate limits, run a
@@ -106,7 +106,7 @@ non-online audit and report the limitation.
 After pushing the tap Formula, require the tap's `update-api-metadata.yml`
 workflow to succeed for that commit. Derive the GitHub tap repository from
 `tacogips/homebrew-tap`, wait for the matching workflow run, then
-verify `api/formula/kaiba-viewer.json` from
+verify `api/formula/stria.json` from
 GitHub Raw. The JSON release is incomplete unless `.versions.stable` equals the
 release version and `.ruby_source_checksum.sha256` equals the SHA-256 of the
 committed Formula Ruby file.

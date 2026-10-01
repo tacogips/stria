@@ -414,3 +414,23 @@ sample.
 ## Progress Log
 
 - (worker appends entries here: hashes, commands, exit codes, log paths, drift notes)
+- P01 implementation complete for this phase. Package is `stria` with `StriaCore`,
+  `stria`, and `stria-app`; `Package.resolved` pins agent-gateway at
+  `c7f269753ec36aca92d429ec13316ba033128967`. G1 signatures and checkout paths
+  are recorded in `design-docs/references/agent-gateway-c7f2697.md`.
+- Shared contracts, temp-root support, PDF fixture, service fakes, and Foundation
+  suites are implemented. All five Done Criteria items are verified by final
+  resolve/build/test/lint/no-kaiba evidence below; tests use temporary directories.
+- Final evidence under `tmp/stria-v01-session-241/P01/logs/`: `final-resolve.log`
+  (`swift package resolve`, exit 0), `final-build-after-date-fix.log`
+  (`swift build`, exit 0), `final-full-tests.log` (`swift test`, 8 passed, 0
+  failed), `foundation-tests-final-rerun.log` (8 passed, 0 failed), and
+  `swiftlint-final.log` (strict changed-file lint, exit 0; manifest at
+  `tmp/stria-v01-session-241/P01/evidence/changed-swift-files.nul`).
+  Package/reference/no-kaiba/line-count checks each exited 0 in their named logs.
+- Initial compiler and test failures were corrected and rerun successfully;
+  their original logs remain preserved. Concurrent fanout workers also changed
+  P02-owned documentation/release files in this shared worktree. P01 did not
+  edit those paths; consequently workspace status includes authorized changes
+  outside this plan's writePaths.
+- Formal integrity/adversarial review and serial finalization remain downstream.

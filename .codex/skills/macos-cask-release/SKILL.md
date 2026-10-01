@@ -9,7 +9,7 @@ Use this skill for Cask releases installed with:
 
 ```bash
 brew tap tacogips/homebrew-tap
-brew install --cask kaiba-viewer
+brew install --cask stria
 ```
 
 Use `.codex/skills/homebrew-release/SKILL.md` for unsigned Formula tarballs.
@@ -36,7 +36,7 @@ Check version alignment:
 
 ```bash
 version="$(tr -d '[:space:]' < VERSION)"
-swift run kaiba-viewer --version | tail -n 1 | grep -Fx "$version"
+swift run stria --version | tail -n 1 | grep -Fx "$version"
 ```
 
 Check the release plan:
@@ -55,18 +55,18 @@ kinko exec --env APPLE_SIGNING_IDENTITY,APPLE_ID,APPLE_PASSWORD,APPLE_TEAM_ID --
 Expected outputs:
 
 ```text
-dist/homebrew-cask/kaiba-viewer-<version>-darwin-arm64.dmg
-dist/homebrew-cask/kaiba-viewer-<version>-darwin-x64.dmg
+dist/homebrew-cask/stria-<version>-darwin-arm64.dmg
+dist/homebrew-cask/stria-<version>-darwin-x64.dmg
 ```
 
 Validate:
 
 ```bash
 version="$(tr -d '[:space:]' < VERSION)"
-/Applications/Xcode.app/Contents/Developer/usr/bin/stapler validate "dist/homebrew-cask/kaiba-viewer-${version}-darwin-arm64.dmg"
-/Applications/Xcode.app/Contents/Developer/usr/bin/stapler validate "dist/homebrew-cask/kaiba-viewer-${version}-darwin-x64.dmg"
-spctl --assess --type open --context context:primary-signature --verbose=4 "dist/homebrew-cask/kaiba-viewer-${version}-darwin-arm64.dmg"
-spctl --assess --type open --context context:primary-signature --verbose=4 "dist/homebrew-cask/kaiba-viewer-${version}-darwin-x64.dmg"
+/Applications/Xcode.app/Contents/Developer/usr/bin/stapler validate "dist/homebrew-cask/stria-${version}-darwin-arm64.dmg"
+/Applications/Xcode.app/Contents/Developer/usr/bin/stapler validate "dist/homebrew-cask/stria-${version}-darwin-x64.dmg"
+spctl --assess --type open --context context:primary-signature --verbose=4 "dist/homebrew-cask/stria-${version}-darwin-arm64.dmg"
+spctl --assess --type open --context context:primary-signature --verbose=4 "dist/homebrew-cask/stria-${version}-darwin-x64.dmg"
 ```
 
 ## Tagged Release
@@ -79,24 +79,24 @@ kinko exec --env APPLE_SIGNING_IDENTITY,APPLE_ID,APPLE_PASSWORD,APPLE_TEAM_ID --
 ```
 
 The wrapper checks the local and remote tag, verifies `VERSION`, uploads both
-DMGs to `tacogips/kaiba-viewer`, and renders
-`../homebrew-tap/Casks/kaiba-viewer.rb`.
+DMGs to `tacogips/stria`, and renders
+`../homebrew-tap/Casks/stria.rb`.
 
 After reviewing the rendered tap Cask:
 
 ```bash
 cd ../homebrew-tap
-git add Casks/kaiba-viewer.rb README.md
+git add Casks/stria.rb README.md
 git diff --staged --stat
-git commit -m "chore: release kaiba-viewer <version>"
+git commit -m "chore: release stria <version>"
 git push origin main
 ```
 
 ## Tap Verification
 
 ```bash
-brew fetch --cask tacogips/homebrew-tap/kaiba-viewer
-HOMEBREW_NO_GITHUB_API=1 brew audit --cask tacogips/homebrew-tap/kaiba-viewer
+brew fetch --cask tacogips/homebrew-tap/stria
+HOMEBREW_NO_GITHUB_API=1 brew audit --cask tacogips/homebrew-tap/stria
 ```
 
 If `brew audit --online` fails with local GitHub credential errors, use
@@ -108,7 +108,7 @@ credentials, not the Cask syntax.
 After pushing the tap Cask, require the tap's `update-api-metadata.yml`
 workflow to succeed for that commit. Derive the GitHub tap repository from
 `tacogips/homebrew-tap`, wait for the matching workflow run, then
-verify `api/cask/kaiba-viewer.json` from GitHub
+verify `api/cask/stria.json` from GitHub
 Raw. The JSON release is incomplete unless `.version` equals the release
 version and `.ruby_source_checksum.sha256` equals the SHA-256 of the committed
 Cask Ruby file.

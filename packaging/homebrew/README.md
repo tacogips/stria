@@ -2,7 +2,7 @@
 
 This project ships two Homebrew release paths:
 
-- Formula: unsigned tarballs containing `bin/kaiba-viewer`.
+- Formula: unsigned tarballs containing `bin/stria`.
 - Cask: signed, notarized, and stapled macOS DMGs containing the command line tool.
 
 Swift formula archives are macOS-only by default. Add Linux archives only after
@@ -19,17 +19,17 @@ scripts/build-homebrew-release.sh darwin-arm64 darwin-x64
 The command writes archives and checksums under `dist/homebrew/`:
 
 ```text
-dist/homebrew/kaiba-viewer-<version>-darwin-arm64.tar.gz
-dist/homebrew/kaiba-viewer-<version>-darwin-arm64.tar.gz.sha256
-dist/homebrew/kaiba-viewer-<version>-darwin-x64.tar.gz
-dist/homebrew/kaiba-viewer-<version>-darwin-x64.tar.gz.sha256
+dist/homebrew/stria-<version>-darwin-arm64.tar.gz
+dist/homebrew/stria-<version>-darwin-arm64.tar.gz.sha256
+dist/homebrew/stria-<version>-darwin-x64.tar.gz
+dist/homebrew/stria-<version>-darwin-x64.tar.gz.sha256
 ```
 
 Publish those assets to the GitHub release named `v<version>`, then render the
 formula into a tap checkout:
 
 ```bash
-scripts/render-homebrew-formula.sh <version> ../homebrew-tap/Formula/kaiba-viewer.rb
+scripts/render-homebrew-formula.sh <version> ../homebrew-tap/Formula/stria.rb
 ```
 
 ## Cask
@@ -44,16 +44,16 @@ kinko exec --env APPLE_SIGNING_IDENTITY,APPLE_ID,APPLE_PASSWORD,APPLE_TEAM_ID --
 This writes:
 
 ```text
-dist/homebrew-cask/kaiba-viewer-<version>-darwin-arm64.dmg
-dist/homebrew-cask/kaiba-viewer-<version>-darwin-arm64.dmg.sha256
-dist/homebrew-cask/kaiba-viewer-<version>-darwin-x64.dmg
-dist/homebrew-cask/kaiba-viewer-<version>-darwin-x64.dmg.sha256
+dist/homebrew-cask/stria-<version>-darwin-arm64.dmg
+dist/homebrew-cask/stria-<version>-darwin-arm64.dmg.sha256
+dist/homebrew-cask/stria-<version>-darwin-x64.dmg
+dist/homebrew-cask/stria-<version>-darwin-x64.dmg.sha256
 ```
 
 Render the Cask:
 
 ```bash
-scripts/render-homebrew-cask.sh <version> ../homebrew-tap/Casks/kaiba-viewer.rb
+scripts/render-homebrew-cask.sh <version> ../homebrew-tap/Casks/stria.rb
 ```
 
 For a tagged release, the local wrapper verifies the tag, builds DMGs, uploads
@@ -69,10 +69,10 @@ kinko exec --env APPLE_SIGNING_IDENTITY,APPLE_ID,APPLE_PASSWORD,APPLE_TEAM_ID --
 From the tap checkout:
 
 ```bash
-ruby -c Formula/kaiba-viewer.rb
-brew audit --strict kaiba-viewer || brew audit --strict --formula kaiba-viewer
-brew fetch --cask tacogips/homebrew-tap/kaiba-viewer
-HOMEBREW_NO_GITHUB_API=1 brew audit --cask tacogips/homebrew-tap/kaiba-viewer
+ruby -c Formula/stria.rb
+brew audit --strict stria || brew audit --strict --formula stria
+brew fetch --cask tacogips/homebrew-tap/stria
+HOMEBREW_NO_GITHUB_API=1 brew audit --cask tacogips/homebrew-tap/stria
 ```
 
 If online audit fails due local GitHub credentials or rate limits, run the
