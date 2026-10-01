@@ -256,4 +256,26 @@ public enum CLIJSON {
 
 ## Progress Log
 
-- (worker appends entries here)
+- Session 243 P06 implementation: added the typed invocation and pure parser,
+  page-list parser, usage text, canonical JSON helpers and the 16-key config
+  path getter/setter, with four focused Swift Testing suites. P06 source files
+  compile in `swift build` (exit 0, `tmp/stria-v01-session-243/P06/build-rerun-1.log`);
+  exact changed-file strict SwiftLint passes (`swiftlint-final.log`, exit 0),
+  and all assigned Swift files are below 1000 lines (`line-count.log`).
+- The root command `swift test --filter 'ParserTests|PageListTests|CLIJSONTests|ConfigKeyPathTests'`
+  could not build the shared test target: another plan's P04 test has a
+  throwing `#expect` at `Tests/StriaCoreTests/Imaging/P04ImagingTests.swift:19`,
+  and the P05 `PreflightTests` compilation ended with Swift compiler signal 6.
+  No foreign files were changed. An isolated SwiftPM test package under this
+  plan's evidence directory compiled the unchanged P06 test copies against the
+  current StriaCore source and passed all 10 tests in the four assigned suites
+  (`isolated-test-rerun-1.log`, exit 0). This is scoped behavioral evidence;
+  the shared root test command remains for serial integration verification.
+- Completion criteria outcome: API/parser/config contracts implemented and
+  the four assigned suites pass in isolated execution. Root aggregate testing
+  remains blocked by P04/P05 test compilation as described above.
+- Root test retry (`tmp/stria-v01-session-243/P06/test-rerun-2.log`, exit 1)
+  confirms P05 `PreflightTests.swift` now compiles. The only current shared
+  test target failure is the out-of-scope throwing assertion in
+  `Tests/StriaCoreTests/Imaging/P04ImagingTests.swift:19`; the prior P05 signal
+  6 was resolved by its owner after the earlier logged attempt.

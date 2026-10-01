@@ -219,4 +219,5 @@ Generate PDFs with `SamplePDFFactory`.
 
 ## Progress Log
 
-- (worker appends entries here)
+- Implemented all six P04 production contracts and the five imaging test suites in `Tests/StriaCoreTests/Imaging/P04ImagingTests.swift`. Isolated Swift 6 typechecking passed (`tmp/stria-v01-session-243/P04/logs/p04-source-typecheck.log`, exit 0); selected changed-file strict SwiftLint passed (`tmp/stria-v01-session-243/P04/logs/swiftlint.log`, exit 0); the P04 Swift file-length gate passed (`tmp/stria-v01-session-243/P04/logs/file-length.log`, exit 0).
+- Full `swift build` and `swift test --filter 'IdentityTests|InspectorTests|RenderCodecTests|OutlineTests|PageImageCacheTests'` both stop before completing module compilation/test discovery (exit 1). Diagnostics are confined to foreign shared-tree files owned by P03/P06: `Sources/StriaCore/Storage/StriaStore+Documents.swift`, `Sources/StriaCore/Storage/StoreSupport.swift`, `Sources/StriaCore/Storage/SQLiteConnection.swift`, and `Sources/StriaCore/CLI/CommandLineParser.swift`. Their complete logs are `tmp/stria-v01-session-243/P04/logs/swift-build-retry.log` and `tmp/stria-v01-session-243/P04/logs/imaging-tests.log`. Behavioral suite completion remains pending serial repair and verification; no foreign files were changed.
