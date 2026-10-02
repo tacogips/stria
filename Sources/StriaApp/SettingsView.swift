@@ -22,6 +22,7 @@ struct SettingsView: View {
             Text(SettingsViewModel.displayName(for: vendor)).tag(vendor)
           }
         }
+        .pickerStyle(.menu)
         .onChange(of: settings.ocrVendor) { _, _ in settings.applySuggestions(ocr: true) }
         if SettingsViewModel.needsModel(settings.ocrVendor) {
           ModelField(settings: settings, vendor: settings.ocrVendor, model: $settings.ocrModel, ocr: true)
@@ -41,6 +42,7 @@ struct SettingsView: View {
             Text(SettingsViewModel.displayName(for: vendor)).tag(vendor)
           }
         }
+        .pickerStyle(.menu)
         .onChange(of: settings.agentVendor) { _, _ in settings.applySuggestions(ocr: false) }
         if SettingsViewModel.needsModel(settings.agentVendor) {
           ModelField(settings: settings, vendor: settings.agentVendor, model: $settings.agentModel, ocr: false)
@@ -89,19 +91,22 @@ struct SettingsView: View {
 }
 
 /// Model picker limited to the chosen vendor's models, with "Custom…" for
-/// any other id and, for API vendors, a live refresh from the vendor.
+/// any other id and, for API vendors, a live refresh from the vendor. The
+/// option list is computed once per vendor (or fetch), not on every render,
+/// so choosing an entry applies without a visible delay.
 private struct ModelField: View {
   @Bindable var settings: SettingsViewModel
   let vendor: String
   @Binding var model: String
   let ocr: Bool
   @State private var custom = false
+  @State private var options: [String] = []
 
-  private var options: [String] { settings.modelOptions(for: vendor, current: custom ? "" : model) }
+  private var fetchedCount: Int { settings.fetchedModels[vendor]?.count ?? 0 }
 
   private var selection: Binding<String> {
     Binding(
-      get: { custom || !options.contains(model) ? SettingsViewModel.customModel : model },
+      get: { custom ? SettingsViewModel.customModel : (options.contains(model) ? model : SettingsViewModel.customModel) },
       set: { value in
         if value == SettingsViewModel.customModel {
           custom = true
@@ -120,7 +125,13 @@ private struct ModelField: View {
       Divider()
       Text("Custom…").tag(SettingsViewModel.customModel)
     }
-    .onChange(of: vendor) { _, _ in custom = false }
+    .pickerStyle(.menu)
+    .onAppear { refreshOptions() }
+    .onChange(of: vendor) { _, _ in
+      custom = false
+      refreshOptions()
+    }
+    .onChange(of: fetchedCount) { _, _ in refreshOptions() }
     if custom || (!model.isEmpty && !options.contains(model)) {
       TextField("Model id", text: $model, prompt: Text("model id as the vendor names it"))
         .textFieldStyle(FlatTextFieldStyle())
@@ -133,10 +144,14 @@ private struct ModelField: View {
         .disabled(settings.isFetchingModels)
         if let error = settings.modelFetchError {
           Text(error).font(.caption).foregroundStyle(.red).lineLimit(2)
-        } else if let fetched = settings.fetchedModels[vendor] {
-          Text("\(fetched.count) models").font(.caption).foregroundStyle(.secondary)
+        } else if fetchedCount > 0 {
+          Text("\(fetchedCount) models").font(.caption).foregroundStyle(.secondary)
         }
       }
     }
+  }
+
+  private func refreshOptions() {
+    options = settings.modelOptions(for: vendor, current: custom ? "" : model)
   }
 }

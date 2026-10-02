@@ -21,7 +21,8 @@ import Testing
     #expect(!settings.save())
     #expect(settings.error?.contains("model is required") == true)
     settings.applySuggestions(ocr: true)
-    #expect(settings.ocrModel == "claude-sonnet-5-5")
+    #expect(settings.ocrModel == ModelCatalog.defaultModel(for: "claude-code"))
+    #expect(settings.ocrModel == "claude-opus-5-5")
     settings.ocrAutoRunOnImport = false
     settings.agentVendor = "anthropic"
     settings.applySuggestions(ocr: false)
@@ -95,10 +96,13 @@ import Testing
 
       settings.agentVendor = "claude-code"
       settings.applySuggestions(ocr: false)
-      #expect(settings.agentModel == "claude-sonnet-5-5")
+      #expect(settings.agentModel == "claude-opus-5-5")
       settings.agentVendor = "gemini"
       settings.applySuggestions(ocr: false)
-      #expect(settings.agentModel == "gemini-2.5-pro")
+      #expect(settings.agentModel == "gemini-3.5-flash-lite")
+      #expect(ModelCatalog.models(for: "openai") == ["gpt-6-luna", "gpt-6-sol", "gpt-6-astra"])
+      #expect(ModelCatalog.models(for: "openrouter").contains("anthropic/claude-opus-5-5"))
+      #expect(!ModelCatalog.updatedAt.isEmpty)
 
       settings.agentVendor = "anthropic"
       settings.agentAPIKeyEnvironment = ""

@@ -117,14 +117,9 @@ public final class SettingsViewModel {
     vendor != notConfigured && vendor != KnownVendors.pdfTextLayer
   }
 
+  /// The vendor's first curated model (see `ModelCatalog`).
   public static func suggestedModel(for vendor: String) -> String? {
-    switch vendor {
-    case "claude-code", "anthropic": "claude-sonnet-5-5"
-    case "codex", "openai": "gpt-5"
-    case "gemini": "gemini-2.5-pro"
-    case "openrouter": "anthropic/claude-sonnet-5-5"
-    default: nil
-    }
+    ModelCatalog.defaultModel(for: vendor)
   }
 
   public static func suggestedAPIKeyEnvironment(for vendor: String) -> String? {

@@ -23,7 +23,8 @@ let package = Package(
         .product(name: "AgentGateway", package: "agent-gateway"),
         .product(name: "AgentGatewayAppCore", package: "agent-gateway"),
         .product(name: "ACP", package: "agent-gateway")
-      ]
+      ],
+      resources: [.copy("Resources/ProviderModels.json")]
     ),
     .executableTarget(name: "StriaCLI", dependencies: ["StriaCore"]),
     // The app runs as a bare SwiftPM executable. The embedded Info.plist
