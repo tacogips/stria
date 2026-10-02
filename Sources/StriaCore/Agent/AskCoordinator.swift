@@ -10,13 +10,12 @@ struct AskCoordinator: Sendable {
   }
 
   func ask(_ request: AskRequest) async throws -> AskResponse {
-    let selector = ContextSelector(store: store, config: environment.config.agent)
-    let refs = try await selector.select(for: request)
+    let threadId = request.threadId ?? UUID().uuidString
+    let previousMessages = try await store.threadMessages(threadId: threadId)
+    let refs = try await selectContext(for: request, previousMessages: previousMessages)
     guard !refs.isEmpty else { throw StriaError.noRelevantPages("No relevant pages were found") }
 
     let contextPages = try await makeContextPages(refs)
-    let threadId = request.threadId ?? UUID().uuidString
-    let previousMessages = try await store.threadMessages(threadId: threadId)
     let history = previousMessages.filter { $0.status == .ok }.map { ChatTurn(role: $0.role, content: $0.content) }
     let thread = previousMessages.isEmpty
       ? NewChatThread(documentId: anchor(for: request.context).docId, pageNumber: anchor(for: request.context).page,
@@ -71,6 +70,24 @@ struct AskCoordinator: Sendable {
     let sent = contextPages.map { Citation(docId: $0.docId, title: $0.title, page: $0.page, imagePath: $0.pngPath.path) }
     return AskResponse(threadId: threadId, answer: answer.text, vendor: settings.vendor, model: settings.model,
                        runId: runId, citations: AskResponse.citedPages(in: answer.text, contextPages: sent), contextPages: sent)
+  }
+
+  /// Fresh retrieval first; in an existing thread the pages the previous
+  /// answer cited stay in context, so a follow-up such as "what else is on
+  /// that page?" (which retrieves nothing on its own) keeps working.
+  private func selectContext(for request: AskRequest, previousMessages: [ChatMessageRecord]) async throws -> [PageRef] {
+    let selector = ContextSelector(store: store, config: environment.config.agent)
+    let cap = request.limit ?? environment.config.agent.maxImages
+    let prior = previousMessages.last { $0.role == .assistant && $0.status == .ok }?.citations ?? []
+    let fresh: [PageRef]
+    do {
+      fresh = try await selector.select(for: request)
+    } catch let error as StriaError where error.code == .noRelevantPages && !prior.isEmpty {
+      fresh = []
+    }
+    var merged: [PageRef] = []
+    for ref in fresh + prior where !merged.contains(ref) && merged.count < max(1, cap) { merged.append(ref) }
+    return merged
   }
 
   private func handle(

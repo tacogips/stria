@@ -61,6 +61,25 @@ import Testing
     }
   }
 
+  @Test func threadFollowUpReusesPreviouslyCitedPages() async throws {
+    try await withTestDataRoot { paths in
+      _ = try await prepareAskDocument(paths: paths, id: "doc", texts: [1: "zebra quantum lattice", 2: "unrelated"])
+      let fake = FakeAgentService()
+      await fake.enqueue(.success("It is on [doc p.1]."))
+      let library = try StriaLibrary.open(environment: makeTestEnvironment(paths: paths, agent: fake))
+      let first = try await library.ask(AskRequest(question: "Which page mentions zebra?", context: .library))
+      #expect(first.citations.map(\.page) == [1])
+      let followUp = try await library.ask(AskRequest(question: "What else is on that page?", context: .library, threadId: first.threadId))
+      #expect(followUp.contextPages.map(\.page) == [1])
+      let requests = await fake.requests
+      #expect(requests.count == 2)
+      #expect(requests[1].history.count == 2)
+      await #expect(throws: StriaError.self) {
+        _ = try await library.ask(AskRequest(question: "What else is on that page?", context: .library))
+      }
+    }
+  }
+
   @Test func streamedChunksConcatenateToTheAnswer() async throws {
     try await withTestDataRoot { paths in
       _ = try await prepareAskDocument(paths: paths, id: "doc", texts: [1: "OCR text"])

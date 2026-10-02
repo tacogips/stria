@@ -212,8 +212,12 @@ not an AI path, so agent-gateway remains the only AI library.
 - For each page, stria sends the expanded PNG (always) and the OCR text (when
   `done`). OCR text is truncated so the total stays within
   `agent.maxContextCharacters` (default 60000).
-- If retrieval returns no page, `ask` fails with `noRelevantPages` (exit 3),
-  calls no model and persists nothing.
+- In an existing thread (`--thread`, or the app's active chat) the pages
+  cited by the previous answer stay in context after the fresh retrieval
+  results, within the same cap. A follow-up such as "what else is on that
+  page?" retrieves nothing on its own and still works.
+- If neither retrieval nor the thread yields a page, `ask` fails with
+  `noRelevantPages` (exit 3), calls no model and persists nothing.
 
 ### Prompt
 
