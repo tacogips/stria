@@ -54,6 +54,7 @@ struct StriaReaderApp: App {
       }
       .preferredColorScheme(appearance.colorScheme)
     }
+    .windowResizability(.contentMinSize)
   }
 }
 

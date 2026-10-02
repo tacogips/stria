@@ -7,7 +7,36 @@ struct SettingsView: View {
   @Bindable var settings: SettingsViewModel
   @AppStorage(Appearance.storageKey) private var appearance = Appearance.default
 
+  /// A scrolling form with the Save / Revert bar pinned below it, so the
+  /// buttons stay reachable at any window height; the window is resizable.
   var body: some View {
+    VStack(spacing: 0) {
+      form
+      Divider()
+      footer
+    }
+    .frame(minWidth: 520, idealWidth: 580, minHeight: 420, idealHeight: 640)
+    .onAppear { settings.load() }
+  }
+
+  private var footer: some View {
+    HStack {
+      if let error = settings.error {
+        Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.red).font(.callout).lineLimit(2)
+      } else if let savedAt = settings.savedAt {
+        Text("Saved \(RelativeAge.string(from: savedAt))").font(.callout).foregroundStyle(.secondary)
+      }
+      Spacer()
+      Button("Revert") { settings.load() }
+      Button("Save") { settings.save() }
+        .keyboardShortcut(.defaultAction)
+    }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 10)
+    .background(Flat.panel)
+  }
+
+  private var form: some View {
     Form {
       Section("Appearance") {
         Picker("Theme", selection: $appearance) {
@@ -55,7 +84,7 @@ struct SettingsView: View {
       Section {
         TextEditor(text: $settings.agentSystemPrompt)
           .font(.system(.body, design: .monospaced))
-          .frame(minHeight: 160)
+          .frame(minHeight: 120, maxHeight: 240)
           .overlay(Rectangle().stroke(Flat.border, lineWidth: 1))
         HStack {
           Text(settings.systemPromptIsDefault ? "Using the default prompt." : "Custom prompt.")
@@ -69,24 +98,8 @@ struct SettingsView: View {
       } footer: {
         Text("Sent with every question. Stria adds the retrieved pages and the question after it.")
       }
-      Section {
-        HStack {
-          if let error = settings.error {
-            Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.red).font(.callout)
-          } else if let savedAt = settings.savedAt {
-            Text("Saved \(RelativeAge.string(from: savedAt))").font(.callout).foregroundStyle(.secondary)
-          }
-          Spacer()
-          Button("Revert") { settings.load() }
-          Button("Save") { settings.save() }
-            .keyboardShortcut(.defaultAction)
-        }
-      }
     }
     .formStyle(.grouped)
-    .frame(width: 560, height: 780)
-    .padding(.bottom, 8)
-    .onAppear { settings.load() }
   }
 }
 

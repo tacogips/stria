@@ -242,7 +242,10 @@ with `StriaLibrary.saveConfig` on Save (nothing is written before). Sections:
   none is set) with "Reset to Default". A prompt equal to the default is
   stored as null.
 - Save validates (a model vendor needs a model, an API vendor needs a
-  variable name) and shows the error inline; Revert reloads the file.
+  variable name) and shows the error inline; Revert reloads the file. The
+  sections scroll, and Save / Revert sit in a bar pinned below the form, so
+  they stay reachable at any height; the window is resizable (minimum
+  520 x 420).
 
 After a save, `AppModel.configRevision` increments; the library banner and
 the agent pane's "No agent vendor is configured" notice (both with a
