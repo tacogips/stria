@@ -13,7 +13,7 @@ private enum OCRConfigCodingKeys: String, CodingKey {
   case vendor, model, apiKeyEnvironment, concurrency, prompt, timeoutSeconds, autoRunOnImport
 }
 private enum AgentConfigCodingKeys: String, CodingKey {
-  case vendor, model, apiKeyEnvironment, neighborPages, maxImages, maxContextCharacters, systemPrompt, timeoutSeconds
+  case vendor, model, apiKeyEnvironment, neighborPages, maxImages, maxContextCharacters, systemPrompt, timeoutSeconds, credentials
 }
 private enum StriaConfigCodingKeys: String, CodingKey { case version, render, ocr, agent }
 
@@ -87,14 +87,30 @@ public struct StriaConfig: Codable, Equatable, Sendable {
     public var systemPrompt: String?
     /// Upper bound for one question's model call.
     public var timeoutSeconds: Int
+    /// API key environment variable name per API vendor. The chat picks the
+    /// vendor and model per question; this is the only per-vendor setting.
+    public var credentials: [String: String]
+
+    public static let defaultCredentials = [
+      "anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY", "gemini": "GEMINI_API_KEY",
+      "openrouter": "OPENROUTER_API_KEY", "cursor-api": "CURSOR_API_KEY"
+    ]
 
     public var isConfigured: Bool { vendor != nil }
 
+    /// The credential variable for a vendor: the per-vendor table, else the
+    /// legacy single `apiKeyEnvironment` when it belongs to that vendor.
+    public func credential(for vendor: String) -> String? {
+      if let name = credentials[vendor], !name.isEmpty { return name }
+      return self.vendor == vendor ? apiKeyEnvironment : nil
+    }
+
     public init(vendor: String?, model: String?, apiKeyEnvironment: String?, neighborPages: Int, maxImages: Int,
-                maxContextCharacters: Int, systemPrompt: String?, timeoutSeconds: Int = 600) {
+                maxContextCharacters: Int, systemPrompt: String?, timeoutSeconds: Int = 600,
+                credentials: [String: String] = AgentConfig.defaultCredentials) {
       self.vendor = vendor; self.model = model; self.apiKeyEnvironment = apiKeyEnvironment
       self.neighborPages = neighborPages; self.maxImages = maxImages; self.maxContextCharacters = maxContextCharacters
-      self.systemPrompt = systemPrompt; self.timeoutSeconds = timeoutSeconds
+      self.systemPrompt = systemPrompt; self.timeoutSeconds = timeoutSeconds; self.credentials = credentials
     }
     public init(from decoder: Decoder) throws {
       let c = try decoder.container(keyedBy: AgentConfigCodingKeys.self)
@@ -105,7 +121,8 @@ public struct StriaConfig: Codable, Equatable, Sendable {
                 maxImages: try c.decodeIfPresent(Int.self, forKey: .maxImages) ?? 4,
                 maxContextCharacters: try c.decodeIfPresent(Int.self, forKey: .maxContextCharacters) ?? 60_000,
                 systemPrompt: try decodeOptional(String.self, key: .systemPrompt, in: c, defaultValue: nil),
-                timeoutSeconds: try c.decodeIfPresent(Int.self, forKey: .timeoutSeconds) ?? 600)
+                timeoutSeconds: try c.decodeIfPresent(Int.self, forKey: .timeoutSeconds) ?? 600,
+                credentials: try c.decodeIfPresent([String: String].self, forKey: .credentials) ?? AgentConfig.defaultCredentials)
     }
     public func encode(to encoder: Encoder) throws {
       var c = encoder.container(keyedBy: AgentConfigCodingKeys.self)
@@ -113,6 +130,7 @@ public struct StriaConfig: Codable, Equatable, Sendable {
       try c.encode(apiKeyEnvironment, forKey: .apiKeyEnvironment); try c.encode(neighborPages, forKey: .neighborPages)
       try c.encode(maxImages, forKey: .maxImages); try c.encode(maxContextCharacters, forKey: .maxContextCharacters)
       try c.encode(systemPrompt, forKey: .systemPrompt); try c.encode(timeoutSeconds, forKey: .timeoutSeconds)
+      try c.encode(credentials, forKey: .credentials)
     }
   }
 
@@ -153,7 +171,7 @@ public struct StriaConfig: Codable, Equatable, Sendable {
     if let vendor = agent.vendor, !KnownVendors.gateway.contains(vendor) {
       throw .config("Unknown agent vendor '\(vendor)'")
     }
-    for name in [ocr.apiKeyEnvironment, agent.apiKeyEnvironment].compactMap({ $0 }) {
+    for name in [ocr.apiKeyEnvironment, agent.apiKeyEnvironment].compactMap({ $0 }) + Array(agent.credentials.values) {
       guard name.range(of: "^[A-Z_][A-Z0-9_]*$", options: .regularExpression) != nil else {
         throw .config("Invalid apiKeyEnvironment name")
       }

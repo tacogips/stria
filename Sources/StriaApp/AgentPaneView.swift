@@ -46,17 +46,8 @@ struct AgentPaneView: View {
       switch tab {
       case .chat:
         scopePicker
-        if !agent.vendorConfigured {
-          VStack(alignment: .leading, spacing: 6) {
-            Label("No agent vendor is configured.", systemImage: "gearshape")
-            SettingsLink { Text("Open Settings…") }
-          }
-          .font(.callout)
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .padding(.horizontal)
-          .padding(.vertical, 8)
+        vendorBar
           .id(configRevision)
-        }
         if let notice = agent.notice {
           Label(notice, systemImage: "exclamationmark.circle")
             .font(.callout)
@@ -70,6 +61,66 @@ struct AgentPaneView: View {
       case .history:
         history
       }
+    }
+  }
+
+  /// Vendor and model for the next question. API vendors without a usable
+  /// key cannot be chosen (disabled, with the reason) and a warning with a
+  /// Settings link appears if the current selection loses its key.
+  private var vendorBar: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      HStack(spacing: 8) {
+        Menu {
+          ForEach(AgentPaneViewModel.vendorOptions, id: \.self) { vendor in
+            let availability = agent.availability(of: vendor)
+            Button {
+              Task { await agent.select(vendor: vendor) }
+            } label: {
+              switch availability {
+              case .ready: Text(SettingsViewModel.displayName(for: vendor))
+              case .needsCredentialName: Text("\(SettingsViewModel.displayName(for: vendor)) (no API key variable in Settings)")
+              case .missingKey(let name): Text("\(SettingsViewModel.displayName(for: vendor)) (\(name) not set)")
+              }
+            }
+            .disabled(!availability.isReady)
+          }
+        } label: {
+          Label(agent.selectedVendor.map { SettingsViewModel.displayName(for: $0) } ?? "Choose vendor…", systemImage: "cpu")
+        }
+        .fixedSize()
+        if let vendor = agent.selectedVendor {
+          Picker("Model", selection: Binding(
+            get: { agent.selectedModel ?? "" },
+            set: { model in Task { await agent.select(model: model) } }
+          )) {
+            ForEach(agent.modelOptions(for: vendor), id: \.self) { Text($0).tag($0) }
+          }
+          .pickerStyle(.menu)
+          .labelsHidden()
+          .fixedSize()
+        }
+        Spacer()
+      }
+      if let vendor = agent.selectedVendor, !agent.availability(of: vendor).isReady {
+        HStack(spacing: 8) {
+          Label(warningText(for: agent.availability(of: vendor)), systemImage: "exclamationmark.triangle")
+            .foregroundStyle(.orange)
+          SettingsLink { Text("Open Settings…") }
+        }
+        .font(.callout)
+      } else if agent.selectedVendor == nil {
+        Text("Choose the vendor and model that answer your questions.").font(.caption).foregroundStyle(.secondary)
+      }
+    }
+    .padding(.horizontal)
+    .padding(.top, 10)
+  }
+
+  private func warningText(for availability: VendorAvailability) -> String {
+    switch availability {
+    case .ready: ""
+    case .needsCredentialName: "This vendor has no API key variable configured."
+    case .missingKey(let name): "Environment variable \(name) is not set; relaunch Stria with it or pick another vendor."
     }
   }
 
@@ -140,7 +191,7 @@ struct AgentPaneView: View {
           .help("Stop waiting for this answer (Cmd-.)")
       } else {
         Button("Send") { agent.submit() }
-          .disabled(agent.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+          .disabled(agent.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !agent.canSend)
           .keyboardShortcut(.return, modifiers: .command)
           .help("Send the question (Cmd-Return); / focuses this field")
       }
@@ -212,10 +263,10 @@ private struct MessageView: View {
       VStack(alignment: .leading, spacing: 6) {
         Text(isUser ? "You" : "Assistant")
           .font(.caption.bold())
-          .foregroundStyle(isUser ? Flat.userBubbleText.opacity(0.85) : Color.secondary)
+          .foregroundStyle(.secondary)
         Text(Self.attributedContent(message.content, documentId: documentId))
           .textSelection(.enabled)
-          .foregroundStyle(message.status == .error ? Color.red : (isUser ? Flat.userBubbleText : Color.primary))
+          .foregroundStyle(message.status == .error ? Color.red : Color.primary)
           .environment(\.openURL, OpenURLAction { url in
             guard url.scheme == Self.citationScheme, let page = Int(url.host() ?? "") else { return .systemAction }
             onCitation(page)
@@ -223,8 +274,9 @@ private struct MessageView: View {
           })
       }
       .padding(10)
-      .background(isUser ? Flat.userBubble : Flat.assistantBubble)
-      .foregroundStyle(isUser ? Flat.userBubbleText : Color.primary)
+      .background(Flat.assistantBubble, in: RoundedRectangle(cornerRadius: Flat.bubbleRadius))
+      .overlay(RoundedRectangle(cornerRadius: Flat.bubbleRadius)
+        .stroke(isUser ? Flat.userBubble : Flat.border, lineWidth: isUser ? 1.5 : 1))
       if !isUser { Spacer(minLength: 40) }
     }
     .padding(.horizontal)
@@ -269,7 +321,8 @@ private struct StreamingAnswerView: View {
         }
       }
       .padding(10)
-      .background(Flat.assistantBubble)
+      .background(Flat.assistantBubble, in: RoundedRectangle(cornerRadius: Flat.bubbleRadius))
+      .overlay(RoundedRectangle(cornerRadius: Flat.bubbleRadius).stroke(Flat.border, lineWidth: 1))
       Spacer(minLength: 40)
     }
     .padding(.horizontal)

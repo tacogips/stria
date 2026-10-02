@@ -12,6 +12,8 @@ enum Flat {
   static let hover = Color(nsColor: .unemphasizedSelectedContentBackgroundColor)
   static let selected = Color(nsColor: .selectedContentBackgroundColor)
   static let border = Color(nsColor: .separatorColor)
+  /// Chat bubbles are the one rounded element (requested for readability).
+  static let bubbleRadius: CGFloat = 10
 }
 
 /// A square text field with a solid 1-point border.

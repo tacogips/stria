@@ -17,6 +17,14 @@ public enum LibraryViewMode: String, CaseIterable, Sendable {
   }
 }
 
+/// The OCR state of a whole document, for the library badge.
+public enum DocumentOCRState: Equatable, Sendable {
+  case notStarted
+  case partial
+  case complete
+  case hasFailures
+}
+
 public struct LibraryRow: Identifiable, Equatable, Sendable {
   public let id: String
   public var title: String
@@ -28,6 +36,13 @@ public struct LibraryRow: Identifiable, Equatable, Sendable {
   public var lastOpenedAt: Date?
   /// True while this app process is rendering or OCRing the document.
   public var isBusy: Bool
+
+  public var ocrState: DocumentOCRState {
+    if ocr.failed > 0 { return .hasFailures }
+    if ocr.done == 0 { return .notStarted }
+    if ocr.pending > 0 { return .partial }
+    return .complete
+  }
 
   public init(id: String, title: String, pageCount: Int, importStatus: ImportStatus, rendered: Int,
               ocr: OCRCounts, unavailableReason: String? = nil, lastOpenedAt: Date? = nil, isBusy: Bool = false) {
@@ -162,6 +177,20 @@ public final class LibraryViewModel {
     searchResults = []
     searchError = nil
     isSearching = false
+  }
+
+  /// OCR every page again, whatever its state (done pages are replaced).
+  public func rerunOCRAllPages(documentId: String) async {
+    guard let row = rows.first(where: { $0.id == documentId }), row.pageCount > 0 else { return }
+    setBusy(documentId, true)
+    defer { setBusy(documentId, false) }
+    do {
+      let summary = try await library.runOCR(documentId: documentId, selection: .pages(Array(1...row.pageCount)))
+      unavailableReasons[documentId] = summary.unavailableReason
+      await refresh()
+    } catch {
+      alert = (error as? StriaError)?.message ?? error.localizedDescription
+    }
   }
 
   public func remove(documentId: String) async {

@@ -9,10 +9,10 @@ struct AskCoordinator: Sendable {
     self.store = store
   }
 
-  static let notConfiguredReason = "Agent vendor is not configured. Choose one in Settings (app) or with `stria config set agent.vendor <vendor>`."
+  static let notConfiguredReason = "No agent vendor is selected. Choose a vendor and model in the chat pane, or set agent.vendor with `stria config set`."
 
   func ask(_ request: AskRequest) async throws -> AskResponse {
-    guard environment.config.agent.isConfigured else { throw StriaError.serviceUnavailable(Self.notConfiguredReason) }
+    let selection = try await resolveSelection(request.selection)
     let threadId = request.threadId ?? UUID().uuidString
     let previousMessages = try await store.threadMessages(threadId: threadId)
     let refs = try await selectContext(for: request, previousMessages: previousMessages)
@@ -26,10 +26,10 @@ struct AskCoordinator: Sendable {
       : nil
     let startedAt = environment.clock()
     let runId = UUID().uuidString
-    let settings = ServiceSettings(agent: environment.config.agent)
+    let settings = ServiceSettings(agent: environment.config.agent, vendor: selection.vendor, model: selection.model)
     let agentRequest = AgentRequest(
       question: request.question,
-      systemPrompt: systemPrompt(for: request.context),
+      systemPrompt: systemPrompt(for: request.context, vendor: selection.vendor),
       contextPages: contextPages,
       history: history,
       settings: settings
@@ -75,11 +75,22 @@ struct AskCoordinator: Sendable {
                        runId: runId, citations: AskResponse.citedPages(in: answer.text, contextPages: sent), contextPages: sent)
   }
 
+  /// Request selection, else the last chat selection stored in SQLite, else
+  /// the config's `agent.vendor` / `agent.model`; none means unconfigured.
+  func resolveSelection(_ requested: AgentSelection?) async throws -> AgentSelection {
+    if let requested { return requested }
+    if let stored = try await store.meta(AgentSelection.vendorKey), !stored.isEmpty {
+      return AgentSelection(vendor: stored, model: try await store.meta(AgentSelection.modelKey))
+    }
+    guard let vendor = environment.config.agent.vendor else { throw StriaError.serviceUnavailable(Self.notConfiguredReason) }
+    return AgentSelection(vendor: vendor, model: environment.config.agent.model)
+  }
+
   /// The configured (or default) prompt, plus the Stria tools section when
   /// the vendor can run commands and a `stria` executable exists.
-  func systemPrompt(for context: AskContext) -> String {
+  func systemPrompt(for context: AskContext, vendor: String) -> String {
     let base = environment.config.agent.systemPrompt ?? AgentDefaults.systemPrompt
-    guard let vendor = environment.config.agent.vendor, KnownVendors.cliVendors.contains(vendor),
+    guard KnownVendors.cliVendors.contains(vendor),
           let executable = StriaToolsPrompt.locateExecutable() else { return base }
     let docId: String?
     switch context {

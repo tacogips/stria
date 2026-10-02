@@ -1,7 +1,8 @@
 import Foundation
 
 public enum ConfigKeyPath {
-  public static let keys = [
+  public static let credentialKeys = KnownVendors.apiKeyVendors.sorted().map { "agent.credentials.\($0)" }
+  public static let keys = credentialKeys + [
     "agent.apiKeyEnvironment", "agent.maxContextCharacters", "agent.maxImages", "agent.model",
     "agent.neighborPages", "agent.systemPrompt", "agent.timeoutSeconds", "agent.vendor", "ocr.apiKeyEnvironment",
     "ocr.autoRunOnImport", "ocr.concurrency", "ocr.model", "ocr.prompt", "ocr.timeoutSeconds", "ocr.vendor", "render.dpi",
@@ -9,28 +10,35 @@ public enum ConfigKeyPath {
   ]
 
   public static func value(of key: String, in config: StriaConfig) throws(StriaError) -> JSONValue {
+    if let vendor = credentialVendor(key) { return config.agent.credentials[vendor].map(JSONValue.string) ?? .null }
     switch key {
-    case "render.dpi": .int(config.render.dpi)
-    case "render.imageFormat": .string(config.render.imageFormat.rawValue)
-    case "render.quality": .double(config.render.quality)
-    case "render.maxPixelDimension": .int(config.render.maxPixelDimension)
-    case "ocr.vendor": config.ocr.vendor.map(JSONValue.string) ?? .null
-    case "ocr.autoRunOnImport": .bool(config.ocr.autoRunOnImport)
-    case "ocr.model": config.ocr.model.map(JSONValue.string) ?? .null
-    case "ocr.apiKeyEnvironment": config.ocr.apiKeyEnvironment.map(JSONValue.string) ?? .null
-    case "ocr.concurrency": .int(config.ocr.concurrency)
-    case "ocr.prompt": config.ocr.prompt.map(JSONValue.string) ?? .null
-    case "ocr.timeoutSeconds": .int(config.ocr.timeoutSeconds)
-    case "agent.timeoutSeconds": .int(config.agent.timeoutSeconds)
-    case "agent.vendor": config.agent.vendor.map(JSONValue.string) ?? .null
-    case "agent.model": config.agent.model.map(JSONValue.string) ?? .null
-    case "agent.apiKeyEnvironment": config.agent.apiKeyEnvironment.map(JSONValue.string) ?? .null
-    case "agent.neighborPages": .int(config.agent.neighborPages)
-    case "agent.maxImages": .int(config.agent.maxImages)
-    case "agent.maxContextCharacters": .int(config.agent.maxContextCharacters)
-    case "agent.systemPrompt": config.agent.systemPrompt.map(JSONValue.string) ?? .null
+    case "render.dpi": return .int(config.render.dpi)
+    case "render.imageFormat": return .string(config.render.imageFormat.rawValue)
+    case "render.quality": return .double(config.render.quality)
+    case "render.maxPixelDimension": return .int(config.render.maxPixelDimension)
+    case "ocr.vendor": return config.ocr.vendor.map(JSONValue.string) ?? .null
+    case "ocr.autoRunOnImport": return .bool(config.ocr.autoRunOnImport)
+    case "ocr.model": return config.ocr.model.map(JSONValue.string) ?? .null
+    case "ocr.apiKeyEnvironment": return config.ocr.apiKeyEnvironment.map(JSONValue.string) ?? .null
+    case "ocr.concurrency": return .int(config.ocr.concurrency)
+    case "ocr.prompt": return config.ocr.prompt.map(JSONValue.string) ?? .null
+    case "ocr.timeoutSeconds": return .int(config.ocr.timeoutSeconds)
+    case "agent.timeoutSeconds": return .int(config.agent.timeoutSeconds)
+    case "agent.vendor": return config.agent.vendor.map(JSONValue.string) ?? .null
+    case "agent.model": return config.agent.model.map(JSONValue.string) ?? .null
+    case "agent.apiKeyEnvironment": return config.agent.apiKeyEnvironment.map(JSONValue.string) ?? .null
+    case "agent.neighborPages": return .int(config.agent.neighborPages)
+    case "agent.maxImages": return .int(config.agent.maxImages)
+    case "agent.maxContextCharacters": return .int(config.agent.maxContextCharacters)
+    case "agent.systemPrompt": return config.agent.systemPrompt.map(JSONValue.string) ?? .null
     default: throw .usage("Unknown config key '\(key)'")
     }
+  }
+
+  private static func credentialVendor(_ key: String) -> String? {
+    guard key.hasPrefix("agent.credentials.") else { return nil }
+    let vendor = String(key.dropFirst("agent.credentials.".count))
+    return KnownVendors.apiKeyVendors.contains(vendor) ? vendor : nil
   }
 
   public static func setting(_ key: String, to raw: String, in config: StriaConfig) throws(StriaError) -> StriaConfig {
@@ -63,7 +71,8 @@ public enum ConfigKeyPath {
     case "agent.model": updated.agent.model = nil
     case "agent.apiKeyEnvironment": updated.agent.apiKeyEnvironment = nil
     case "agent.systemPrompt": updated.agent.systemPrompt = nil
-    default: throw .usage("Config key '\(key)' cannot be null")
+    default:
+      if let vendor = credentialVendor(key) { updated.agent.credentials[vendor] = nil } else { throw .usage("Config key '\(key)' cannot be null") }
     }
   }
 
@@ -104,7 +113,8 @@ public enum ConfigKeyPath {
     case "agent.maxContextCharacters": updated.agent.maxContextCharacters = try integer(raw, key: key)
     case "agent.systemPrompt": updated.agent.systemPrompt = raw
     case "agent.timeoutSeconds": updated.agent.timeoutSeconds = try integer(raw, key: key)
-    default: throw .usage("Unknown config key '\(key)'")
+    default:
+      if let vendor = credentialVendor(key) { updated.agent.credentials[vendor] = raw } else { throw .usage("Unknown config key '\(key)'") }
     }
   }
 

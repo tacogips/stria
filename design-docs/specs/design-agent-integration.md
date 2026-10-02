@@ -322,7 +322,11 @@ The API at that revision, as stated in the intake, is used only inside
    app's Cancel button, an OCR run being cancelled), stria sends
    `session/cancel` so a CLI vendor process stops, and the call fails with
    `failed("timed out after N s")` or rethrows `CancellationError`.
-8. `client.stop()` runs on every exit path. The in-memory transport only
+8. Per-vendor CLI arguments (`GatewayPromptRunner.vendorArguments`): codex
+   gets `--skip-git-repo-check`, because sessions run in the data root's
+   `cache/`, which is not a git repository, and `codex exec` refuses that
+   otherwise.
+9. `client.stop()` runs on every exit path. The in-memory transport only
    finishes on close, so without it each OCR page would leak the pump tasks.
 
 Each call creates its own agent, connection and session. Sessions are never

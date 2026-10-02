@@ -12,6 +12,17 @@ public enum HistoryMode: Equatable, Sendable {
   case document
 }
 
+/// Whether a vendor can be used right now.
+public enum VendorAvailability: Equatable, Sendable {
+  case ready
+  /// An API vendor whose credential variable name is not configured.
+  case needsCredentialName
+  /// An API vendor whose variable is configured but not set in this process.
+  case missingKey(String)
+
+  public var isReady: Bool { self == .ready }
+}
+
 @MainActor
 @Observable
 public final class AgentPaneViewModel {
@@ -22,6 +33,9 @@ public final class AgentPaneViewModel {
   public private(set) var inFlight = false
   /// The partial answer while a request streams; nil otherwise.
   public private(set) var streamingAnswer: String?
+  /// The vendor and model used for the next question (chosen in the composer).
+  public private(set) var selectedVendor: String?
+  public private(set) var selectedModel: String?
   /// Bumped to ask the view to focus the input field (the `/` shortcut).
   public private(set) var focusInputRequest = 0
 
@@ -37,14 +51,74 @@ public final class AgentPaneViewModel {
 
   private let library: StriaLibrary
   private let reader: ReaderViewModel
+  private let processEnvironment: [String: String]
   private var sendTask: Task<Void, Never>?
   private var historyReloadTask: Task<Void, Never>?
   private let historyDebounce: Duration
 
-  public init(library: StriaLibrary, reader: ReaderViewModel, historyDebounce: Duration = .milliseconds(300)) {
+  public init(library: StriaLibrary, reader: ReaderViewModel, historyDebounce: Duration = .milliseconds(300),
+              processEnvironment: [String: String] = ProcessInfo.processInfo.environment) {
     self.library = library
     self.reader = reader
     self.historyDebounce = historyDebounce
+    self.processEnvironment = processEnvironment
+    // Start from config; loadSelection() replaces it with the last chat choice.
+    selectedVendor = library.environment.config.agent.vendor
+    selectedModel = library.environment.config.agent.model
+  }
+
+  public static let vendorOptions = KnownVendors.gateway
+
+  /// Restores the last selection from SQLite (falling back to config).
+  public func loadSelection() async {
+    if let stored = try? await library.lastAgentSelection() {
+      selectedVendor = stored.vendor
+      selectedModel = stored.model
+    } else if let vendor = library.environment.config.agent.vendor {
+      selectedVendor = vendor
+      selectedModel = library.environment.config.agent.model
+    }
+  }
+
+  public func availability(of vendor: String) -> VendorAvailability {
+    guard KnownVendors.apiKeyVendors.contains(vendor) else { return .ready }
+    guard let name = library.environment.config.agent.credential(for: vendor) else { return .needsCredentialName }
+    guard let value = processEnvironment[name], !value.isEmpty else { return .missingKey(name) }
+    return .ready
+  }
+
+  public func modelOptions(for vendor: String) -> [String] {
+    var models = ModelCatalog.models(for: vendor)
+    if vendor == selectedVendor, let model = selectedModel, !model.isEmpty, !models.contains(model) { models.append(model) }
+    return models
+  }
+
+  /// Picks a vendor (only when it is usable) with its default model, and remembers it.
+  public func select(vendor: String) async {
+    guard availability(of: vendor).isReady else { return }
+    selectedVendor = vendor
+    selectedModel = ModelCatalog.defaultModel(for: vendor)
+    await persistSelection()
+  }
+
+  public func select(model: String) async {
+    guard selectedVendor != nil else { return }
+    selectedModel = model.trimmingCharacters(in: .whitespacesAndNewlines)
+    await persistSelection()
+  }
+
+  public var selection: AgentSelection? {
+    guard let vendor = selectedVendor, let model = selectedModel, !model.isEmpty else { return nil }
+    return AgentSelection(vendor: vendor, model: model)
+  }
+
+  public var canSend: Bool {
+    guard let vendor = selectedVendor else { return false }
+    return selection != nil && availability(of: vendor).isReady && !inFlight
+  }
+
+  private func persistSelection() async {
+    try? await library.setLastAgentSelection(selection ?? selectedVendor.map { AgentSelection(vendor: $0, model: nil) })
   }
 
   /// Starts `send()` as a cancellable task (the view's Send button).
@@ -69,7 +143,7 @@ public final class AgentPaneViewModel {
     }
   }
 
-  public var vendorConfigured: Bool { library.environment.config.agent.isConfigured }
+  public var vendorConfigured: Bool { selection != nil }
 
   public var scopeDescription: String {
     let page = reader.currentPage
@@ -96,6 +170,10 @@ public final class AgentPaneViewModel {
   public func send() async {
     let question = input.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !question.isEmpty, !inFlight else { return }
+    guard let selection, availability(of: selection.vendor).isReady else {
+      notice = selectedVendor == nil ? "Choose a vendor and model first." : "The selected vendor needs an API key; see Settings."
+      return
+    }
     inFlight = true
     notice = nil
     let requestThreadId = threadId ?? UUID().uuidString
@@ -115,7 +193,7 @@ public final class AgentPaneViewModel {
     transcript.append(ChatMessageRecord(id: Self.pendingMessageID, threadId: requestThreadId, role: .user, status: .ok,
                                         content: question, documentId: reader.documentId, pageNumber: reader.currentPage,
                                         createdAt: Date()))
-    let request = AskRequest(question: question, context: context, threadId: requestThreadId) { [weak self] chunk in
+    let request = AskRequest(question: question, context: context, threadId: requestThreadId, selection: selection) { [weak self] chunk in
       Task { @MainActor in self?.appendStreamedChunk(chunk) }
     }
     do {

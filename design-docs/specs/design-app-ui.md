@@ -34,10 +34,11 @@ or answers.
 
 The reader toolbar contains:
 
-- leading: one sidebar toggle (Stria's own, the built-in one is removed
-  with `.toolbar(removing: .sidebarToggle)` so its tooltip can name the
-  shortcuts), and a "< Library" back button that returns home (also `Esc`, `Cmd-Shift-L` via
-  the View menu, and a "< Library" row at the top of the left pane);
+- no navigation items: the built-in sidebar toggle is removed
+  (`.toolbar(removing: .sidebarToggle)`). The left pane's header carries
+  "< Library" (also `Esc`, `Cmd-Shift-L`) on the left and a hide-sidebar icon
+  (`Ctrl-Cmd-S`, `Shift+L`) on the right; when the sidebar is collapsed a
+  small tab at the PDF's left edge brings it back, as in chilla;
 - principal: a page field showing `n of N` with previous and next buttons;
 - trailing: a `.searchable(placement: .toolbar)` search field and an
   inspector toggle button.
@@ -79,8 +80,17 @@ The reader toolbar contains:
   shows), the `PDFDocument` is parsed off the main actor, `last_opened_at`
   is set, and background cache expansion of all pages starts. A failed open
   returns to the library with the error.
-- Row context menu: "Run OCR" (pending pages), "Retry Failed OCR" and
-  "Remove..." (also the Delete key on the selected row). Removal asks for
+- Each row and card shows an OCR badge for documents that finished
+  rendering: "OCR done" (green), "OCR n/N" (partial, blue), "Not OCRed"
+  (grey) or "OCR n failed" (orange), with a tooltip giving the counts
+  (`LibraryRow.ocrState`).
+- Row context menu: "Run OCR on Remaining Pages..." (pending and failed),
+  "Re-OCR All Pages..." (every page, replacing existing text; available
+  whatever the current state) and "Remove..."; the toolbar Run OCR button
+  (`Cmd-Shift-O`) picks remaining pages, or all pages when the document is
+  complete. Every OCR run asks for confirmation first, naming the page
+  count, the OCR vendor and model, and whether existing text is replaced.
+  The earlier "Run OCR" / "Retry Failed OCR" items are replaced by these (also the Delete key on the selected row). Removal asks for
   confirmation, names what is deleted (stored copy, page images, OCR text,
   chat history) and states that the imported file itself is untouched. It
   calls `StriaLibrary.removeDocument` (`design-storage.md#document-removal`).
@@ -206,10 +216,11 @@ while a search is active.
 
 ## Visual Style and Appearance
 
-Flat and solid: no corner radius and no translucent fills anywhere in the
-app (`Flat` in `StriaApp`). Chat bubbles are square, the user's in the
-solid accent colour with white text and the assistant's in the control
-background colour; text fields are square with a 1-point separator-colour
+Flat and solid: no translucent fills, and no corner radius except on chat
+bubbles (`Flat` in `StriaApp`). Chat bubbles have a 10-point radius and the
+control background colour; the user's is outlined in the accent colour
+(not filled, so the text stays easy to read) and the assistant's in the
+separator colour; text fields are square with a 1-point separator-colour
 border (`FlatTextFieldStyle`); hover and selection use the system's solid
 selection colours; the setup banner is a solid control-background strip.
 Every fill is an opaque system colour, so both modes stay readable.

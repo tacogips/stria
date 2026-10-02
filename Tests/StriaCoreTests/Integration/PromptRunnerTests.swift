@@ -71,6 +71,18 @@ private extension URL {
     }
   }
 
+  @Test func codexRunsOutsideAGitRepository() async throws {
+    try await withTestDataRoot { paths in
+      let executor = FakeGatewayExecutor(.reply("ok"))
+      let runner = GatewayPromptRunner(makeExecutor: { _ in executor })
+      let settings = ServiceSettings(vendor: "codex", model: "gpt-6-luna", apiKeyEnvironment: nil, timeoutSeconds: 30)
+      _ = try await runner.run(settings: settings, systemPrompt: nil, parts: [.text("hello")],
+                               cwd: paths.cache, environment: [:], secretValue: nil)
+      #expect(await executor.params.first?.arguments == ["--skip-git-repo-check"])
+      #expect(GatewayPromptRunner.vendorArguments(.claudeCode).isEmpty)
+    }
+  }
+
   @Test func hungVendorTimesOutAsFailed() async throws {
     try await withTestDataRoot { paths in
       let executor = FakeGatewayExecutor(.hang)
@@ -81,7 +93,8 @@ private extension URL {
         try await runner.run(settings: settings, systemPrompt: nil, parts: [.text("prompt")],
                              cwd: paths.cache, environment: [:], secretValue: nil)
       }
-      #expect(Date().timeIntervalSince(started) < 10)
+      // Generous bound: the full suite runs in parallel; the point is "not the 60 s hang".
+      #expect(Date().timeIntervalSince(started) < 30)
     }
   }
 

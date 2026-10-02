@@ -4,20 +4,30 @@ import StriaCore
 struct LeftPaneView: View {
   @Bindable var reader: ReaderViewModel
   var onBack: (() -> Void)?
+  var onHide: (() -> Void)?
   @State private var expandedIDs: Set<String> = []
 
   var body: some View {
     VStack(spacing: 0) {
-      if let onBack {
-        Button(action: onBack) {
-          Label("Library", systemImage: "chevron.left")
-            .frame(maxWidth: .infinity, alignment: .leading)
+      HStack {
+        if let onBack {
+          Button(action: onBack) {
+            Label("Library", systemImage: "chevron.left")
+          }
+          .buttonStyle(.plain)
+          .help("Back to the library (Esc or Cmd-Shift-L)")
         }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 12)
-        .padding(.top, 10)
-        .help("Back to the library (Esc)")
+        Spacer()
+        if let onHide {
+          Button(action: onHide) {
+            Image(systemName: "sidebar.left")
+          }
+          .buttonStyle(.plain)
+          .help("Hide the sidebar (Ctrl-Cmd-S or Shift+L)")
+        }
       }
+      .padding(.horizontal, 12)
+      .padding(.top, 10)
       Picker("Sidebar", selection: $reader.sidebarMode) {
         Text("Contents").tag(SidebarMode.contents)
         Text("Thumbnails").tag(SidebarMode.thumbnails)

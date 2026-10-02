@@ -10,16 +10,16 @@ public final class SettingsViewModel {
   /// "" stands for "not configured".
   public static let notConfigured = ""
   public static let ocrVendorOptions = [notConfigured, KnownVendors.pdfTextLayer] + KnownVendors.gateway
-  public static let agentVendorOptions = [notConfigured] + KnownVendors.gateway
+  /// API vendors whose credential variable name is set in Settings.
+  public static let credentialVendors = KnownVendors.apiKeyVendors.sorted()
 
   public var ocrVendor = notConfigured
   public var ocrModel = ""
   public var ocrAPIKeyEnvironment = ""
   public var ocrAutoRunOnImport = true
   public var ocrConcurrency = 2
-  public var agentVendor = notConfigured
-  public var agentModel = ""
-  public var agentAPIKeyEnvironment = ""
+  /// Credential variable name per API vendor ("" = none).
+  public var credentials: [String: String] = [:]
   /// The prompt as shown for editing; the default text when none is set.
   public var agentSystemPrompt = AgentDefaults.systemPrompt
   public private(set) var error: String?
@@ -34,14 +34,24 @@ public final class SettingsViewModel {
 
   private let library: StriaLibrary
   private let modelLister: @Sendable (String, String?) async throws -> [String]
+  private let processEnvironment: [String: String]
 
   public init(library: StriaLibrary,
+              processEnvironment: [String: String] = ProcessInfo.processInfo.environment,
               modelLister: @escaping @Sendable (String, String?) async throws -> [String] = {
                 try await GatewayModelCatalogService.models(vendor: $0, apiKeyEnvironment: $1)
               }) {
     self.library = library
+    self.processEnvironment = processEnvironment
     self.modelLister = modelLister
     load()
+  }
+
+  /// Whether the named variable is set in this app's environment.
+  public func environmentHasValue(_ name: String) -> Bool {
+    let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty, let value = processEnvironment[trimmed] else { return false }
+    return !value.isEmpty
   }
 
   /// Models the picker offers for a vendor: the known catalog plus anything
@@ -57,8 +67,9 @@ public final class SettingsViewModel {
   public func canFetchModels(for vendor: String) -> Bool { ModelCatalog.supportsListing(vendor) }
 
   public func fetchModels(ocr: Bool) async {
-    let vendor = ocr ? ocrVendor : agentVendor
-    let keyName = Self.trimmed(ocr ? ocrAPIKeyEnvironment : agentAPIKeyEnvironment)
+    _ = ocr
+    let vendor = ocrVendor
+    let keyName = Self.trimmed(ocrAPIKeyEnvironment)
     isFetchingModels = true
     modelFetchError = nil
     defer { isFetchingModels = false }
@@ -81,9 +92,8 @@ public final class SettingsViewModel {
     ocrAPIKeyEnvironment = config.ocr.apiKeyEnvironment ?? ""
     ocrAutoRunOnImport = config.ocr.autoRunOnImport
     ocrConcurrency = config.ocr.concurrency
-    agentVendor = config.agent.vendor ?? Self.notConfigured
-    agentModel = config.agent.model ?? ""
-    agentAPIKeyEnvironment = config.agent.apiKeyEnvironment ?? ""
+    credentials = config.agent.credentials
+    for vendor in Self.credentialVendors where credentials[vendor] == nil { credentials[vendor] = "" }
     agentSystemPrompt = config.agent.systemPrompt ?? AgentDefaults.systemPrompt
     error = nil
   }
@@ -140,10 +150,6 @@ public final class SettingsViewModel {
       if !ocrModel.isEmpty, !Self.modelMayBelong(ocrModel, to: ocrVendor) { ocrModel = "" }
       if ocrModel.isEmpty, let model = Self.suggestedModel(for: ocrVendor) { ocrModel = model }
       if ocrAPIKeyEnvironment.isEmpty, let name = Self.suggestedAPIKeyEnvironment(for: ocrVendor) { ocrAPIKeyEnvironment = name }
-    } else {
-      if !agentModel.isEmpty, !Self.modelMayBelong(agentModel, to: agentVendor) { agentModel = "" }
-      if agentModel.isEmpty, let model = Self.suggestedModel(for: agentVendor) { agentModel = model }
-      if agentAPIKeyEnvironment.isEmpty, let name = Self.suggestedAPIKeyEnvironment(for: agentVendor) { agentAPIKeyEnvironment = name }
     }
   }
 
@@ -161,18 +167,14 @@ public final class SettingsViewModel {
     config.ocr.apiKeyEnvironment = Self.trimmed(ocrAPIKeyEnvironment)
     config.ocr.autoRunOnImport = ocrAutoRunOnImport
     config.ocr.concurrency = ocrConcurrency
-    config.agent.vendor = agentVendor == Self.notConfigured ? nil : agentVendor
-    config.agent.model = Self.trimmed(agentModel)
-    config.agent.apiKeyEnvironment = Self.trimmed(agentAPIKeyEnvironment)
+    config.agent.credentials = credentials.reduce(into: [:]) { result, entry in
+      if let name = Self.trimmed(entry.value) { result[entry.key] = name }
+    }
     // The default is stored as nil, so a future default change reaches users who never edited it.
     config.agent.systemPrompt = systemPromptIsDefault ? nil : Self.trimmed(agentSystemPrompt)
     if Self.needsModel(ocrVendor), config.ocr.model == nil { throw .config("OCR: a model is required for \(Self.displayName(for: ocrVendor))") }
     if Self.requiresAPIKey(ocrVendor), config.ocr.apiKeyEnvironment == nil {
       throw .config("OCR: an API key environment variable name is required for \(Self.displayName(for: ocrVendor))")
-    }
-    if Self.needsModel(agentVendor), config.agent.model == nil { throw .config("Agent: a model is required for \(Self.displayName(for: agentVendor))") }
-    if Self.requiresAPIKey(agentVendor), config.agent.apiKeyEnvironment == nil {
-      throw .config("Agent: an API key environment variable name is required for \(Self.displayName(for: agentVendor))")
     }
     try config.validate()
     return config

@@ -26,6 +26,7 @@ struct GatewayPromptRunner: Sendable {
       vendor: vendor,
       model: settings.model,
       systemPrompt: systemPrompt,
+      arguments: Self.vendorArguments(vendor),
       apiKeyEnvironment: settings.apiKeyEnvironment
     )
     let agent = GatewayACPAgent(defaults: defaults, executor: makeExecutor(environment))
@@ -56,6 +57,13 @@ struct GatewayPromptRunner: Sendable {
       await client.stop()
       throw ServiceError.failed(SecretRedactor.redact(String(describing: error), secrets: [secretValue].compactMap { $0 }))
     }
+  }
+
+  /// Extra CLI arguments per vendor. Sessions run in the data root's cache
+  /// folder, which is not a git repository, and `codex exec` refuses to run
+  /// there without `--skip-git-repo-check`.
+  static func vendorArguments(_ vendor: GatewayVendor) -> [String] {
+    vendor == .codex ? ["--skip-git-repo-check"] : []
   }
 
   /// Races the prompt turn against the deadline. On timeout or cancellation

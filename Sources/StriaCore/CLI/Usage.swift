@@ -13,7 +13,7 @@ public enum Usage {
     page image <docId> <page> [--output <path>]
     page text <docId> <page>
     search <query> [--doc <docId>] [--limit <n>]
-    ask <question> [--doc <docId>] [--page <n>] [--query <terms>] [--limit <n>] [--thread <id>]
+    ask <question> [--doc <docId>] [--page <n>] [--query <terms>] [--limit <n>] [--thread <id>] [--vendor <v> [--model <m>]]
     history [--doc <docId>] [--page <n>] [--limit <n>]
     config get [<key>]
     config set <key> <value>

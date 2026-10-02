@@ -121,3 +121,29 @@ import Testing
     }
   }
 }
+
+@Suite @MainActor struct LibraryOCRStateTests {
+  @Test func ocrStateAndRerunAllPagesReplacesText() async throws {
+    try await withAppModelDataRoot { paths in
+      let ocr = FakeOCRService()
+      var config = StriaConfig.testing
+      config.ocr.autoRunOnImport = false
+      let (library, source) = try makeAppModelFixture(paths: paths, pageTexts: ["one", "two"], ocr: ocr, config: config)
+      let model = LibraryViewModel(library: library)
+      model.importFiles([source])
+      await model.waitForImports()
+      let id = try #require(model.rows.first?.id)
+      #expect(model.rows.first?.ocrState == .notStarted)
+      await ocr.script(docId: id, page: 1, .success("first"))
+      await ocr.script(docId: id, page: 2, .failure(.failed("boom")))
+      await model.runOCR(documentId: id, retryFailed: false)
+      #expect(model.rows.first?.ocrState == .hasFailures)
+      await ocr.script(docId: id, page: 1, .success("first again"))
+      await ocr.script(docId: id, page: 2, .success("second"))
+      await model.rerunOCRAllPages(documentId: id)
+      #expect(model.rows.first?.ocrState == .complete)
+      #expect(try await library.pageText(documentId: id, page: 1).ocrText == "first again")
+      #expect(await ocr.requests.count == 4)
+    }
+  }
+}

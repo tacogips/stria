@@ -11,7 +11,12 @@ public struct ServiceSettings: Equatable, Sendable {
     self.init(vendor: ocr.vendor ?? "", model: ocr.model, apiKeyEnvironment: ocr.apiKeyEnvironment, timeoutSeconds: ocr.timeoutSeconds)
   }
   public init(agent: StriaConfig.AgentConfig) {
-    self.init(vendor: agent.vendor ?? "", model: agent.model, apiKeyEnvironment: agent.apiKeyEnvironment, timeoutSeconds: agent.timeoutSeconds)
+    self.init(agent: agent, vendor: agent.vendor ?? "", model: agent.model)
+  }
+  /// Settings for a vendor and model chosen per question; the credential
+  /// comes from the agent's per-vendor table.
+  public init(agent: StriaConfig.AgentConfig, vendor: String, model: String?) {
+    self.init(vendor: vendor, model: model, apiKeyEnvironment: agent.credential(for: vendor), timeoutSeconds: agent.timeoutSeconds)
   }
 }
 public enum ServiceError: Error, Equatable, Sendable { case unavailable(String), failed(String) }

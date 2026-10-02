@@ -2,18 +2,33 @@ import SwiftUI
 import StriaCore
 import UniformTypeIdentifiers
 
+/// A document waiting for the user to confirm an OCR run.
+struct PendingOCR: Identifiable {
+  enum Kind { case remaining, allPages }
+  let row: LibraryRow
+  let kind: Kind
+  var id: String { row.id + (kind == .allPages ? "-all" : "-remaining") }
+}
+
 struct LibraryView: View {
   @Bindable var model: AppModel
   @FocusedValue(\.striaImport) private var importAction
   @State private var selection: String?
   @State private var pendingRemoval: LibraryRow?
+  /// A document waiting for the user to confirm an OCR run.
+  @State private var pendingOCR: PendingOCR?
+
   @State private var hoveredID: String?
   @AppStorage(LibraryViewMode.storageKey) private var viewMode = LibraryViewMode.list
 
   var body: some View {
+    withDialogs
+  }
+
+  private var content: some View {
     VStack(spacing: 0) {
-      if !model.library.ocrConfigured || !model.library.agentConfigured {
-        SetupBanner(ocrConfigured: model.library.ocrConfigured, agentConfigured: model.library.agentConfigured)
+      if !model.library.ocrConfigured {
+        SetupBanner()
           .id(model.configRevision)
       }
       if model.library.isSearching {
@@ -28,6 +43,95 @@ struct LibraryView: View {
     .onSubmit(of: .search) { Task { await model.library.submitSearch() } }
     .onChange(of: model.library.searchQuery) { _, query in
       if query.isEmpty { model.library.clearSearch() }
+    }
+  }
+
+  private var withNavigation: some View {
+    content
+    .navigationTitle("Library")
+    .focusedSceneValue(\.striaLibraryViewMode, $viewMode)
+    .focusedSceneValue(\.striaRunOCR, { runOCRForSelection() })
+    .toolbar {
+      ToolbarItem(placement: .principal) {
+        Picker("View", selection: $viewMode) {
+          ForEach(LibraryViewMode.allCases, id: \.self) { mode in
+            Label(mode.title, systemImage: mode == .list ? "list.bullet" : "square.grid.2x2").tag(mode)
+          }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .help("List or card view (Cmd-1 / Cmd-2)")
+      }
+    }
+  }
+
+  private var withActions: some View {
+    withNavigation
+    .onKeyPress(.return) {
+      guard let selection else { return .ignored }
+      open(selection)
+      return .handled
+    }
+    .onDeleteCommand {
+      guard let selection, let row = model.library.rows.first(where: { $0.id == selection }) else { return }
+      pendingRemoval = row
+    }
+    .dropDestination(for: URL.self) { urls, _ in
+      importDropped(urls)
+      return !urls.isEmpty
+    }
+    .toolbar {
+      ToolbarItem(placement: .primaryAction) {
+        Button { importAction?() } label: { Label("Import", systemImage: "square.and.arrow.down") }
+          .help("Import PDF files (Cmd-O)")
+      }
+      ToolbarItem(placement: .primaryAction) {
+        Button { runOCRForSelection() } label: {
+          Label("Run OCR", systemImage: "text.viewfinder")
+        }
+        .disabled(selection == nil || !model.library.ocrConfigured)
+        .help(model.library.ocrConfigured
+              ? "OCR the selected document (Cmd-Shift-O): remaining pages, or all pages again when it is complete. Asks first."
+              : "Choose an OCR vendor in Settings first (Agent > Settings…)")
+      }
+    }
+  }
+
+  private var withDialogs: some View {
+    withActions
+    .alert("Error", isPresented: Binding(
+      get: { model.library.alert != nil },
+      set: { if !$0 { model.library.alert = nil } }
+    )) {
+      Button("OK", role: .cancel) { model.library.alert = nil }
+    } message: {
+      Text(model.library.alert ?? "")
+    }
+    .onChange(of: model.library.selectedID) { _, id in selection = id }
+    .confirmationDialog(
+      pendingOCR.map(confirmationTitle) ?? "",
+      isPresented: Binding(get: { pendingOCR != nil }, set: { if !$0 { pendingOCR = nil } }),
+      presenting: pendingOCR
+    ) { pending in
+      Button(pending.kind == .allPages ? "Re-OCR All Pages" : "Run OCR") {
+        switch pending.kind {
+        case .remaining: Task { await model.library.runOCR(documentId: pending.row.id, retryFailed: true) }
+        case .allPages: Task { await model.library.rerunOCRAllPages(documentId: pending.row.id) }
+        }
+      }
+      Button("Cancel", role: .cancel) {}
+    } message: { pending in
+      Text(confirmationMessage(pending))
+    }
+    .confirmationDialog(
+      "Remove \"\(pendingRemoval?.title ?? "")\"?",
+      isPresented: Binding(get: { pendingRemoval != nil }, set: { if !$0 { pendingRemoval = nil } }),
+      presenting: pendingRemoval
+    ) { row in
+      Button("Remove", role: .destructive) { Task { await model.library.remove(documentId: row.id) } }
+      Button("Cancel", role: .cancel) {}
+    } message: { _ in
+      Text("This deletes the stored copy, page images, OCR text and chat history for this document. The file you imported is not touched.")
     }
   }
 
@@ -96,66 +200,6 @@ struct LibraryView: View {
         }
       }
     }
-    .navigationTitle("Library")
-    .focusedSceneValue(\.striaLibraryViewMode, $viewMode)
-    .focusedSceneValue(\.striaRunOCR, { runOCRForSelection() })
-    .toolbar {
-      ToolbarItem(placement: .principal) {
-        Picker("View", selection: $viewMode) {
-          ForEach(LibraryViewMode.allCases, id: \.self) { mode in
-            Label(mode.title, systemImage: mode == .list ? "list.bullet" : "square.grid.2x2").tag(mode)
-          }
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .help("List or card view (Cmd-1 / Cmd-2)")
-      }
-    }
-    .onKeyPress(.return) {
-      guard let selection else { return .ignored }
-      open(selection)
-      return .handled
-    }
-    .onDeleteCommand {
-      guard let selection, let row = model.library.rows.first(where: { $0.id == selection }) else { return }
-      pendingRemoval = row
-    }
-    .dropDestination(for: URL.self) { urls, _ in
-      importDropped(urls)
-      return !urls.isEmpty
-    }
-    .toolbar {
-      ToolbarItem(placement: .primaryAction) {
-        Button { importAction?() } label: { Label("Import", systemImage: "square.and.arrow.down") }
-          .help("Import PDF files (Cmd-O)")
-      }
-      ToolbarItem(placement: .primaryAction) {
-        Button { runOCRForSelection() } label: {
-          Label("Run OCR", systemImage: "text.viewfinder")
-        }
-        .disabled(selection == nil || !model.library.ocrConfigured)
-        .help(model.library.ocrConfigured ? "OCR the pending and failed pages of the selected document (Cmd-Shift-O)" : "Choose an OCR vendor in Settings first (Agent > Settings…)")
-      }
-    }
-    .alert("Error", isPresented: Binding(
-      get: { model.library.alert != nil },
-      set: { if !$0 { model.library.alert = nil } }
-    )) {
-      Button("OK", role: .cancel) { model.library.alert = nil }
-    } message: {
-      Text(model.library.alert ?? "")
-    }
-    .onChange(of: model.library.selectedID) { _, id in selection = id }
-    .confirmationDialog(
-      "Remove \"\(pendingRemoval?.title ?? "")\"?",
-      isPresented: Binding(get: { pendingRemoval != nil }, set: { if !$0 { pendingRemoval = nil } }),
-      presenting: pendingRemoval
-    ) { row in
-      Button("Remove", role: .destructive) { Task { await model.library.remove(documentId: row.id) } }
-      Button("Cancel", role: .cancel) {}
-    } message: { _ in
-      Text("This deletes the stored copy, page images, OCR text and chat history for this document. The file you imported is not touched.")
-    }
   }
 
   private var documentCards: some View {
@@ -177,15 +221,34 @@ struct LibraryView: View {
   @ViewBuilder private func rowMenu(_ row: LibraryRow) -> some View {
     Button("Open") { open(row.id) }
     Divider()
-    Button("Run OCR") { Task { await model.library.runOCR(documentId: row.id, retryFailed: false) } }
-    Button("Retry Failed OCR") { Task { await model.library.runOCR(documentId: row.id, retryFailed: true) } }
+    Button("Run OCR on Remaining Pages…") { pendingOCR = PendingOCR(row: row, kind: .remaining) }
+      .disabled(!model.library.ocrConfigured || row.ocr.pending + row.ocr.failed == 0)
+    Button("Re-OCR All Pages…") { pendingOCR = PendingOCR(row: row, kind: .allPages) }
+      .disabled(!model.library.ocrConfigured)
     Divider()
     Button("Remove…", role: .destructive) { pendingRemoval = row }
   }
 
   private func runOCRForSelection() {
-    guard let selection, model.library.ocrConfigured else { return }
-    Task { await model.library.runOCR(documentId: selection, retryFailed: true) }
+    guard let selection, model.library.ocrConfigured,
+          let row = model.library.rows.first(where: { $0.id == selection }) else { return }
+    pendingOCR = PendingOCR(row: row, kind: row.ocr.pending + row.ocr.failed > 0 ? .remaining : .allPages)
+  }
+
+  private func confirmationTitle(_ pending: PendingOCR) -> String {
+    switch pending.kind {
+    case .remaining: "Run OCR on \(pending.row.ocr.pending + pending.row.ocr.failed) pages of \"\(pending.row.title)\"?"
+    case .allPages: "Re-OCR all \(pending.row.pageCount) pages of \"\(pending.row.title)\"?"
+    }
+  }
+
+  private func confirmationMessage(_ pending: PendingOCR) -> String {
+    let vendor = model.settings.ocrVendor
+    let using = "This calls \(SettingsViewModel.displayName(for: vendor)) (\(model.settings.ocrModel.isEmpty ? "no model" : model.settings.ocrModel)) once per page."
+    switch pending.kind {
+    case .remaining: return using + " Pages already OCRed are kept."
+    case .allPages: return using + " Existing OCR text is replaced; a page that fails keeps no text until it is retried."
+    }
   }
 
   private func open(_ id: String) {
@@ -242,7 +305,10 @@ private struct LibraryRowView: View {
           }
           Text("\(row.pageCount) pages").foregroundStyle(.secondary)
         }
-        Text(statusText).font(.caption).foregroundStyle(.secondary)
+        HStack(spacing: 8) {
+          if row.importStatus == .ready { OCRBadge(row: row) }
+          Text(statusText).font(.caption).foregroundStyle(.secondary)
+        }
       }
       if row.isBusy {
         ProgressView().controlSize(.small)
@@ -264,16 +330,7 @@ private struct LibraryRowView: View {
 
 /// Shown until both vendors are chosen; opens the Settings window.
 private struct SetupBanner: View {
-  let ocrConfigured: Bool
-  let agentConfigured: Bool
-
-  private var message: String {
-    switch (ocrConfigured, agentConfigured) {
-    case (false, false): "Choose an OCR vendor and an agent vendor to enable text search and questions."
-    case (false, true): "Choose an OCR vendor to make imported pages searchable."
-    default: "Choose an agent vendor to ask questions about pages."
-    }
-  }
+  private let message = "Choose an OCR vendor to make imported pages searchable."
 
   var body: some View {
     HStack(spacing: 12) {
@@ -305,6 +362,7 @@ private struct LibraryCardView: View {
         Spacer()
         if row.isBusy { ProgressView().controlSize(.mini) }
       }
+      if row.importStatus == .ready { OCRBadge(row: row) }
       Text(statusText).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
     }
     .padding(10)
@@ -322,5 +380,51 @@ private struct LibraryCardView: View {
     if row.ocr.failed > 0 { return "OCR \(row.ocr.done)/\(row.pageCount), \(row.ocr.failed) failed" }
     if row.ocr.pending > 0 { return "OCR \(row.ocr.done)/\(row.pageCount)" }
     return "OCR \(row.ocr.done)/\(row.pageCount)"
+  }
+}
+
+/// A compact OCR status badge: done, partial, not started, or failures.
+struct OCRBadge: View {
+  let row: LibraryRow
+
+  var body: some View {
+    Label(text, systemImage: symbol)
+      .font(.caption.bold())
+      .foregroundStyle(color)
+      .padding(.horizontal, 6)
+      .padding(.vertical, 2)
+      .overlay(Rectangle().stroke(color, lineWidth: 1))
+      .help(help)
+  }
+
+  private var text: String {
+    switch row.ocrState {
+    case .complete: "OCR done"
+    case .partial: "OCR \(row.ocr.done)/\(row.pageCount)"
+    case .notStarted: "Not OCRed"
+    case .hasFailures: "OCR \(row.ocr.failed) failed"
+    }
+  }
+
+  private var symbol: String {
+    switch row.ocrState {
+    case .complete: "checkmark.circle"
+    case .partial: "circle.lefthalf.filled"
+    case .notStarted: "circle.dashed"
+    case .hasFailures: "exclamationmark.triangle"
+    }
+  }
+
+  private var color: Color {
+    switch row.ocrState {
+    case .complete: .green
+    case .partial: .blue
+    case .notStarted: .secondary
+    case .hasFailures: .orange
+    }
+  }
+
+  private var help: String {
+    "\(row.ocr.done) of \(row.pageCount) pages OCRed, \(row.ocr.pending) pending, \(row.ocr.failed) failed. Right-click to run or redo OCR."
   }
 }

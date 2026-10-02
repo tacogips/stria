@@ -2,15 +2,20 @@ import StriaCore
 import Testing
 
 @Suite struct ConfigKeyPathTests {
-  @Test func exposesExactlyNineteenLeafKeys() throws {
-    #expect(ConfigKeyPath.keys.count == 19)
-    #expect(Set(ConfigKeyPath.keys) == Set([
+  @Test func exposesExactlyTwentyFourLeafKeys() throws {
+    #expect(ConfigKeyPath.keys.count == 24)
+    #expect(Set(ConfigKeyPath.keys) == Set(ConfigKeyPath.credentialKeys + [
       "render.dpi", "render.imageFormat", "render.quality", "render.maxPixelDimension",
       "ocr.vendor", "ocr.model", "ocr.apiKeyEnvironment", "ocr.concurrency", "ocr.prompt", "ocr.timeoutSeconds", "ocr.autoRunOnImport",
       "agent.vendor", "agent.model", "agent.apiKeyEnvironment", "agent.neighborPages",
       "agent.maxImages", "agent.maxContextCharacters", "agent.systemPrompt", "agent.timeoutSeconds"
     ]))
     #expect(try ConfigKeyPath.value(of: "ocr.timeoutSeconds", in: .defaults) == .int(300))
+    #expect(try ConfigKeyPath.value(of: "agent.credentials.openai", in: .defaults) == .string("OPENAI_API_KEY"))
+    #expect(try ConfigKeyPath.setting("agent.credentials.openai", to: "MY_KEY", in: .defaults).agent.credentials["openai"] == "MY_KEY")
+    #expect(try ConfigKeyPath.setting("agent.credentials.openai", to: "null", in: .defaults).agent.credentials["openai"] == nil)
+    #expect(throws: StriaError.self) { try ConfigKeyPath.setting("agent.credentials.openai", to: "sk-bad", in: .defaults) }
+    #expect(throws: StriaError.self) { try ConfigKeyPath.value(of: "agent.credentials.claude-code", in: .defaults) }
     #expect(try ConfigKeyPath.setting("agent.timeoutSeconds", to: "900", in: .defaults).agent.timeoutSeconds == 900)
     #expect(throws: StriaError.self) { try ConfigKeyPath.setting("agent.timeoutSeconds", to: "5", in: .defaults) }
     #expect(try ConfigKeyPath.value(of: "ocr.model", in: .defaults) == .null)

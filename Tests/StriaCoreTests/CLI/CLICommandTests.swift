@@ -37,9 +37,9 @@ import Testing
       let pageScope = try CommandLineParser.parse(["ask", "q", "--doc", id, "--page", "2"]).command
       let documentScope = try CommandLineParser.parse(["ask", "q", "--doc", id]).command
       let libraryScope = try CommandLineParser.parse(["ask", "q"]).command
-      #expect(pageScope == .ask(question: "q", docId: id, page: 2, query: nil, limit: nil, thread: nil))
-      #expect(documentScope == .ask(question: "q", docId: id, page: nil, query: nil, limit: nil, thread: nil))
-      #expect(libraryScope == .ask(question: "q", docId: nil, page: nil, query: nil, limit: nil, thread: nil))
+      #expect(pageScope == .ask(question: "q", docId: id, page: 2, query: nil, limit: nil, thread: nil, vendor: nil, model: nil))
+      #expect(documentScope == .ask(question: "q", docId: id, page: nil, query: nil, limit: nil, thread: nil, vendor: nil, model: nil))
+      #expect(libraryScope == .ask(question: "q", docId: nil, page: nil, query: nil, limit: nil, thread: nil, vendor: nil, model: nil))
     }
   }
 

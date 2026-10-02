@@ -16,9 +16,9 @@ public extension StriaConfig {
     config.ocr.vendor = "anthropic"
     config.ocr.model = "test-ocr-model"
     config.ocr.apiKeyEnvironment = "TEST_API_KEY"
-    config.agent.vendor = "anthropic"
+    // A CLI vendor needs no key, so app-model tests can send without one.
+    config.agent.vendor = "claude-code"
     config.agent.model = "test-agent-model"
-    config.agent.apiKeyEnvironment = "TEST_API_KEY"
     return config
   }
 }

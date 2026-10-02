@@ -7,6 +7,15 @@ public enum AskContext: Equatable, Sendable {
   case library
 }
 
+/// A vendor and model chosen for questions.
+public struct AgentSelection: Equatable, Sendable {
+  public static let vendorKey = "agent.lastVendor"
+  public static let modelKey = "agent.lastModel"
+  public var vendor: String
+  public var model: String?
+  public init(vendor: String, model: String?) { self.vendor = vendor; self.model = model }
+}
+
 public struct AskRequest: Sendable {
   public var question: String
   public var context: AskContext
@@ -15,14 +24,18 @@ public struct AskRequest: Sendable {
   public var threadId: String?
   /// Receives the answer as it streams. Optional; the CLI leaves it nil.
   public var onChunk: AnswerChunkHandler?
+  /// The vendor and model for this question; nil falls back to the last
+  /// chat selection, then to `agent.vendor` / `agent.model` in config.
+  public var selection: AgentSelection?
 
   public init(question: String, context: AskContext, retrievalQuery: String? = nil, limit: Int? = nil,
-              threadId: String? = nil, onChunk: AnswerChunkHandler? = nil) {
+              threadId: String? = nil, selection: AgentSelection? = nil, onChunk: AnswerChunkHandler? = nil) {
     self.question = question
     self.context = context
     self.retrievalQuery = retrievalQuery
     self.limit = limit
     self.threadId = threadId
+    self.selection = selection
     self.onChunk = onChunk
   }
 }

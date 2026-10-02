@@ -13,7 +13,7 @@ enum QueryCommands {
                             score: $0.score, imagePath: $0.imagePath, imageCached: $0.imageCached)
       }
       return SearchOutput(query: response.query, matchMode: response.matchMode, results: results)
-    case .ask(let question, let docId, let page, let query, let limit, let thread):
+    case .ask(let question, let docId, let page, let query, let limit, let thread, let vendor, let model):
       let context: AskContext
       if let docId, let page {
         context = .page(docId: docId, page: page)
@@ -23,7 +23,8 @@ enum QueryCommands {
         context = .library
       }
       let response = try await library.ask(AskRequest(question: question, context: context, retrievalQuery: query,
-                                                      limit: limit, threadId: thread))
+                                                      limit: limit, threadId: thread,
+                                                      selection: vendor.map { AgentSelection(vendor: $0, model: model) }))
       let citations = response.citations.map {
         AskOutput.OutputCitation(docId: $0.docId, title: $0.title, page: $0.page, imagePath: $0.imagePath)
       }

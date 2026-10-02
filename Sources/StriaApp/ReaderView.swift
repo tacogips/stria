@@ -14,12 +14,26 @@ struct ReaderView: View {
 
   var body: some View {
     NavigationSplitView(columnVisibility: $columnVisibility) {
-      LeftPaneView(reader: reader, onBack: { Task { await model.showLibrary() } })
+      LeftPaneView(reader: reader, onBack: { Task { await model.showLibrary() } }, onHide: { toggleSidebar() })
         .navigationSplitViewColumnWidth(min: 180, ideal: 280, max: 640)
     } detail: {
       PDFKitView(reader: reader)
         .background(.background)
         .navigationTitle(reader.title)
+        .overlay(alignment: .leading) {
+          if columnVisibility == .detailOnly {
+            // chilla-style edge tab: the collapsed sidebar comes back with one click.
+            Button { toggleSidebar() } label: {
+              Image(systemName: "chevron.right")
+                .font(.caption.bold())
+                .frame(width: 14, height: 44)
+                .background(Flat.assistantBubble)
+                .overlay(Rectangle().stroke(Flat.border, lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .help("Show the sidebar (Ctrl-Cmd-S or Shift+L)")
+          }
+        }
     }
     .inspector(isPresented: $showAgent) {
       AgentPaneView(agent: agent, reader: reader, configRevision: model.configRevision)
@@ -39,19 +53,6 @@ struct ReaderView: View {
     .focusedSceneValue(\.striaSidebar, $columnVisibility)
     .toolbar(removing: .sidebarToggle)
     .toolbar {
-      ToolbarItem(placement: .navigation) {
-        Button { toggleSidebar() } label: {
-          Label(columnVisibility == .detailOnly ? "Show Sidebar" : "Hide Sidebar", systemImage: "sidebar.left")
-        }
-        .help((columnVisibility == .detailOnly ? "Show the sidebar" : "Hide the sidebar") + " (Ctrl-Cmd-S or Shift+L)")
-      }
-      ToolbarItem(placement: .navigation) {
-        Button { Task { await model.showLibrary() } } label: {
-          Label("Library", systemImage: "chevron.left")
-            .labelStyle(.titleAndIcon)
-        }
-        .help("Back to the library (Esc or Cmd-Shift-L)")
-      }
       ToolbarItem(placement: .principal) {
         PageFieldView(reader: reader)
       }

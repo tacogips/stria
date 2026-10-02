@@ -65,21 +65,32 @@ struct SettingsView: View {
         Toggle("Run OCR automatically after import", isOn: $settings.ocrAutoRunOnImport)
         Stepper("Concurrent pages: \(settings.ocrConcurrency)", value: $settings.ocrConcurrency, in: 1...8)
       }
-      Section("Agent") {
-        Picker("Vendor", selection: $settings.agentVendor) {
-          ForEach(SettingsViewModel.agentVendorOptions, id: \.self) { vendor in
-            Text(SettingsViewModel.displayName(for: vendor)).tag(vendor)
+      Section {
+        ForEach(SettingsViewModel.credentialVendors, id: \.self) { vendor in
+          HStack {
+            TextField(SettingsViewModel.displayName(for: vendor), text: Binding(
+              get: { settings.credentials[vendor] ?? "" },
+              set: { settings.credentials[vendor] = $0 }
+            ), prompt: Text(SettingsViewModel.suggestedAPIKeyEnvironment(for: vendor) ?? "VARIABLE_NAME"))
+            .textFieldStyle(FlatTextFieldStyle())
+            let name = settings.credentials[vendor] ?? ""
+            if name.trimmingCharacters(in: .whitespaces).isEmpty {
+              Text("no variable").font(.caption).foregroundStyle(.secondary).frame(width: 90, alignment: .trailing)
+            } else if settings.environmentHasValue(name) {
+              Label("set", systemImage: "checkmark").font(.caption).foregroundStyle(.green).frame(width: 90, alignment: .trailing)
+            } else {
+              Label("not set", systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.orange).frame(width: 90, alignment: .trailing)
+            }
           }
         }
-        .pickerStyle(.menu)
-        .onChange(of: settings.agentVendor) { _, _ in settings.applySuggestions(ocr: false) }
-        if SettingsViewModel.needsModel(settings.agentVendor) {
-          ModelField(settings: settings, vendor: settings.agentVendor, model: $settings.agentModel, ocr: false)
-        }
-        if SettingsViewModel.requiresAPIKey(settings.agentVendor) {
-          TextField("API key environment variable", text: $settings.agentAPIKeyEnvironment,
-                    prompt: Text(SettingsViewModel.suggestedAPIKeyEnvironment(for: settings.agentVendor) ?? "NAME"))
-        }
+      } header: {
+        Text("Agent API Keys")
+      } footer: {
+        Text("""
+          The name of the environment variable holding each API vendor's key; values are read from the environment \
+          Stria was launched from and never stored. The vendor and model for a question are chosen in the chat pane; \
+          CLI vendors (Claude Code, Codex, Cursor) use their own login.
+          """)
       }
       Section {
         TextEditor(text: $settings.agentSystemPrompt)

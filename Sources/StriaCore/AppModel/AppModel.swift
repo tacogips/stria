@@ -43,7 +43,9 @@ public final class AppModel {
       try await striaLibrary.markOpened(documentId: documentId)
       if let page { reader.goToPage(page) }
       self.reader = reader
-      agent = AgentPaneViewModel(library: striaLibrary, reader: reader)
+      let agent = AgentPaneViewModel(library: striaLibrary, reader: reader)
+      await agent.loadSelection()
+      self.agent = agent
     } catch {
       route = .library
       library.alert = (error as? StriaError)?.message ?? error.localizedDescription

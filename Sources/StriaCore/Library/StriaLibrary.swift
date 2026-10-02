@@ -16,6 +16,18 @@ public struct StriaLibrary: Sendable {
     self.store = store
   }
 
+  /// The vendor and model the user last chose in the chat, kept in SQLite so
+  /// the next session starts with them.
+  public func lastAgentSelection() async throws -> AgentSelection? {
+    guard let vendor = try await store.meta(AgentSelection.vendorKey), !vendor.isEmpty else { return nil }
+    return AgentSelection(vendor: vendor, model: try await store.meta(AgentSelection.modelKey))
+  }
+
+  public func setLastAgentSelection(_ selection: AgentSelection?) async throws {
+    try await store.setMeta(AgentSelection.vendorKey, selection?.vendor)
+    try await store.setMeta(AgentSelection.modelKey, selection?.model)
+  }
+
   /// Validates and writes the configuration, then makes it current for every
   /// later call in this process.
   public func saveConfig(_ config: StriaConfig) throws {
