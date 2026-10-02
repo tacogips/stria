@@ -165,10 +165,16 @@ while a search is active.
   is anchored to the page that was current at its first question.
 - `unavailable` errors (for example, a credential env var is unset) show an
   inline notice naming the reason and are not persisted.
-- History: a segmented control switches between "This page" and "This PDF"
-  (`design-storage.md#chat-history-queries`). The list refreshes after each
-  answer, and on page change debounced by 300 ms (and only in "This page"
-  mode, where the result can change). Selecting an entry opens its thread and jumps
+- The pane has two tabs, **Chat** and **History**, as a segmented control at
+  the top. Chat holds the scope picker, transcript and composer. History
+  fills the pane with the past questions and answers; its own segmented
+  control switches between "This page" and "This PDF"
+  (`design-storage.md#chat-history-queries`), each row shows the role, page,
+  relative time and up to three lines of text, and an empty state names the
+  scope. The list refreshes when the tab is shown, after each answer, and on
+  page change debounced by 300 ms (and only in "This page" mode, where the
+  result can change). Selecting an entry reopens its thread in the Chat tab
+  and jumps to its page. Selecting an entry opens its thread and jumps
   to its anchor page.
 
 ## Commands and Shortcuts

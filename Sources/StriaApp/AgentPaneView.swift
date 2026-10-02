@@ -1,25 +1,42 @@
 import SwiftUI
 import StriaCore
 
+/// The right pane has two tabs: Chat (scope, transcript, composer) and
+/// History (past questions for this page or this PDF). Picking a history
+/// entry reopens its thread in the Chat tab and jumps to its page.
 struct AgentPaneView: View {
   @Bindable var agent: AgentPaneViewModel
   let reader: ReaderViewModel
+  @State private var tab: Tab = .chat
+
+  enum Tab: Hashable { case chat, history }
 
   var body: some View {
     VStack(spacing: 0) {
-      scopePicker
-      if let notice = agent.notice {
-        Label(notice, systemImage: "exclamationmark.circle")
-          .font(.callout)
-          .foregroundStyle(.orange)
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .padding(.horizontal)
-          .padding(.vertical, 8)
+      Picker("Agent pane", selection: $tab) {
+        Text("Chat").tag(Tab.chat)
+        Text("History").tag(Tab.history)
       }
-      transcript
-      composer
-      Divider()
-      history
+      .pickerStyle(.segmented)
+      .labelsHidden()
+      .padding(.horizontal)
+      .padding(.top, 10)
+      switch tab {
+      case .chat:
+        scopePicker
+        if let notice = agent.notice {
+          Label(notice, systemImage: "exclamationmark.circle")
+            .font(.callout)
+            .foregroundStyle(.orange)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+        }
+        transcript
+        composer
+      case .history:
+        history
+      }
     }
     .navigationTitle("Agent")
     .toolbar {
@@ -114,24 +131,39 @@ struct AgentPaneView: View {
       .padding(.horizontal)
       .onChange(of: agent.historyMode) { _, _ in Task { await agent.reloadHistory() } }
 
-      List(agent.history, id: \.id) { message in
-        Button {
-          Task { await agent.selectHistory(message) }
-        } label: {
-          VStack(alignment: .leading, spacing: 3) {
-            Text(message.role == .user ? message.content : "Answer: \(message.content)")
-              .lineLimit(2)
-            if let page = message.pageNumber {
-              Text("Page \(page)").font(.caption).foregroundStyle(.secondary)
+      if agent.history.isEmpty {
+        ContentUnavailableView("No Questions Yet", systemImage: "clock",
+                               description: Text(agent.historyMode == .page ? "Nothing has been asked about this page." : "Nothing has been asked about this PDF."))
+      } else {
+        List(agent.history, id: \.id) { message in
+          Button {
+            Task { await agent.selectHistory(message) }
+            tab = .chat
+          } label: {
+            VStack(alignment: .leading, spacing: 3) {
+              HStack(spacing: 6) {
+                Text(message.role == .user ? "You" : "Assistant")
+                  .font(.caption.bold())
+                  .foregroundStyle(.secondary)
+                if let page = message.pageNumber {
+                  Text("p. \(page)").font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Text(message.createdAt, style: .relative).font(.caption2).foregroundStyle(.tertiary)
+              }
+              Text(message.content)
+                .lineLimit(3)
+                .foregroundStyle(message.status == .error ? Color.red : Color.primary)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
           }
-          .frame(maxWidth: .infinity, alignment: .leading)
+          .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
       }
-      .frame(minHeight: 100, maxHeight: 220)
     }
-    .padding(.vertical, 8)
+    .padding(.top, 8)
+    .task { await agent.reloadHistory() }
   }
 }
 
