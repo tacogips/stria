@@ -34,6 +34,11 @@ public final class LibraryViewModel {
   public var alert: String?
   public private(set) var isImporting = false
   public var selectedID: String?
+  /// OCR search across every document, shown in place of the list.
+  public var searchQuery = ""
+  public private(set) var searchResults: [SearchResultItem] = []
+  public private(set) var searchError: String?
+  public private(set) var isSearching = false
 
   private let library: StriaLibrary
   private var importTasks: [UUID: Task<Void, Never>] = [:]
@@ -57,7 +62,8 @@ public final class LibraryViewModel {
           importStatus: summary.importStatus,
           rendered: renderedPages[summary.id] ?? (summary.importStatus == .ready ? summary.pageCount : 0),
           ocr: summary.ocr,
-          unavailableReason: unavailableReasons[summary.id],
+          unavailableReason: unavailableReasons[summary.id]
+            ?? (summary.ocr.pending > 0 && !library.environment.config.ocr.isConfigured ? "not configured" : nil),
           lastOpenedAt: record.lastOpenedAt,
           isBusy: busyIDs.contains(summary.id)
         ))
@@ -101,6 +107,32 @@ public final class LibraryViewModel {
     }
   }
 
+  /// Whether OCR and the agent have a vendor; the library banner points to
+  /// Settings while either is missing.
+  public var ocrConfigured: Bool { library.environment.config.ocr.isConfigured }
+  public var agentConfigured: Bool { library.environment.config.agent.isConfigured }
+  public var ocrRunsAutomatically: Bool { library.environment.config.ocr.autoRunOnImport }
+
+  public func submitSearch() async {
+    let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !query.isEmpty else { clearSearch(); return }
+    do {
+      searchResults = try await library.search(query: query, documentId: nil, limit: 100).results
+      searchError = nil
+    } catch {
+      searchResults = []
+      searchError = (error as? StriaError)?.message ?? error.localizedDescription
+    }
+    isSearching = true
+  }
+
+  public func clearSearch() {
+    searchQuery = ""
+    searchResults = []
+    searchError = nil
+    isSearching = false
+  }
+
   public func remove(documentId: String) async {
     do {
       try await library.removeDocument(id: documentId)
@@ -122,7 +154,8 @@ public final class LibraryViewModel {
 
   private func consumeImport(at url: URL) async {
     var eventDocumentId: String?
-    for await event in library.importEvents(at: url, runOCR: true) {
+    let ocr = library.environment.config.ocr
+    for await event in library.importEvents(at: url, runOCR: ocr.autoRunOnImport && ocr.isConfigured) {
       switch event {
       case .copied(let docId):
         eventDocumentId = docId

@@ -1,0 +1,157 @@
+import Foundation
+import Observation
+
+/// Draft of the OCR and agent settings edited in the app's Settings window.
+/// Nothing is written until `save()`; a saved config applies to the next
+/// OCR or ask call immediately through `StriaLibrary.saveConfig`.
+@MainActor
+@Observable
+public final class SettingsViewModel {
+  /// "" stands for "not configured".
+  public static let notConfigured = ""
+  public static let ocrVendorOptions = [notConfigured, KnownVendors.pdfTextLayer] + KnownVendors.gateway
+  public static let agentVendorOptions = [notConfigured] + KnownVendors.gateway
+
+  public var ocrVendor = notConfigured
+  public var ocrModel = ""
+  public var ocrAPIKeyEnvironment = ""
+  public var ocrAutoRunOnImport = true
+  public var ocrConcurrency = 2
+  public var agentVendor = notConfigured
+  public var agentModel = ""
+  public var agentAPIKeyEnvironment = ""
+  /// The prompt as shown for editing; the default text when none is set.
+  public var agentSystemPrompt = AgentDefaults.systemPrompt
+  public private(set) var error: String?
+  public private(set) var savedAt: Date?
+  public var onSaved: (() -> Void)?
+
+  private let library: StriaLibrary
+
+  public init(library: StriaLibrary) {
+    self.library = library
+    load()
+  }
+
+  /// Reloads the draft from the current configuration, discarding edits.
+  public func load() {
+    let config = library.environment.config
+    ocrVendor = config.ocr.vendor ?? Self.notConfigured
+    ocrModel = config.ocr.model ?? ""
+    ocrAPIKeyEnvironment = config.ocr.apiKeyEnvironment ?? ""
+    ocrAutoRunOnImport = config.ocr.autoRunOnImport
+    ocrConcurrency = config.ocr.concurrency
+    agentVendor = config.agent.vendor ?? Self.notConfigured
+    agentModel = config.agent.model ?? ""
+    agentAPIKeyEnvironment = config.agent.apiKeyEnvironment ?? ""
+    agentSystemPrompt = config.agent.systemPrompt ?? AgentDefaults.systemPrompt
+    error = nil
+  }
+
+  public var systemPromptIsDefault: Bool {
+    agentSystemPrompt.trimmingCharacters(in: .whitespacesAndNewlines) == AgentDefaults.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  public func resetSystemPrompt() { agentSystemPrompt = AgentDefaults.systemPrompt }
+
+  public static func displayName(for vendor: String) -> String {
+    switch vendor {
+    case notConfigured: "Not configured"
+    case KnownVendors.pdfTextLayer: "PDF text layer (no model, embedded text only)"
+    case "claude-code": "Claude Code CLI"
+    case "codex": "Codex CLI"
+    case "cursor": "Cursor CLI"
+    case "cursor-api": "Cursor API (no image input)"
+    case "openai": "OpenAI API"
+    case "anthropic": "Anthropic API"
+    case "gemini": "Gemini API"
+    case "openrouter": "OpenRouter API"
+    default: vendor
+    }
+  }
+
+  /// API vendors need a credential variable; CLI vendors use their own login.
+  public static func requiresAPIKey(_ vendor: String) -> Bool { KnownVendors.apiKeyVendors.contains(vendor) }
+
+  public static func needsModel(_ vendor: String) -> Bool {
+    vendor != notConfigured && vendor != KnownVendors.pdfTextLayer
+  }
+
+  public static func suggestedModel(for vendor: String) -> String? {
+    switch vendor {
+    case "claude-code", "anthropic": "claude-sonnet-5-5"
+    case "codex", "openai": "gpt-5"
+    case "gemini": "gemini-2.5-pro"
+    case "openrouter": "anthropic/claude-sonnet-5-5"
+    default: nil
+    }
+  }
+
+  public static func suggestedAPIKeyEnvironment(for vendor: String) -> String? {
+    switch vendor {
+    case "anthropic": "ANTHROPIC_API_KEY"
+    case "openai": "OPENAI_API_KEY"
+    case "gemini": "GEMINI_API_KEY"
+    case "openrouter": "OPENROUTER_API_KEY"
+    case "cursor-api": "CURSOR_API_KEY"
+    default: nil
+    }
+  }
+
+  /// Fills empty model and credential fields with the vendor's suggestions.
+  public func applySuggestions(ocr: Bool) {
+    if ocr {
+      if ocrModel.isEmpty, let model = Self.suggestedModel(for: ocrVendor) { ocrModel = model }
+      if ocrAPIKeyEnvironment.isEmpty, let name = Self.suggestedAPIKeyEnvironment(for: ocrVendor) { ocrAPIKeyEnvironment = name }
+    } else {
+      if agentModel.isEmpty, let model = Self.suggestedModel(for: agentVendor) { agentModel = model }
+      if agentAPIKeyEnvironment.isEmpty, let name = Self.suggestedAPIKeyEnvironment(for: agentVendor) { agentAPIKeyEnvironment = name }
+    }
+  }
+
+  /// The configuration the draft describes, or the reason it is invalid.
+  public func draftConfig() throws(StriaError) -> StriaConfig {
+    var config = library.environment.config
+    config.ocr.vendor = ocrVendor == Self.notConfigured ? nil : ocrVendor
+    config.ocr.model = Self.trimmed(ocrModel)
+    config.ocr.apiKeyEnvironment = Self.trimmed(ocrAPIKeyEnvironment)
+    config.ocr.autoRunOnImport = ocrAutoRunOnImport
+    config.ocr.concurrency = ocrConcurrency
+    config.agent.vendor = agentVendor == Self.notConfigured ? nil : agentVendor
+    config.agent.model = Self.trimmed(agentModel)
+    config.agent.apiKeyEnvironment = Self.trimmed(agentAPIKeyEnvironment)
+    // The default is stored as nil, so a future default change reaches users who never edited it.
+    config.agent.systemPrompt = systemPromptIsDefault ? nil : Self.trimmed(agentSystemPrompt)
+    if Self.needsModel(ocrVendor), config.ocr.model == nil { throw .config("OCR: a model is required for \(Self.displayName(for: ocrVendor))") }
+    if Self.requiresAPIKey(ocrVendor), config.ocr.apiKeyEnvironment == nil {
+      throw .config("OCR: an API key environment variable name is required for \(Self.displayName(for: ocrVendor))")
+    }
+    if Self.needsModel(agentVendor), config.agent.model == nil { throw .config("Agent: a model is required for \(Self.displayName(for: agentVendor))") }
+    if Self.requiresAPIKey(agentVendor), config.agent.apiKeyEnvironment == nil {
+      throw .config("Agent: an API key environment variable name is required for \(Self.displayName(for: agentVendor))")
+    }
+    try config.validate()
+    return config
+  }
+
+  @discardableResult
+  public func save() -> Bool {
+    do {
+      try library.saveConfig(try draftConfig())
+      error = nil
+      savedAt = Date()
+      onSaved?()
+      return true
+    } catch let failure as StriaError {
+      error = failure.message
+    } catch {
+      self.error = error.localizedDescription
+    }
+    return false
+  }
+
+  private static func trimmed(_ value: String) -> String? {
+    let text = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    return text.isEmpty ? nil : text
+  }
+}

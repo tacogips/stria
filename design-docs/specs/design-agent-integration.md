@@ -430,7 +430,16 @@ still work. No local-path dependency is added without user approval.
 ## Config
 
 `<root>/config.json` is created with defaults on first run (atomic write) and
-is never rewritten on load:
+is never rewritten on load. The defaults name no vendor: `ocr.vendor` and
+`agent.vendor` are null until the user chooses them, so a fresh install never
+calls an API the user did not pick. While unconfigured, OCR runs end as
+`unavailable` with a reason pointing at Settings / `stria config set`
+(pages stay `pending`), and `ask` fails with `serviceUnavailable` before any
+call. `ocr.autoRunOnImport` (default true) decides whether an import OCRs its
+pages at once or waits for "Run OCR". The app edits the file through the
+Settings window (`StriaLibrary.saveConfig`), and the saved configuration
+applies to the next call in the running process (`ConfigBox` inside
+`StriaEnvironment`).
 
 - missing keys take their defaults;
 - unknown keys are ignored;
@@ -442,13 +451,11 @@ is never rewritten on load:
   "version": 1,
   "render": { "dpi": 150, "imageFormat": "heic", "quality": 0.75, "maxPixelDimension": 4096 },
   "ocr": {
-    "vendor": "anthropic", "model": "claude-sonnet-5-5",
-    "apiKeyEnvironment": "ANTHROPIC_API_KEY", "concurrency": 2, "prompt": null,
-    "timeoutSeconds": 300
+    "vendor": null, "model": null, "apiKeyEnvironment": null, "concurrency": 2,
+    "prompt": null, "timeoutSeconds": 300, "autoRunOnImport": true
   },
   "agent": {
-    "vendor": "anthropic", "model": "claude-opus-5-5",
-    "apiKeyEnvironment": "ANTHROPIC_API_KEY", "neighborPages": 1,
+    "vendor": null, "model": null, "apiKeyEnvironment": null, "neighborPages": 1,
     "maxImages": 4, "maxContextCharacters": 60000, "systemPrompt": null,
     "timeoutSeconds": 600
   }
@@ -468,11 +475,16 @@ Validation for `stria config set <key> <value>` (dotted keys above):
 | `agent.maxImages` | 1...10 |
 | `agent.maxContextCharacters` | 1000...500000 |
 | `ocr.timeoutSeconds`, `agent.timeoutSeconds` | 10...3600 |
-| `ocr.vendor`, `agent.vendor` | a `GatewayVendor` raw value (`claude-code`, `codex`, `cursor`, `cursor-api`, `openai`, `anthropic`, `gemini`, `openrouter`); `ocr.vendor` also accepts `pdf-text-layer` |
+| `ocr.vendor`, `agent.vendor` | `null` (not configured) or a `GatewayVendor` raw value (`claude-code`, `codex`, `cursor`, `cursor-api`, `openai`, `anthropic`, `gemini`, `openrouter`); `ocr.vendor` also accepts `pdf-text-layer` |
+| `ocr.autoRunOnImport` | `true` or `false` |
 | `ocr.apiKeyEnvironment`, `agent.apiKeyEnvironment` | must match `^[A-Z_][A-Z0-9_]*$`, or `null` |
 
-The value `null` clears the optional keys `model`, `apiKeyEnvironment`,
-`prompt` and `systemPrompt`. The default values are recorded in
+The value `null` clears the optional keys `vendor`, `model`,
+`apiKeyEnvironment`, `prompt` and `systemPrompt`. A null `agent.systemPrompt`
+means the built-in default (`AgentDefaults.systemPrompt`, a Stria-specific RAG
+prompt); the Settings window shows the default text for editing and stores
+null again when the text equals the default, so a later default change
+reaches users who never edited it. The default values are recorded in
 `../user-qa/default-agent-config.md`.
 
 ## Secrets

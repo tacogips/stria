@@ -11,7 +11,7 @@ public struct ParsedInvocation: Equatable, Sendable {
 public enum CLICommand: Equatable, Sendable {
   case help(topic: String?)
   case version
-  case importPDF(path: String, noOCR: Bool)
+  case importPDF(path: String, noOCR: Bool, forceOCR: Bool)
   case ocr(docId: String, pages: String?, retryFailed: Bool)
   case list
   case show(docId: String)

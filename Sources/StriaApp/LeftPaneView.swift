@@ -15,7 +15,9 @@ struct LeftPaneView: View {
         }
       }
       .pickerStyle(.segmented)
-      .padding(10)
+      .labelsHidden()
+      .padding(.horizontal, 12)
+      .padding(.vertical, 8)
 
       Group {
         switch reader.sidebarMode {
@@ -37,6 +39,7 @@ struct LeftPaneView: View {
         List(1...max(reader.pageCount, 1), id: \.self, selection: pageSelection) { page in
           Text("Page \(page)").id(page)
         }
+        .listStyle(.sidebar)
         .onChange(of: reader.currentPage) { _, page in proxy.scrollTo(page) }
       }
     } else {
@@ -46,6 +49,7 @@ struct LeftPaneView: View {
             OutlineRowView(row: row, expandedIDs: $expandedIDs)
           }
         }
+        .listStyle(.sidebar)
         .onAppear { revealCurrentSection(proxy) }
         .onChange(of: reader.currentOutlineNodeID) { _, _ in revealCurrentSection(proxy) }
       }

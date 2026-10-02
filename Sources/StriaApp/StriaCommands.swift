@@ -10,6 +10,7 @@ struct StriaCommands: Commands {
   @FocusedValue(\.striaLibrary) private var libraryAction
   @FocusedValue(\.striaImport) private var importAction
   @FocusedValue(\.striaAgent) private var agent
+  @FocusedValue(\.striaShortcutHelp) private var shortcutHelp
 
   var body: some Commands {
     CommandMenu("Go") {
@@ -60,6 +61,12 @@ struct StriaCommands: Commands {
       Button("Cancel Question") { agent?.cancel() }
         .keyboardShortcut(".", modifiers: .command)
         .disabled(agent?.inFlight != true)
+    }
+
+    CommandGroup(replacing: .help) {
+      Button("Keyboard Shortcuts") { shortcutHelp?.wrappedValue = true }
+        .keyboardShortcut("/", modifiers: .command)
+        .disabled(shortcutHelp == nil)
     }
 
     CommandGroup(replacing: .newItem) {

@@ -35,9 +35,10 @@ public enum CommandLineParser {
   private static func parseCommand(_ command: String, arguments: [String]) throws(StriaError) -> CLICommand {
     switch command {
     case "import":
-      let parsed = try options(arguments, flags: ["--no-ocr"], values: [], command: command)
+      let parsed = try options(arguments, flags: ["--no-ocr", "--ocr"], values: [], command: command)
       try requirePositionals(parsed.positionals, count: 1, command: command)
-      return .importPDF(path: parsed.positionals[0], noOCR: parsed.flags.contains("--no-ocr"))
+      if parsed.flags.contains("--no-ocr") && parsed.flags.contains("--ocr") { throw .usage("--ocr and --no-ocr are exclusive") }
+      return .importPDF(path: parsed.positionals[0], noOCR: parsed.flags.contains("--no-ocr"), forceOCR: parsed.flags.contains("--ocr"))
     case "ocr":
       let parsed = try options(arguments, flags: ["--retry-failed"], values: ["--pages"], command: command)
       try requirePositionals(parsed.positionals, count: 1, command: command)

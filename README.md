@@ -57,7 +57,7 @@ The default data root is `~/.local/stria`. `STRIA_HOME` overrides it, and the CL
 
 ## Configuration
 
-The first data-root use creates `config.json` with defaults. Inspect or edit settings with `stria config get [<key>]` and `stria config set <key> <value>`. Configuration stores API-key environment variable names, never secret values. See [default agent configuration](design-docs/user-qa/default-agent-config.md).
+The first data-root use creates `config.json` with no OCR or agent vendor: nothing is called until you choose one. In the app, open Settings (`Cmd-,`) and pick an OCR vendor and an agent vendor, a model, and for API vendors the name of the environment variable that holds the key; the library shows a banner with a Settings link until both are set. Settings also has a "Run OCR automatically after import" switch (`ocr.autoRunOnImport`); when it is off, pages wait until you choose Run OCR for a document (toolbar button or context menu). The agent's system prompt can be edited there and reset to the default. From the CLI, use `stria config get [<key>]` and `stria config set <key> <value>` (for example `stria config set ocr.vendor claude-code`, `stria config set ocr.model claude-sonnet-5-5`). Configuration stores API-key environment variable names, never secret values. See [default agent configuration](design-docs/user-qa/default-agent-config.md).
 
 OCR and agent calls go through [agent-gateway](https://github.com/tacogips/agent-gateway). `ocr.vendor` and `agent.vendor` accept an agent-gateway vendor (`claude-code`, `codex`, `cursor`, `cursor-api`, `openai`, `anthropic`, `gemini`, `openrouter`). `ocr.vendor` also accepts `pdf-text-layer`, which reads the PDF's embedded text locally with no model call. If OCR is unavailable, for example because the API-key environment variable is unset, import still succeeds and pages stay pending so `stria ocr` can run them later.
 
@@ -69,7 +69,7 @@ A gateway OCR reply that is empty, or that says no image was received, is record
 
 `stria [--home <path>] <command> ...` prints one JSON object on stdout for success and is intended primarily for agent tools. `stria --help` carries the output contract and the agent workflow, so an agent can learn the tool from the help text alone. `--json` is accepted and has no effect; `--help` and `--version` never create the data root.
 
-- `stria import <pdf> [--no-ocr]`: import a PDF and optionally run OCR; prints the document ID
+- `stria import <pdf> [--ocr | --no-ocr]`: import a PDF; OCR runs when `ocr.autoRunOnImport` is on (the default) or `--ocr` is given, and never with `--no-ocr`; prints the document ID
 - `stria ocr <docId> [--pages <list>] [--retry-failed]`: run or retry page OCR
 - `stria list`: list imported PDFs and OCR progress
 - `stria show <docId>`: show document metadata and outline
@@ -102,6 +102,15 @@ See [the CLI contract](design-docs/specs/command.md) for the JSON shapes.
 3. Answer using the retrieved page and cite the document ID and page. Use `stria show <docId>` to inspect its outline.
 
 Alternatively, `stria ask "<question>"` performs retrieval and answering with the configured agent and saves the conversation.
+
+## Keyboard shortcuts in the reader
+
+Single keys, in the style of chilla, that pause while a text field is being edited:
+
+- `Shift+L` / `Shift+R`: collapse or expand the left pane / the agent pane
+- `/`: focus the agent chat input
+- `Ctrl+D` / `Ctrl+U`: page the PDF down / up; `j` / `k`: scroll one line
+- `?` (or Help > Keyboard Shortcuts, `Cmd-/`): show the full list, including the menu shortcuts (`Cmd-Opt-G` go to page, `Cmd-Opt-Up/Down` previous/next page, `Cmd-+`/`Cmd--` zoom, `Cmd-Return` send, `Cmd-.` cancel, `Cmd-Shift-L` library)
 
 ## Packaging
 

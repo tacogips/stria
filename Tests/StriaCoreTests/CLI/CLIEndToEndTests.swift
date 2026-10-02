@@ -64,7 +64,14 @@ import Testing
 func execute(
   _ arguments: [String], home: URL, paths: StriaPaths, ocr: FakeOCRService, agent: FakeAgentService
 ) async -> CommandOutput {
-  await StriaCommand.run(arguments: ["--home", home.path] + arguments,
+  // A fresh data root starts unconfigured; the CLI tests need configured
+  // vendors so the fakes are reached. help/version must not touch the root.
+  let homePaths = StriaPaths(root: home)
+  if !arguments.contains("--help"), !arguments.contains("--version"),
+     !FileManager.default.fileExists(atPath: homePaths.config.path) {
+    try? ConfigStore.save(.testing, paths: homePaths)
+  }
+  return await StriaCommand.run(arguments: ["--home", home.path] + arguments,
                          environment: ["STRIA_HOME": paths.root.appendingPathComponent("other-home").path],
                          homeDirectory: paths.root, currentDirectory: paths.root,
                          services: { _, _ in (ocr, agent) })

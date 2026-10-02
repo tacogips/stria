@@ -96,7 +96,7 @@ import Testing
 
   @Test func documentAnchorAndTextBudgetAreHonored() async throws {
     try await withTestDataRoot { paths in
-      var config = StriaConfig.defaults
+      var config = StriaConfig.testing
       config.agent.maxContextCharacters = 10
       config.agent.maxImages = 2
       _ = try await prepareAskDocument(paths: paths, id: "doc", texts: [1: "12345678", 2: "abcdefgh"])

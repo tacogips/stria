@@ -9,7 +9,10 @@ struct AskCoordinator: Sendable {
     self.store = store
   }
 
+  static let notConfiguredReason = "Agent vendor is not configured. Choose one in Settings (app) or with `stria config set agent.vendor <vendor>`."
+
   func ask(_ request: AskRequest) async throws -> AskResponse {
+    guard environment.config.agent.isConfigured else { throw StriaError.serviceUnavailable(Self.notConfiguredReason) }
     let threadId = request.threadId ?? UUID().uuidString
     let previousMessages = try await store.threadMessages(threadId: threadId)
     let refs = try await selectContext(for: request, previousMessages: previousMessages)

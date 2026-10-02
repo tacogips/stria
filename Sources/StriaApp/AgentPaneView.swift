@@ -7,7 +7,9 @@ import StriaCore
 struct AgentPaneView: View {
   @Bindable var agent: AgentPaneViewModel
   let reader: ReaderViewModel
+  var configRevision = 0
   @State private var tab: Tab = .chat
+  @FocusState private var inputFocused: Bool
 
   enum Tab: Hashable { case chat, history }
 
@@ -20,10 +22,41 @@ struct AgentPaneView: View {
       .pickerStyle(.segmented)
       .labelsHidden()
       .padding(.horizontal)
-      .padding(.top, 10)
+      .padding(.vertical, 10)
+      Divider()
+      tabContent
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+    .onChange(of: agent.focusInputRequest) { _, _ in
+      tab = .chat
+      inputFocused = true
+    }
+    .navigationTitle("Agent")
+    .toolbar {
+      ToolbarItem(placement: .primaryAction) {
+        Button("New Chat") { agent.newChat() }
+          .disabled(agent.inFlight)
+          .help("Start a new conversation (Cmd-Shift-N)")
+      }
+    }
+  }
+
+  @ViewBuilder private var tabContent: some View {
+    VStack(spacing: 0) {
       switch tab {
       case .chat:
         scopePicker
+        if !agent.vendorConfigured {
+          VStack(alignment: .leading, spacing: 6) {
+            Label("No agent vendor is configured.", systemImage: "gearshape")
+            SettingsLink { Text("Open Settings…") }
+          }
+          .font(.callout)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(.horizontal)
+          .padding(.vertical, 8)
+          .id(configRevision)
+        }
         if let notice = agent.notice {
           Label(notice, systemImage: "exclamationmark.circle")
             .font(.callout)
@@ -36,14 +69,6 @@ struct AgentPaneView: View {
         composer
       case .history:
         history
-      }
-    }
-    .navigationTitle("Agent")
-    .toolbar {
-      ToolbarItem(placement: .primaryAction) {
-        Button("New Chat") { agent.newChat() }
-          .disabled(agent.inFlight)
-          .help("Start a new conversation (Cmd-Shift-N)")
       }
     }
   }
@@ -66,7 +91,7 @@ struct AgentPaneView: View {
   private var transcript: some View {
     ScrollViewReader { proxy in
       ScrollView {
-        LazyVStack(alignment: .leading, spacing: 12) {
+        LazyVStack(spacing: 12) {
           if agent.transcript.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
               Text("Try asking").font(.headline)
@@ -108,6 +133,7 @@ struct AgentPaneView: View {
       TextField("Ask about this PDF…", text: $agent.input, axis: .vertical)
         .lineLimit(2...6)
         .textFieldStyle(.roundedBorder)
+        .focused($inputFocused)
         .onSubmit { agent.submit() }
       if agent.inFlight {
         Button("Cancel") { agent.cancel() }
@@ -175,24 +201,31 @@ private struct MessageView: View {
   let documentId: String
   let onCitation: (Int) -> Void
 
+  private var isUser: Bool { message.role == .user }
+
+  /// Chat-app layout: the user's questions sit on the right in the accent
+  /// colour, the assistant's answers on the left.
   var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      Text(message.role == .user ? "You" : "Assistant")
-        .font(.caption.bold())
-        .foregroundStyle(.secondary)
-      Text(Self.attributedContent(message.content, documentId: documentId))
-        .textSelection(.enabled)
-        .foregroundStyle(message.status == .error ? Color.red : Color.primary)
-        .environment(\.openURL, OpenURLAction { url in
-          guard url.scheme == Self.citationScheme, let page = Int(url.host() ?? "") else { return .systemAction }
-          onCitation(page)
-          return .handled
-        })
+    HStack(alignment: .bottom, spacing: 0) {
+      if isUser { Spacer(minLength: 40) }
+      VStack(alignment: .leading, spacing: 6) {
+        Text(isUser ? "You" : "Assistant")
+          .font(.caption.bold())
+          .foregroundStyle(.secondary)
+        Text(Self.attributedContent(message.content, documentId: documentId))
+          .textSelection(.enabled)
+          .foregroundStyle(message.status == .error ? Color.red : Color.primary)
+          .environment(\.openURL, OpenURLAction { url in
+            guard url.scheme == Self.citationScheme, let page = Int(url.host() ?? "") else { return .systemAction }
+            onCitation(page)
+            return .handled
+          })
+      }
+      .padding(10)
+      .background(isUser ? Color.accentColor.opacity(0.18) : Color.secondary.opacity(0.1))
+      .clipShape(RoundedRectangle(cornerRadius: 12))
+      if !isUser { Spacer(minLength: 40) }
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(10)
-    .background(message.role == .user ? Color.accentColor.opacity(0.08) : Color.secondary.opacity(0.06))
-    .clipShape(RoundedRectangle(cornerRadius: 8))
     .padding(.horizontal)
   }
 
@@ -224,19 +257,21 @@ private struct StreamingAnswerView: View {
   let text: String
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      HStack(spacing: 6) {
-        Text("Assistant").font(.caption.bold()).foregroundStyle(.secondary)
-        ProgressView().controlSize(.mini)
+    HStack(alignment: .bottom, spacing: 0) {
+      VStack(alignment: .leading, spacing: 6) {
+        HStack(spacing: 6) {
+          Text("Assistant").font(.caption.bold()).foregroundStyle(.secondary)
+          ProgressView().controlSize(.mini)
+        }
+        if !text.isEmpty {
+          Text(text).textSelection(.enabled)
+        }
       }
-      if !text.isEmpty {
-        Text(text).textSelection(.enabled)
-      }
+      .padding(10)
+      .background(Color.secondary.opacity(0.1))
+      .clipShape(RoundedRectangle(cornerRadius: 12))
+      Spacer(minLength: 40)
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(10)
-    .background(Color.secondary.opacity(0.06))
-    .clipShape(RoundedRectangle(cornerRadius: 8))
     .padding(.horizontal)
   }
 }

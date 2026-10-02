@@ -26,7 +26,19 @@ let package = Package(
       ]
     ),
     .executableTarget(name: "StriaCLI", dependencies: ["StriaCore"]),
-    .executableTarget(name: "StriaApp", dependencies: ["StriaCore"]),
+    // The app runs as a bare SwiftPM executable. The embedded Info.plist
+    // gives it the name "Stria" in the menu bar and Dock instead of the
+    // executable name.
+    .executableTarget(
+      name: "StriaApp",
+      dependencies: ["StriaCore"],
+      linkerSettings: [
+        .unsafeFlags(
+          ["-Xlinker", "-sectcreate", "-Xlinker", "__TEXT", "-Xlinker", "__info_plist", "-Xlinker", "Resources/StriaInfo.plist"],
+          .when(platforms: [.macOS])
+        )
+      ]
+    ),
     .testTarget(name: "StriaCoreTests", dependencies: ["StriaCore"])
   ],
   swiftLanguageModes: [.v6]

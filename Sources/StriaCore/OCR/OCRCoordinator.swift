@@ -2,6 +2,7 @@ import Foundation
 
 struct OCRCoordinator: Sendable {
   let library: StriaLibrary
+  static let notConfiguredReason = "OCR vendor is not configured. Choose one in Settings (app) or with `stria config set ocr.vendor <vendor>`."
 
   func run(documentId: String, selection: OCRSelection,
            onProgress: @Sendable (OCRProgress) -> Void = { _ in }) async throws -> OCRRunSummary {
@@ -10,6 +11,10 @@ struct OCRCoordinator: Sendable {
     }
     let pages = try await selectedPages(documentId: documentId, selection: selection)
     let initialCounts = try await library.store.ocrCounts(documentId: documentId)
+    guard library.environment.config.ocr.isConfigured else {
+      return OCRRunSummary(docId: documentId, processed: [], done: initialCounts.done, failed: initialCounts.failed,
+                           pending: initialCounts.pending, failures: [], unavailableReason: Self.notConfiguredReason)
+    }
     guard !pages.isEmpty else {
       return OCRRunSummary(docId: documentId, processed: [], done: initialCounts.done, failed: initialCounts.failed,
                            pending: initialCounts.pending, failures: [], unavailableReason: nil)

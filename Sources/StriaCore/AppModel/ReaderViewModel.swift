@@ -15,6 +15,13 @@ public struct ZoomRequest: Equatable, Sendable {
   public let kind: Kind
 }
 
+/// A scroll command for the PDF view, consumed once per id.
+public struct ScrollRequest: Equatable, Sendable {
+  public enum Kind: Equatable, Sendable { case pageDown, pageUp, lineDown, lineUp }
+  public let id: UUID
+  public let kind: Kind
+}
+
 /// A flattened outline node with a stable id ("0.2.1" = path of indices), so
 /// views can select, expand and scroll to the current section.
 public struct OutlineRow: Identifiable, Equatable, Sendable {
@@ -56,6 +63,7 @@ public final class ReaderViewModel {
   public private(set) var navigation: PageNavigation?
   public var requestedPage: Int? { navigation?.page }
   public private(set) var zoom: ZoomRequest?
+  public private(set) var scroll: ScrollRequest?
   public private(set) var outline: [OutlineNode] = []
   public private(set) var outlineRows: [OutlineRow] = []
   public private(set) var searchError: String?
@@ -139,6 +147,10 @@ public final class ReaderViewModel {
 
   public func requestZoom(_ kind: ZoomRequest.Kind) {
     zoom = ZoomRequest(id: UUID(), kind: kind)
+  }
+
+  public func requestScroll(_ kind: ScrollRequest.Kind) {
+    scroll = ScrollRequest(id: UUID(), kind: kind)
   }
 
   public func commitPageField() {

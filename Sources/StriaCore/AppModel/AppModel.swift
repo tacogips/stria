@@ -13,6 +13,9 @@ public final class AppModel {
   public let library: LibraryViewModel
   public private(set) var reader: ReaderViewModel?
   public private(set) var agent: AgentPaneViewModel?
+  /// Bumped after Settings saves, so views that read config re-render.
+  public private(set) var configRevision = 0
+  public let settings: SettingsViewModel
 
   private let striaLibrary: StriaLibrary
   private let debounce: Duration
@@ -21,9 +24,16 @@ public final class AppModel {
     striaLibrary = library
     self.debounce = debounce
     self.library = LibraryViewModel(library: library)
+    settings = SettingsViewModel(library: library)
+    settings.onSaved = { [weak self] in
+      guard let self else { return }
+      configRevision += 1
+      Task { await self.library.refresh() }
+    }
   }
 
-  public func open(documentId: String) async {
+  /// Opens a document, optionally at a page (a library search hit).
+  public func open(documentId: String, page: Int? = nil) async {
     // Route first: the reader screen shows its opening indicator while the
     // PDF loads; on failure the library comes back with the error.
     route = .reader(docId: documentId)
@@ -31,6 +41,7 @@ public final class AppModel {
       let reader = ReaderViewModel(library: striaLibrary, documentId: documentId, debounce: debounce)
       try await reader.open()
       try await striaLibrary.markOpened(documentId: documentId)
+      if let page { reader.goToPage(page) }
       self.reader = reader
       agent = AgentPaneViewModel(library: striaLibrary, reader: reader)
     } catch {

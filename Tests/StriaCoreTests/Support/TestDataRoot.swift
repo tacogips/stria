@@ -8,11 +8,26 @@ public func withTestDataRoot<T>(_ body: (StriaPaths) async throws -> T) async th
   return try await body(StriaPaths(root: root))
 }
 
+public extension StriaConfig {
+  /// Defaults plus configured (fake-friendly) vendors, so coordinators do
+  /// not short-circuit as "not configured" in tests that use the fakes.
+  static var testing: StriaConfig {
+    var config = StriaConfig.defaults
+    config.ocr.vendor = "anthropic"
+    config.ocr.model = "test-ocr-model"
+    config.ocr.apiKeyEnvironment = "TEST_API_KEY"
+    config.agent.vendor = "anthropic"
+    config.agent.model = "test-agent-model"
+    config.agent.apiKeyEnvironment = "TEST_API_KEY"
+    return config
+  }
+}
+
 public func makeTestEnvironment(
   paths: StriaPaths,
   ocr: any OCRService = FakeOCRService(),
   agent: any AgentService = FakeAgentService(),
-  config: StriaConfig = .defaults,
+  config: StriaConfig = .testing,
   clock: @escaping @Sendable () -> Date = { Date() }
 ) -> StriaEnvironment {
   StriaEnvironment(paths: paths, config: config, ocrService: ocr, agentService: agent, clock: clock)

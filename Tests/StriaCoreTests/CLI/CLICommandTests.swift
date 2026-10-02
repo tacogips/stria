@@ -125,4 +125,30 @@ import Testing
       #expect(try json(badOption.stderr)["error"]?.objectValue?.keySet == Set(["code", "message"]))
     }
   }
+
+  @Test func importHonoursAutoOCRSettingAndFlags() async throws {
+    try await withTestDataRoot { paths in
+      let home = paths.root.appendingPathComponent("home")
+      let input = paths.root.appendingPathComponent("doc.pdf")
+      try SamplePDFFactory.makePDF(at: input, pages: ["one"])
+      let ocr = FakeOCRService()
+      let agent = FakeAgentService()
+      _ = await execute(["config", "set", "ocr.autoRunOnImport", "false"], home: home, paths: paths, ocr: ocr, agent: agent)
+      let imported = await execute(["import", input.path], home: home, paths: paths, ocr: ocr, agent: agent)
+      #expect(try json(imported.stdout)["ocr"]?.objectValue?["status"] == .string("skipped"))
+      #expect(await ocr.requests.isEmpty)
+      let second = paths.root.appendingPathComponent("second.pdf")
+      try SamplePDFFactory.makePDF(at: second, pages: ["two"])
+      let forced = await execute(["import", second.path, "--ocr"], home: home, paths: paths, ocr: ocr, agent: agent)
+      #expect(try json(forced.stdout)["ocr"]?.objectValue?["status"] == .string("completed"))
+      #expect(await ocr.requests.count == 1)
+      let both = await execute(["import", input.path, "--ocr", "--no-ocr"], home: home, paths: paths, ocr: ocr, agent: agent)
+      #expect(both.exitCode == 2)
+      _ = await execute(["config", "set", "ocr.vendor", "null"], home: home, paths: paths, ocr: ocr, agent: agent)
+      let unconfigured = await execute(["ocr", try json(imported.stdout)["document"]?.objectValue?["id"]?.stringValue ?? ""],
+                                       home: home, paths: paths, ocr: ocr, agent: agent)
+      #expect(unconfigured.exitCode == 4)
+      #expect(unconfigured.stderr.contains("not configured"))
+    }
+  }
 }

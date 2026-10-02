@@ -15,4 +15,11 @@ public struct StriaLibrary: Sendable {
     self.environment = environment
     self.store = store
   }
+
+  /// Validates and writes the configuration, then makes it current for every
+  /// later call in this process.
+  public func saveConfig(_ config: StriaConfig) throws {
+    try ConfigStore.save(config, paths: paths)
+    environment.updateConfig(config)
+  }
 }

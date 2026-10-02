@@ -43,6 +43,7 @@ struct PDFKitView: NSViewRepresentable {
     weak var pdfView: PDFView?
     var handledNavigationID: UUID?
     private var handledZoomID: UUID?
+    private var handledScrollID: UUID?
     private var retryScheduled = false
 
     init(reader: ReaderViewModel) { self.reader = reader }
@@ -50,7 +51,8 @@ struct PDFKitView: NSViewRepresentable {
     func applyPendingRequests() {
       let navigation = reader.navigation.flatMap { $0.id == handledNavigationID ? nil : $0 }
       let zoom = reader.zoom.flatMap { $0.id == handledZoomID ? nil : $0 }
-      guard navigation != nil || zoom != nil else { return }
+      let scroll = reader.scroll.flatMap { $0.id == handledScrollID ? nil : $0 }
+      guard navigation != nil || zoom != nil || scroll != nil else { return }
       guard let pdfView, pdfView.window != nil, pdfView.bounds.width > 0 else {
         scheduleRetry()
         return
@@ -69,6 +71,15 @@ struct PDFKitView: NSViewRepresentable {
           pdfView.scaleFactor = 1
         case .fitWidth:
           pdfView.autoScales = true
+        }
+      }
+      if let scroll {
+        handledScrollID = scroll.id
+        switch scroll.kind {
+        case .pageDown: pdfView.scrollPageDown(nil)
+        case .pageUp: pdfView.scrollPageUp(nil)
+        case .lineDown: pdfView.scrollLineDown(nil)
+        case .lineUp: pdfView.scrollLineUp(nil)
         }
       }
     }

@@ -6,11 +6,12 @@ public struct ServiceSettings: Equatable, Sendable {
   public init(vendor: String, model: String?, apiKeyEnvironment: String?, timeoutSeconds: Int = 300) {
     self.vendor = vendor; self.model = model; self.apiKeyEnvironment = apiKeyEnvironment; self.timeoutSeconds = timeoutSeconds
   }
+  /// An unconfigured vendor becomes "" and is rejected by preflight.
   public init(ocr: StriaConfig.OCRConfig) {
-    self.init(vendor: ocr.vendor, model: ocr.model, apiKeyEnvironment: ocr.apiKeyEnvironment, timeoutSeconds: ocr.timeoutSeconds)
+    self.init(vendor: ocr.vendor ?? "", model: ocr.model, apiKeyEnvironment: ocr.apiKeyEnvironment, timeoutSeconds: ocr.timeoutSeconds)
   }
   public init(agent: StriaConfig.AgentConfig) {
-    self.init(vendor: agent.vendor, model: agent.model, apiKeyEnvironment: agent.apiKeyEnvironment, timeoutSeconds: agent.timeoutSeconds)
+    self.init(vendor: agent.vendor ?? "", model: agent.model, apiKeyEnvironment: agent.apiKeyEnvironment, timeoutSeconds: agent.timeoutSeconds)
   }
 }
 public enum ServiceError: Error, Equatable, Sendable { case unavailable(String), failed(String) }

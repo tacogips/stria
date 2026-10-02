@@ -22,6 +22,10 @@ public final class AgentPaneViewModel {
   public private(set) var inFlight = false
   /// The partial answer while a request streams; nil otherwise.
   public private(set) var streamingAnswer: String?
+  /// Bumped to ask the view to focus the input field (the `/` shortcut).
+  public private(set) var focusInputRequest = 0
+
+  public func requestInputFocus() { focusInputRequest += 1 }
   public var notice: String?
   public var historyMode: HistoryMode = .page
   public private(set) var history: [ChatMessageRecord] = []
@@ -64,6 +68,8 @@ public final class AgentPaneViewModel {
       await self?.reloadHistory()
     }
   }
+
+  public var vendorConfigured: Bool { library.environment.config.agent.isConfigured }
 
   public var scopeDescription: String {
     let page = reader.currentPage

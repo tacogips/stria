@@ -27,7 +27,7 @@ func makeAppModelFixture(
   filename: String = "fixture.pdf",
   ocr: FakeOCRService = FakeOCRService(),
   agent: FakeAgentService = FakeAgentService(),
-  config: StriaConfig = .defaults,
+  config: StriaConfig = .testing,
   clock: @escaping @Sendable () -> Date = { Date() }
 ) throws -> (StriaLibrary, URL) {
   let source = paths.root.appendingPathComponent(filename)

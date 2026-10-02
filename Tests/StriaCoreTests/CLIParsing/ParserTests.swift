@@ -5,7 +5,7 @@ import Testing
   @Test func globalOptionsAndBasicCommands() throws {
     #expect(try CommandLineParser.parse(["--home", "/tmp/x", "list"]) == ParsedInvocation(home: "/tmp/x", command: .list))
     #expect(try CommandLineParser.parse(["list", "--home", "/tmp/x"]) == ParsedInvocation(home: "/tmp/x", command: .list))
-    #expect(try CommandLineParser.parse(["import", "a.pdf", "--no-ocr", "--json"]).command == .importPDF(path: "a.pdf", noOCR: true))
+    #expect(try CommandLineParser.parse(["import", "a.pdf", "--no-ocr", "--json"]).command == .importPDF(path: "a.pdf", noOCR: true, forceOCR: false))
     #expect(try CommandLineParser.parse(["page", "image", "abc", "3", "--output", "/tmp/o.png"]).command == .pageImage(docId: "abc", page: 3, output: "/tmp/o.png"))
     #expect(try CommandLineParser.parse(["search", "foo", "--doc", "d", "--limit", "5"]).command == .search(query: "foo", docId: "d", limit: 5))
     #expect(try CommandLineParser.parse(["history", "--doc", "d", "--page", "2"]).command == .history(docId: "d", page: 2, limit: nil))

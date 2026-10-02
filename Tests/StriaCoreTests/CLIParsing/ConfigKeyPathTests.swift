@@ -2,19 +2,23 @@ import StriaCore
 import Testing
 
 @Suite struct ConfigKeyPathTests {
-  @Test func exposesExactlyEighteenLeafKeys() throws {
-    #expect(ConfigKeyPath.keys.count == 18)
+  @Test func exposesExactlyNineteenLeafKeys() throws {
+    #expect(ConfigKeyPath.keys.count == 19)
     #expect(Set(ConfigKeyPath.keys) == Set([
       "render.dpi", "render.imageFormat", "render.quality", "render.maxPixelDimension",
-      "ocr.vendor", "ocr.model", "ocr.apiKeyEnvironment", "ocr.concurrency", "ocr.prompt", "ocr.timeoutSeconds",
+      "ocr.vendor", "ocr.model", "ocr.apiKeyEnvironment", "ocr.concurrency", "ocr.prompt", "ocr.timeoutSeconds", "ocr.autoRunOnImport",
       "agent.vendor", "agent.model", "agent.apiKeyEnvironment", "agent.neighborPages",
       "agent.maxImages", "agent.maxContextCharacters", "agent.systemPrompt", "agent.timeoutSeconds"
     ]))
     #expect(try ConfigKeyPath.value(of: "ocr.timeoutSeconds", in: .defaults) == .int(300))
     #expect(try ConfigKeyPath.setting("agent.timeoutSeconds", to: "900", in: .defaults).agent.timeoutSeconds == 900)
     #expect(throws: StriaError.self) { try ConfigKeyPath.setting("agent.timeoutSeconds", to: "5", in: .defaults) }
-    let model = try ConfigKeyPath.value(of: "ocr.model", in: .defaults)
-    #expect(model == .string("claude-sonnet-5-5"))
+    #expect(try ConfigKeyPath.value(of: "ocr.model", in: .defaults) == .null)
+    #expect(try ConfigKeyPath.value(of: "ocr.vendor", in: .defaults) == .null)
+    #expect(try ConfigKeyPath.value(of: "ocr.model", in: .testing) == .string("test-ocr-model"))
+    #expect(try ConfigKeyPath.setting("ocr.autoRunOnImport", to: "false", in: .defaults).ocr.autoRunOnImport == false)
+    #expect(try ConfigKeyPath.setting("agent.vendor", to: "null", in: .testing).agent.vendor == nil)
+    #expect(throws: StriaError.self) { try ConfigKeyPath.setting("ocr.autoRunOnImport", to: "maybe", in: .defaults) }
   }
 
   @Test func setsAndValidatesValues() throws {

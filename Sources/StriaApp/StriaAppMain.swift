@@ -34,7 +34,7 @@ struct StriaReaderApp: App {
         if let appModel {
           RootView(model: appModel)
         } else {
-          StartupErrorView(message: startupError ?? "stria could not start.")
+          StartupErrorView(message: startupError ?? "Stria could not start.")
         }
       }
       .frame(minWidth: 1100, minHeight: 700)
@@ -42,6 +42,13 @@ struct StriaReaderApp: App {
     .commands {
       SidebarCommands()
       StriaCommands()
+    }
+    Settings {
+      if let appModel {
+        SettingsView(settings: appModel.settings)
+      } else {
+        StartupErrorView(message: startupError ?? "Stria could not start.")
+      }
     }
   }
 }
@@ -58,7 +65,7 @@ private struct StartupErrorView: View {
 
   var body: some View {
     ContentUnavailableView {
-      Label("Unable to Start stria", systemImage: "exclamationmark.triangle")
+      Label("Unable to Start Stria", systemImage: "exclamationmark.triangle")
     } description: {
       Text(message)
     }

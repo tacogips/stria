@@ -3,9 +3,11 @@ import Foundation
 enum DocumentCommands {
   static func run(_ command: CLICommand, library: StriaLibrary, currentDirectory: URL) async throws -> any Encodable {
     switch command {
-    case .importPDF(let path, let noOCR):
+    case .importPDF(let path, let noOCR, let forceOCR):
       let source = resolve(path, relativeTo: currentDirectory)
-      let result = try await library.importDocument(at: source, runOCR: !noOCR)
+      // Without a flag the config decides (ocr.autoRunOnImport), as in the app.
+      let runOCR = !noOCR && (forceOCR || library.environment.config.ocr.autoRunOnImport)
+      let result = try await library.importDocument(at: source, runOCR: runOCR)
       return ImportOutput(alreadyImported: result.alreadyImported, document: result.document, ocr: ImportOCROutput(result.ocr))
     case .ocr(let docId, let pages, let retryFailed):
       let selection: OCRSelection

@@ -7,19 +7,22 @@ struct ReaderView: View {
   @Bindable var agent: AgentPaneViewModel
   @AppStorage("showAgentInspector") private var showAgent = true
   @State private var showPageSheet = false
+  @State private var showShortcutHelp = false
+  @State private var columnVisibility: NavigationSplitViewVisibility = .all
+  @State private var shortcuts = ReaderShortcutMonitor()
 
   var body: some View {
-    NavigationSplitView {
+    NavigationSplitView(columnVisibility: $columnVisibility) {
       LeftPaneView(reader: reader)
-        .navigationSplitViewColumnWidth(min: 210, ideal: 260, max: 360)
+        .navigationSplitViewColumnWidth(min: 180, ideal: 280, max: 640)
     } detail: {
       PDFKitView(reader: reader)
         .background(.background)
         .navigationTitle(reader.title)
     }
     .inspector(isPresented: $showAgent) {
-      AgentPaneView(agent: agent, reader: reader)
-        .inspectorColumnWidth(min: 290, ideal: 360, max: 480)
+      AgentPaneView(agent: agent, reader: reader, configRevision: model.configRevision)
+        .inspectorColumnWidth(min: 300, ideal: 400, max: 720)
     }
     .searchable(text: $reader.searchQuery, placement: .toolbar, prompt: "Search OCR text")
     .onSubmit(of: .search) { Task { await reader.submitSearch(reader.searchQuery) } }
@@ -31,6 +34,7 @@ struct ReaderView: View {
     .focusedSceneValue(\.striaAgent, agent)
     .focusedSceneValue(\.striaPageSheet, $showPageSheet)
     .focusedSceneValue(\.striaAgentVisibility, $showAgent)
+    .focusedSceneValue(\.striaShortcutHelp, $showShortcutHelp)
     .toolbar {
       ToolbarItem(placement: .navigation) {
         Button("Library") { Task { await model.showLibrary() } }
@@ -49,6 +53,26 @@ struct ReaderView: View {
     .sheet(isPresented: $showPageSheet) {
       GoToPageSheet(reader: reader, isPresented: $showPageSheet)
     }
+    .sheet(isPresented: $showShortcutHelp) {
+      ShortcutHelpSheet(isPresented: $showShortcutHelp)
+    }
     .task { await agent.reloadHistory() }
+    .onAppear { shortcuts.install(handle) }
+    .onDisappear { shortcuts.remove() }
+  }
+
+  private func handle(_ shortcut: ReaderShortcut) {
+    switch shortcut {
+    case .toggleLeftPane: columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
+    case .toggleAgentPane: showAgent.toggle()
+    case .focusAgentInput:
+      showAgent = true
+      agent.requestInputFocus()
+    case .pageDown: reader.requestScroll(.pageDown)
+    case .pageUp: reader.requestScroll(.pageUp)
+    case .lineDown: reader.requestScroll(.lineDown)
+    case .lineUp: reader.requestScroll(.lineUp)
+    case .help: showShortcutHelp = true
+    }
   }
 }

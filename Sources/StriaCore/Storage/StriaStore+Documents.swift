@@ -41,7 +41,7 @@ extension StriaStore {
   public func listDocuments(order: DocumentOrder) throws -> [DocumentRecord] {
     let ordering = order == .importedDescending
       ? "imported_at DESC,id"
-      : "last_opened_at IS NULL,last_opened_at DESC,imported_at DESC"
+      : "COALESCE(last_opened_at,imported_at) DESC,imported_at DESC"
     let statement = try database.prepare("SELECT \(Self.documentColumns) FROM documents ORDER BY \(ordering)")
     var documents: [DocumentRecord] = []
     while try statement.step() { documents.append(try documentRecord(statement)) }

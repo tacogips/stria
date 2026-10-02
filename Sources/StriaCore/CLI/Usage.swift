@@ -5,7 +5,7 @@ public enum Usage {
   Usage: stria [--home <path>] <command> [args] [options]
 
   Commands:
-    import <pdf> [--no-ocr]
+    import <pdf> [--ocr | --no-ocr]
     ocr <docId> [--pages <list>] [--retry-failed]
     list
     show <docId>

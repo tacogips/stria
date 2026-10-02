@@ -57,10 +57,14 @@ or null.
 
 ## Commands
 
-### `stria import <pdf> [--no-ocr]`
+### `stria import <pdf> [--ocr | --no-ocr]`
 
-Imports the PDF. Import is idempotent by content. Without `--no-ocr`, the
-command OCRs `pending` pages before returning.
+Imports the PDF. Import is idempotent by content. OCR of the `pending` pages
+runs before returning when `--ocr` is given, or when neither flag is given and
+`ocr.autoRunOnImport` is true (the default, shared with the app). `--no-ocr`
+never runs it; both flags together are a usage error. With no OCR vendor
+configured the import succeeds with `ocr.status = "unavailable"` and a reason
+pointing at Settings / `config set`.
 
 ```json
 {"alreadyImported": false, "document": DocumentSummary,

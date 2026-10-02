@@ -28,6 +28,10 @@ two screens:
    `NavigationSplitView(sidebar: LeftPane, detail: PDFPane)` with
    `.inspector(isPresented:)` for the agent pane.
 
+The sidebar column resizes between 180 and 640 points and the inspector
+between 300 and 720, so either pane can be made wide enough for long outlines
+or answers.
+
 The reader toolbar contains:
 
 - leading: the built-in sidebar toggle (no second one is added), and a
@@ -38,11 +42,20 @@ The reader toolbar contains:
 
 ## Library (home)
 
-- A `List` of imported documents. Each row shows the title, page count, and
-  import or OCR progress: `Rendering 12/80`, `OCR 40/80`, the failed count,
+- A `List` of imported documents (inset style with alternating row
+  backgrounds; the row under the pointer is highlighted). Rows are ordered by
+  most recent use: `COALESCE(last_opened_at, imported_at)` descending, so a
+  new import appears at the top until something else is opened. Each row
+  shows a document icon, the title, when it was last opened, the page count,
+  and import or OCR progress: `Rendering 12/80`, `OCR 40/80`, the failed count,
   or the OCR `unavailable` reason, plus a small spinner while this app
   process is rendering or OCRing the document (`LibraryRow.isBusy`). Rows are ordered by `last_opened_at`
   descending, then `imported_at` descending.
+- The toolbar search field runs the shared OCR search across every document
+  (`LibraryViewModel.submitSearch`); the results replace the list, each row
+  showing the title, page and snippet, and a click opens that document at
+  that page (`AppModel.open(documentId:page:)`). Clearing the field returns
+  to the list.
 - Import uses a toolbar "Import" button (`Cmd-O`) that opens `fileImporter`
   (`UTType.pdf`, multiple selection), or PDF file URLs dropped onto the list.
   - Each import runs in the background through `StriaLibrary.importDocument`
@@ -142,7 +155,9 @@ while a search is active.
   what the assistant will see, for example "Sees page 12",
   "Sees pages 11-13", or "Sees up to 4 relevant pages of <title>, including
   page 12".
-- Transcript: the active thread's messages.
+- Transcript: the active thread's messages as chat bubbles: the user's
+  questions on the right in the accent colour, the assistant's answers (and
+  the streaming bubble) on the left.
   - Every `[<docId> p.<page>]` marker that matches the open document is
     rendered inline as a `p. <page>` link that navigates the PDF to that
     page (an `AttributedString` link with a `stria-page://` URL handled by
@@ -165,8 +180,9 @@ while a search is active.
   is anchored to the page that was current at its first question.
 - `unavailable` errors (for example, a credential env var is unset) show an
   inline notice naming the reason and are not persisted.
-- The pane has two tabs, **Chat** and **History**, as a segmented control at
-  the top. Chat holds the scope picker, transcript and composer. History
+- The pane has two tabs, **Chat** and **History**, as a segmented control
+  pinned at the top (the content below is top-aligned, so switching tabs
+  never moves the control). Chat holds the scope picker, transcript and composer. History
   fills the pane with the past questions and answers; its own segmented
   control switches between "This page" and "This PDF"
   (`design-storage.md#chat-history-queries`), each row shows the role, page,
@@ -176,6 +192,52 @@ while a search is active.
   result can change). Selecting an entry reopens its thread in the Chat tab
   and jumps to its page. Selecting an entry opens its thread and jumps
   to its anchor page.
+
+## Settings Window
+
+`Settings` scene (`Cmd-,`), backed by `SettingsViewModel` in
+`StriaCore/AppModel`, which holds a draft of the configuration and writes it
+with `StriaLibrary.saveConfig` on Save (nothing is written before). Sections:
+
+- OCR: vendor picker ("Not configured", "PDF text layer", then the gateway
+  vendors with display names), model field (shown for model vendors, with the
+  vendor's suggested model as placeholder), API key environment variable
+  field (API vendors only), "Run OCR automatically after import" toggle, and
+  the concurrency stepper. Choosing a vendor fills empty model and variable
+  fields with suggestions.
+- Agent: vendor, model and API key variable in the same way.
+- System Prompt: a text editor showing the current prompt (the default when
+  none is set) with "Reset to Default". A prompt equal to the default is
+  stored as null.
+- Save validates (a model vendor needs a model, an API vendor needs a
+  variable name) and shows the error inline; Revert reloads the file.
+
+After a save, `AppModel.configRevision` increments; the library banner and
+the agent pane's "No agent vendor is configured" notice (both with a
+`SettingsLink`) re-evaluate. Until both vendors are set, the library shows a
+banner pointing to Settings, rows with pending pages read "OCR not run:
+choose a vendor in Settings, then Run OCR", and the Run OCR toolbar button is
+disabled. The app name shown in the menu bar and Dock is "Stria", from the
+Info.plist embedded in the executable (`Resources/StriaInfo.plist`).
+
+## Reader Shortcuts
+
+Single-key shortcuts in the style of chilla (`ReaderShortcut`, a local
+`NSEvent` monitor installed while the reader is on screen). They never fire
+while a text field or text view has focus, so typing is never interrupted:
+
+| Keys | Action |
+| --- | --- |
+| `Shift+L` | Collapse or expand the left pane |
+| `Shift+R` | Collapse or expand the agent pane |
+| `/` | Show the agent pane and focus its input |
+| `Ctrl+D` / `Ctrl+U` | Page the PDF down / up (`PDFView.scrollPageDown/Up`) |
+| `j` / `k` | Scroll the PDF one line down / up |
+| `?` | Show the shortcut list (also Help > Keyboard Shortcuts, `Cmd-/`) |
+
+Scroll requests travel like navigation and zoom: `ReaderViewModel.scroll`
+(`ScrollRequest`, consumed once per id by the `PDFView` coordinator). The
+input focus request is `AgentPaneViewModel.focusInputRequest`.
 
 ## Commands and Shortcuts
 

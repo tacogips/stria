@@ -8,6 +8,9 @@ struct PreflightResult: Equatable, Sendable {
 
 enum GatewayPreflight {
   static func check(_ settings: ServiceSettings, environment: [String: String]) throws(ServiceError) -> PreflightResult {
+    guard !settings.vendor.isEmpty else {
+      throw .unavailable("vendor is not configured; choose one in Settings or with stria config set")
+    }
     guard let vendor = GatewayVendor(rawValue: settings.vendor) else {
       throw .unavailable("unknown vendor \(settings.vendor)")
     }

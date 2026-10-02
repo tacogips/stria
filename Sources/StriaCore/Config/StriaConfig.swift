@@ -7,7 +7,9 @@ public enum KnownVendors {
 }
 
 private enum RenderConfigCodingKeys: String, CodingKey { case dpi, imageFormat, quality, maxPixelDimension }
-private enum OCRConfigCodingKeys: String, CodingKey { case vendor, model, apiKeyEnvironment, concurrency, prompt, timeoutSeconds }
+private enum OCRConfigCodingKeys: String, CodingKey {
+  case vendor, model, apiKeyEnvironment, concurrency, prompt, timeoutSeconds, autoRunOnImport
+}
 private enum AgentConfigCodingKeys: String, CodingKey {
   case vendor, model, apiKeyEnvironment, neighborPages, maxImages, maxContextCharacters, systemPrompt, timeoutSeconds
 }
@@ -33,38 +35,48 @@ public struct StriaConfig: Codable, Equatable, Sendable {
   }
 
   public struct OCRConfig: Codable, Equatable, Sendable {
-    public var vendor: String
+    /// nil means not configured: no OCR runs and nothing is called until the
+    /// user picks a vendor (Settings in the app, `stria config set` in the CLI).
+    public var vendor: String?
     public var model: String?
     public var apiKeyEnvironment: String?
     public var concurrency: Int
     public var prompt: String?
     /// Upper bound for one page's model call.
     public var timeoutSeconds: Int
+    /// Whether an import OCRs its pages right away, or waits for "Run OCR".
+    public var autoRunOnImport: Bool
 
-    public init(vendor: String, model: String?, apiKeyEnvironment: String?, concurrency: Int, prompt: String?,
-                timeoutSeconds: Int = 300) {
+    public var isConfigured: Bool { vendor != nil }
+
+    public init(vendor: String?, model: String?, apiKeyEnvironment: String?, concurrency: Int, prompt: String?,
+                timeoutSeconds: Int = 300, autoRunOnImport: Bool = true) {
       self.vendor = vendor; self.model = model; self.apiKeyEnvironment = apiKeyEnvironment
       self.concurrency = concurrency; self.prompt = prompt; self.timeoutSeconds = timeoutSeconds
+      self.autoRunOnImport = autoRunOnImport
     }
     public init(from decoder: Decoder) throws {
       let c = try decoder.container(keyedBy: OCRConfigCodingKeys.self)
-      self.init(vendor: try c.decodeIfPresent(String.self, forKey: .vendor) ?? "anthropic",
-                model: try decodeOptional(String.self, key: .model, in: c, defaultValue: "claude-sonnet-5-5"),
-                apiKeyEnvironment: try decodeOptional(String.self, key: .apiKeyEnvironment, in: c, defaultValue: "ANTHROPIC_API_KEY"),
+      self.init(vendor: try decodeOptional(String.self, key: .vendor, in: c, defaultValue: nil),
+                model: try decodeOptional(String.self, key: .model, in: c, defaultValue: nil),
+                apiKeyEnvironment: try decodeOptional(String.self, key: .apiKeyEnvironment, in: c, defaultValue: nil),
                 concurrency: try c.decodeIfPresent(Int.self, forKey: .concurrency) ?? 2,
                 prompt: try decodeOptional(String.self, key: .prompt, in: c, defaultValue: nil),
-                timeoutSeconds: try c.decodeIfPresent(Int.self, forKey: .timeoutSeconds) ?? 300)
+                timeoutSeconds: try c.decodeIfPresent(Int.self, forKey: .timeoutSeconds) ?? 300,
+                autoRunOnImport: try c.decodeIfPresent(Bool.self, forKey: .autoRunOnImport) ?? true)
     }
     public func encode(to encoder: Encoder) throws {
       var c = encoder.container(keyedBy: OCRConfigCodingKeys.self)
       try c.encode(vendor, forKey: .vendor); try c.encode(model, forKey: .model)
       try c.encode(apiKeyEnvironment, forKey: .apiKeyEnvironment); try c.encode(concurrency, forKey: .concurrency)
       try c.encode(prompt, forKey: .prompt); try c.encode(timeoutSeconds, forKey: .timeoutSeconds)
+      try c.encode(autoRunOnImport, forKey: .autoRunOnImport)
     }
   }
 
   public struct AgentConfig: Codable, Equatable, Sendable {
-    public var vendor: String
+    /// nil means not configured: asking fails as unavailable until the user picks a vendor.
+    public var vendor: String?
     public var model: String?
     public var apiKeyEnvironment: String?
     public var neighborPages: Int
@@ -74,7 +86,9 @@ public struct StriaConfig: Codable, Equatable, Sendable {
     /// Upper bound for one question's model call.
     public var timeoutSeconds: Int
 
-    public init(vendor: String, model: String?, apiKeyEnvironment: String?, neighborPages: Int, maxImages: Int,
+    public var isConfigured: Bool { vendor != nil }
+
+    public init(vendor: String?, model: String?, apiKeyEnvironment: String?, neighborPages: Int, maxImages: Int,
                 maxContextCharacters: Int, systemPrompt: String?, timeoutSeconds: Int = 600) {
       self.vendor = vendor; self.model = model; self.apiKeyEnvironment = apiKeyEnvironment
       self.neighborPages = neighborPages; self.maxImages = maxImages; self.maxContextCharacters = maxContextCharacters
@@ -82,9 +96,9 @@ public struct StriaConfig: Codable, Equatable, Sendable {
     }
     public init(from decoder: Decoder) throws {
       let c = try decoder.container(keyedBy: AgentConfigCodingKeys.self)
-      self.init(vendor: try c.decodeIfPresent(String.self, forKey: .vendor) ?? "anthropic",
-                model: try decodeOptional(String.self, key: .model, in: c, defaultValue: "claude-opus-5-5"),
-                apiKeyEnvironment: try decodeOptional(String.self, key: .apiKeyEnvironment, in: c, defaultValue: "ANTHROPIC_API_KEY"),
+      self.init(vendor: try decodeOptional(String.self, key: .vendor, in: c, defaultValue: nil),
+                model: try decodeOptional(String.self, key: .model, in: c, defaultValue: nil),
+                apiKeyEnvironment: try decodeOptional(String.self, key: .apiKeyEnvironment, in: c, defaultValue: nil),
                 neighborPages: try c.decodeIfPresent(Int.self, forKey: .neighborPages) ?? 1,
                 maxImages: try c.decodeIfPresent(Int.self, forKey: .maxImages) ?? 4,
                 maxContextCharacters: try c.decodeIfPresent(Int.self, forKey: .maxContextCharacters) ?? 60_000,
@@ -106,8 +120,8 @@ public struct StriaConfig: Codable, Equatable, Sendable {
   public var agent: AgentConfig
   public static let defaults = StriaConfig(
     version: 1, render: .init(dpi: 150, imageFormat: .heic, quality: 0.75, maxPixelDimension: 4096),
-    ocr: .init(vendor: "anthropic", model: "claude-sonnet-5-5", apiKeyEnvironment: "ANTHROPIC_API_KEY", concurrency: 2, prompt: nil),
-    agent: .init(vendor: "anthropic", model: "claude-opus-5-5", apiKeyEnvironment: "ANTHROPIC_API_KEY", neighborPages: 1, maxImages: 4, maxContextCharacters: 60_000, systemPrompt: nil)
+    ocr: .init(vendor: nil, model: nil, apiKeyEnvironment: nil, concurrency: 2, prompt: nil),
+    agent: .init(vendor: nil, model: nil, apiKeyEnvironment: nil, neighborPages: 1, maxImages: 4, maxContextCharacters: 60_000, systemPrompt: nil)
   )
 
   public init(version: Int = 1, render: RenderConfig, ocr: OCRConfig, agent: AgentConfig) {
@@ -123,15 +137,20 @@ public struct StriaConfig: Codable, Equatable, Sendable {
   }
 
   public func validate() throws(StriaError) {
-    guard version == 1, (72...600).contains(render.dpi), (0.1...1.0).contains(render.quality),
+    guard version == 1 else { throw .config("Unsupported config version \(version)") }
+    guard (72...600).contains(render.dpi), (0.1...1.0).contains(render.quality),
           (1024...8192).contains(render.maxPixelDimension), (1...8).contains(ocr.concurrency),
           (0...5).contains(agent.neighborPages), (1...10).contains(agent.maxImages),
           (1000...500_000).contains(agent.maxContextCharacters),
           (10...3600).contains(ocr.timeoutSeconds), (10...3600).contains(agent.timeoutSeconds) else {
       throw .config("Configuration values are outside their allowed ranges")
     }
-    guard KnownVendors.gateway.contains(ocr.vendor) || ocr.vendor == KnownVendors.pdfTextLayer,
-          KnownVendors.gateway.contains(agent.vendor) else { throw .config("Unknown vendor") }
+    if let vendor = ocr.vendor, !KnownVendors.gateway.contains(vendor), vendor != KnownVendors.pdfTextLayer {
+      throw .config("Unknown OCR vendor '\(vendor)'")
+    }
+    if let vendor = agent.vendor, !KnownVendors.gateway.contains(vendor) {
+      throw .config("Unknown agent vendor '\(vendor)'")
+    }
     for name in [ocr.apiKeyEnvironment, agent.apiKeyEnvironment].compactMap({ $0 }) {
       guard name.range(of: "^[A-Z_][A-Z0-9_]*$", options: .regularExpression) != nil else {
         throw .config("Invalid apiKeyEnvironment name")
