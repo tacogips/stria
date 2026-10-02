@@ -74,12 +74,13 @@ public enum CommandLineParser {
       let limit = try optionalPositiveInteger(parsed.values["--limit"], name: "--limit")
       return .search(query: parsed.positionals[0], docId: parsed.values["--doc"], limit: limit)
     case "ask":
-      let parsed = try options(arguments, flags: [], values: ["--doc", "--page", "--query", "--limit"], command: command)
+      let parsed = try options(arguments, flags: [], values: ["--doc", "--page", "--query", "--limit", "--thread"], command: command)
       try requirePositionals(parsed.positionals, count: 1, command: command)
       if parsed.values["--page"] != nil && parsed.values["--doc"] == nil { throw .usage("--page requires --doc") }
       let page = try optionalPositiveInteger(parsed.values["--page"], name: "--page")
       let limit = try optionalPositiveInteger(parsed.values["--limit"], name: "--limit")
-      return .ask(question: parsed.positionals[0], docId: parsed.values["--doc"], page: page, query: parsed.values["--query"], limit: limit)
+      return .ask(question: parsed.positionals[0], docId: parsed.values["--doc"], page: page, query: parsed.values["--query"],
+                  limit: limit, thread: parsed.values["--thread"])
     case "history":
       let parsed = try options(arguments, flags: [], values: ["--doc", "--page", "--limit"], command: command)
       try requirePositionals(parsed.positionals, count: 0, command: command)

@@ -30,8 +30,8 @@ two screens:
 
 The reader toolbar contains:
 
-- leading: the built-in sidebar toggle, and a "Library" button that returns
-  home (`Cmd-Shift-L`);
+- leading: the built-in sidebar toggle (no second one is added), and a
+  "Library" button that returns home (`Cmd-Shift-L` via the View menu);
 - principal: a page field showing `n of N` with previous and next buttons;
 - trailing: a `.searchable(placement: .toolbar)` search field and an
   inspector toggle button.
@@ -40,7 +40,8 @@ The reader toolbar contains:
 
 - A `List` of imported documents. Each row shows the title, page count, and
   import or OCR progress: `Rendering 12/80`, `OCR 40/80`, the failed count,
-  or the OCR `unavailable` reason. Rows are ordered by `last_opened_at`
+  or the OCR `unavailable` reason, plus a small spinner while this app
+  process is rendering or OCRing the document (`LibraryRow.isBusy`). Rows are ordered by `last_opened_at`
   descending, then `imported_at` descending.
 - Import uses a toolbar "Import" button (`Cmd-O`) that opens `fileImporter`
   (`UTType.pdf`, multiple selection), or PDF file URLs dropped onto the list.
@@ -50,8 +51,10 @@ The reader toolbar contains:
     original file, so it never waits for rendering or OCR.
   - Importing the same file again selects the existing row.
 - To open a document, double-click the row or select it and press Return.
-  This sets `last_opened_at`, routes to the reader, and starts background
-  cache expansion of all pages.
+  The route switches to the reader first (its "Opening document" indicator
+  shows), the `PDFDocument` is parsed off the main actor, `last_opened_at`
+  is set, and background cache expansion of all pages starts. A failed open
+  returns to the library with the error.
 - Row context menu: "Run OCR" (pending pages), "Retry Failed OCR" and
   "Remove..." (also the Delete key on the selected row). Removal asks for
   confirmation, names what is deleted (stored copy, page images, OCR text,
@@ -59,20 +62,25 @@ The reader toolbar contains:
   calls `StriaLibrary.removeDocument` (`design-storage.md#document-removal`).
 - Import errors (`invalidPDF`, IO) appear in an alert. A failed copy leaves
   no row in the list.
-- An empty library shows the import button and a drop hint.
+- An empty library shows the import button and a drop hint as an overlay
+  (not a list row). The window title is "Library"; the reader's title is the
+  document title.
 
 ## Reader: Left Pane (sidebar)
 
 A segmented picker at the top switches between **Contents** and
-**Thumbnails**. A third mode, **Search**, appears only while a search is
-active.
+**Thumbnails**. A third segment, **Search**, appears (and is selected) only
+while a search is active.
 
 - **Contents**: a tree from `outline_json`. While the document is still
   `rendering`, the tree comes from the `OutlineExtractor` running on the open
   `PDFDocument`. Clicking a node with a page navigates to it; nodes without a
-  page are not clickable. The current section is highlighted: it is the last
-  node, in document order, whose page is at or before the current page. If
-  the PDF has no outline, the mode shows the flat list "Page 1 ... Page N".
+  page are not clickable. The current section is the list selection: it is
+  the last node, in document order, whose page is at or before the current
+  page. Its collapsed ancestors are expanded and the row is scrolled into
+  view, as in Preview. Rows come from `ReaderViewModel.outlineRows`
+  (`OutlineRow`, built once per open). If the PDF has no outline, the mode
+  shows the flat list "Page 1 ... Page N" with the current page selected.
 - **Thumbnails**: a lazy list of page thumbnails rendered from the open
   `PDFDocument` (`PDFPage.thumbnail(of:for:)`) for visible rows only, off the
   main actor so scanned pages do not stutter the sidebar, each labelled with
@@ -82,8 +90,9 @@ active.
   OCR search scoped to the open document (`design-storage.md#search`). The
   results replace the previous mode. Each row shows the page number and the
   snippet; clicking a row navigates to that page. When some pages are not yet
-  OCRed, a footer reads "N pages not yet OCRed". Clearing the search field
-  returns to the previous mode.
+  OCRed, a footer reads "N pages not yet OCRed". A failed search shows its
+  error in the pane (`ReaderViewModel.searchError`). Clearing the search
+  field returns to the previous mode.
 
 ## Reader: Center Pane (PDF)
 
@@ -100,9 +109,17 @@ active.
   `go(to:)` once per id, so repeated requests for the same page work and no
   observable state is mutated during a SwiftUI update (which would otherwise
   trigger feedback loops and runtime warnings). `requestedPage` is a
-  read-only view of `navigation?.page`.
+  read-only view of `navigation?.page`. A request is held until the
+  `PDFView` is in a window with a non-zero layout, because `go(to:)` before
+  the first layout pass of an `autoScales` view is reset by that pass; this
+  is what makes the last-read restore land on the right page.
+- Zoom: View > Zoom In / Zoom Out / Actual Size / Zoom to Fit
+  (`Cmd-+`, `Cmd--`, `Cmd-0`, `Cmd-9`) go through `ReaderViewModel.zoom`
+  (`ZoomRequest`, consumed once per id like navigation).
 - Page jump works three ways:
-  - the toolbar `n of N` field, committed with Return;
+  - the toolbar `n of N` field, committed with Return. The field keeps its
+    own text while focused, so scrolling never overwrites what is being
+    typed; it re-syncs from the current page when focus leaves;
   - Go > Go to Page... (`Cmd-Opt-G`), which opens a small sheet with a number
     field;
   - Go > Next Page and Previous Page (`Cmd-Opt-Down` / `Cmd-Opt-Up`) and the
@@ -126,26 +143,32 @@ active.
   "Sees pages 11-13", or "Sees up to 4 relevant pages of <title>, including
   page 12".
 - Transcript: the active thread's messages.
-  - Assistant answers render citation chips. Every `[<docId> p.<page>]`
-    marker that matches the open document becomes a clickable chip labelled
-    `p. <page>` that navigates the PDF to that page. Markers for other
-    documents stay plain text.
+  - Every `[<docId> p.<page>]` marker that matches the open document is
+    rendered inline as a `p. <page>` link that navigates the PDF to that
+    page (an `AttributedString` link with a `stria-page://` URL handled by
+    `openURL`). Markers for other documents stay plain text.
+  - The question appears in the transcript as soon as it is sent (a
+    provisional record with `AgentPaneViewModel.pendingMessageID`); the
+    persisted records replace it when the answer arrives, and it is removed
+    if the request is cancelled or unavailable.
   - Failed answers appear as error messages, and they are persisted.
 - Suggested questions: an empty thread shows three fixed prompts: "Summarize
   this page", "Explain the key terms on this page" and "What should I read
   next to understand this?". Clicking one sends it.
 - Input: a multi-line text field. Send with the Send button or
-  `Cmd-Return`. Sending is disabled while a request is in flight. During the
-  request an assistant bubble with a small progress indicator shows the
-  answer as it streams (`AgentPaneViewModel.streamingAnswer`); when the
-  answer completes, the bubble is replaced by the persisted transcript
-  message. "New Chat" starts a new thread. A thread
+  `Cmd-Return`. During the request an assistant bubble with a small
+  progress indicator shows the answer as it streams
+  (`AgentPaneViewModel.streamingAnswer`); when the answer completes, the
+  bubble is replaced by the persisted transcript message. The Send button
+  becomes Cancel (`Cmd-.`, also Agent > Cancel Question) while a request is
+  in flight; cancelling stops the gateway turn and persists nothing. "New Chat" starts a new thread. A thread
   is anchored to the page that was current at its first question.
 - `unavailable` errors (for example, a credential env var is unset) show an
   inline notice naming the reason and are not persisted.
 - History: a segmented control switches between "This page" and "This PDF"
-  (`design-storage.md#chat-history-queries`). The list refreshes on page
-  change and after each answer. Selecting an entry opens its thread and jumps
+  (`design-storage.md#chat-history-queries`). The list refreshes after each
+  answer, and on page change debounced by 300 ms (and only in "This page"
+  mode, where the result can change). Selecting an entry opens its thread and jumps
   to its anchor page.
 
 ## Commands and Shortcuts
@@ -161,8 +184,14 @@ Commands are disabled when no reader is focused.
 | View | Library | `Cmd-Shift-L` |
 | Go | Go to Page... | `Cmd-Opt-G` |
 | Go | Next Page / Previous Page | `Cmd-Opt-Down` / `Cmd-Opt-Up` |
+| View | Zoom In / Zoom Out / Actual Size / Zoom to Fit | `Cmd-+` / `Cmd--` / `Cmd-0` / `Cmd-9` |
 | Agent | Send | `Cmd-Return` (in the input field) |
 | Agent | New Chat | `Cmd-Shift-N` |
+| Agent | Cancel Question | `Cmd-.` |
+
+Every shortcut is declared once, on the menu command. Toolbar buttons call
+the same action without a shortcut of their own, so a key press never fires
+twice (which would, for example, toggle the inspector off and on again).
 
 ## View Models (StriaCore/AppModel)
 

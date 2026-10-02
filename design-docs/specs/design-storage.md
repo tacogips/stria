@@ -24,10 +24,17 @@ directory and is then atomically renamed.
 
 - `sha256`: lowercase hex SHA-256 of the original file bytes (CryptoKit).
 - `docId`: the first 16 hex characters of `sha256`.
-- Importing a file whose `sha256` already exists returns the existing
-  document with `alreadyImported: true`. It does not copy, re-render or
-  re-OCR. If that document is still `rendering` from an interrupted import,
-  rendering resumes from the first missing page.
+- The file is hashed before PDFKit opens it, so re-importing known bytes
+  costs one read. Importing a file whose `sha256` already exists returns the
+  existing document with `alreadyImported: true`. It never re-renders or
+  re-OCRs; it does restore `originals/<docId>.pdf` if that file is missing.
+  If that document is still `rendering` from an interrupted import,
+  rendering resumes from the first missing page with the DPI and format
+  recorded on the row, not the current config.
+- Concurrent imports of the same bytes (for example the app and the CLI)
+  all succeed: page inserts are `INSERT OR IGNORE`, a lost race on the
+  `documents` insert or on the original's rename joins the other importer's
+  document, and both resume the same render.
 - If a `docId` exists with a different `sha256`, the import fails with
   `idCollision`. This is not expected in practice, and the id is never
   lengthened automatically.
@@ -63,7 +70,7 @@ directory and is then atomically renamed.
 
 Progress is reported as an `AsyncStream<ImportEvent>` with the events
 `copied(docId)`, `rendered(page, total)`, `ocr(done, failed, pending, total)`,
-`finished(docId)` and `failed(error)`.
+`finished(ImportResult)` and `failed(error)`.
 
 ## Image Codec
 
@@ -103,8 +110,13 @@ HEIC page, a 500-page PDF adds roughly 50-125 MB to the DB.
 Decision: the system `SQLite3` module (`import SQLite3`) with a thin wrapper
 (prepared statements, blobs, transactions). No third-party SQLite package.
 
-Connection settings: WAL journal, `busy_timeout = 5000`, `foreign_keys = ON`,
-and one connection per process owned by the `StriaStore` actor. Page BLOBs are
+Connection settings: `busy_timeout = 5000` and `foreign_keys = ON` are set
+before anything is read, so opening the store while another process holds
+the write lock waits instead of failing; the `user_version` guard runs next,
+so a too-new database is never modified; then WAL journal and
+`synchronous = NORMAL` (durable against application crashes in WAL mode,
+without one fsync per page insert). One connection per process is owned by
+the `StriaStore` actor. Page BLOBs are
 read one page at a time. No query loads all the images of a document.
 
 ### Migrations
@@ -226,17 +238,24 @@ write wins.
 
 Search is shared by `stria search`, ask retrieval and the app's search mode.
 
-- Normalization: the query and `search_text` are NFKC-normalized, which folds
-  full-width and half-width forms. Trigram matching is case-insensitive, and
-  LIKE is ASCII case-insensitive.
+- Normalization (`SearchQueryBuilder.normalize`, applied to the query and
+  to `search_text` when OCR text is stored): NFKC, which folds full-width
+  and half-width forms, then whitespace between two CJK characters is
+  removed. OCR keeps line breaks and Japanese has no inter-word spaces, so
+  without this a term wrapped across a line ("機械\n学習") would never match
+  the trigram index. `ocr_text` keeps the original line breaks. Trigram
+  matching is case-insensitive, and LIKE is ASCII case-insensitive.
 - Terms: the trimmed query is split on whitespace.
-- `fts` mode (backend `fts5` and every term has 3 or more characters):
-  - match: `page_fts MATCH` with each term as a quoted phrase (internal `"`
-    doubled), joined by `AND`;
+- `fts` mode (backend `fts5` and at least one term has 3 or more
+  characters):
+  - match: `page_fts MATCH` with each term of 3 or more characters as a
+    quoted phrase (internal `"` doubled), joined by `AND`; shorter terms
+    (such as a two-character Japanese word next to a longer one) are applied
+    as `LIKE` filters on the FTS body so the ranking and snippet are kept;
   - order: `bm25(page_fts)`, and `score = -bm25` rounded to 6 decimals;
   - snippet: `snippet(page_fts, 2, '[', ']', '...', 16)`.
-- `like` mode (backend `like`, or any term shorter than 3 characters, such as
-  a two-character Japanese word):
+- `like` mode (backend `like`, or every term shorter than 3 characters, such
+  as a single two-character Japanese word):
   - match: every term must match `pages.search_text LIKE '%term%' ESCAPE '\'`,
     with `%`, `_` and `\` escaped;
   - order: `score` descending, then `document_id, page_number`, where
@@ -266,6 +285,9 @@ retrieval query built from the question:
   with such a question and do not loosen the dedup rule.
 - Backend `fts5`: the trigrams are quoted phrases joined by `OR`, ranked by
   `bm25`.
+- English stop words (`SearchQueryBuilder.stopWords`: the, what, which,
+  about, page, explain, ...) are dropped before trigram expansion, because
+  their trigrams match every page and drown the ranking.
 - Backend `like`: a page matches when it contains at least one trigram. Its
   score is the number of distinct trigrams it contains (one `LIKE` expression
   per trigram summed in SQL), ordered by score descending, then
@@ -284,8 +306,12 @@ Delete key) behind a confirmation dialog.
 
 ## Chat History Queries
 
-- Per page: `chat_messages WHERE document_id = ? AND page_number = ?`.
-- Per PDF: `WHERE document_id = ?`.
+- Per page: `chat_messages WHERE document_id = ? AND page_number = ?`, plus
+  the messages of any library-wide thread (null `document_id`) whose
+  assistant message cites that page in `citations_json`.
+- Per PDF: `WHERE document_id = ?`, plus library-wide threads that cite any
+  page of the document. `citations_json` is written with sorted keys
+  (`{"docId":"...","page":N}`) so the LIKE match is exact.
 - All: no filter. This includes library-wide asks with a null `document_id`.
 - Results are ordered by `created_at, id`. `limit` defaults to the newest 50,
   returned oldest first. `--page` without `--doc` is a `usageError`.

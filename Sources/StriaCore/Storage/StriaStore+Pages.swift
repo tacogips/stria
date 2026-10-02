@@ -3,8 +3,10 @@ import Foundation
 extension StriaStore {
   public func insertPage(documentId: String, pageNumber: Int, image: StoredPageImage) throws {
     try database.transaction {
+      // OR IGNORE: two importers resuming the same document may render the
+      // same page; the first write wins and the second is a no-op.
       let statement = try database.prepare("""
-        INSERT INTO pages(document_id,page_number,image,image_format,width,height,ocr_status,created_at)
+        INSERT OR IGNORE INTO pages(document_id,page_number,image,image_format,width,height,ocr_status,created_at)
         VALUES(?,?,?,?,?,?,'pending',?)
         """)
       try statement.bind(documentId, at: 1).bind(pageNumber, at: 2).bind(image.data, at: 3)
@@ -65,7 +67,7 @@ extension StriaStore {
   ) throws {
     try database.transaction {
       try insertRun(run)
-      let normalized = text.precomposedStringWithCompatibilityMapping
+      let normalized = SearchQueryBuilder.normalize(text)
       let update = try database.prepare("""
         UPDATE pages SET ocr_status='done',ocr_text=?,search_text=?,ocr_vendor=?,ocr_model=?,ocr_error=NULL,
           ocr_updated_at=? WHERE document_id=? AND page_number=?

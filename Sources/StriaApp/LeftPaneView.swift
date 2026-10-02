@@ -3,19 +3,16 @@ import StriaCore
 
 struct LeftPaneView: View {
   @Bindable var reader: ReaderViewModel
-
-  private var contentsSelection: Binding<SidebarMode> {
-    Binding(
-      get: { reader.sidebarMode == .thumbnails ? .thumbnails : .contents },
-      set: { reader.sidebarMode = $0 }
-    )
-  }
+  @State private var expandedIDs: Set<String> = []
 
   var body: some View {
     VStack(spacing: 0) {
-      Picker("Sidebar", selection: contentsSelection) {
+      Picker("Sidebar", selection: $reader.sidebarMode) {
         Text("Contents").tag(SidebarMode.contents)
         Text("Thumbnails").tag(SidebarMode.thumbnails)
+        if reader.sidebarMode == .search {
+          Text("Search").tag(SidebarMode.search)
+        }
       }
       .pickerStyle(.segmented)
       .padding(10)
@@ -31,29 +28,65 @@ struct LeftPaneView: View {
         }
       }
     }
-    .navigationTitle(reader.title)
+    .navigationTitle("Contents")
   }
 
   @ViewBuilder private var contents: some View {
-    if reader.outline.isEmpty {
-      List(1...max(reader.pageCount, 1), id: \.self) { page in
-        Button("Page \(page)") { reader.goToPage(page) }
-          .buttonStyle(.plain)
-          .foregroundStyle(reader.currentPage == page ? Color.accentColor : Color.primary)
+    if reader.outlineRows.isEmpty {
+      ScrollViewReader { proxy in
+        List(1...max(reader.pageCount, 1), id: \.self, selection: pageSelection) { page in
+          Text("Page \(page)").id(page)
+        }
+        .onChange(of: reader.currentPage) { _, page in proxy.scrollTo(page) }
       }
     } else {
-      let rows = OutlineRowNode.make(reader.outline)
-      List {
-        OutlineGroup(rows, children: \.optionalChildren) { node in
-          outlineLabel(node)
+      ScrollViewReader { proxy in
+        List(selection: outlineSelection) {
+          ForEach(reader.outlineRows) { row in
+            OutlineRowView(row: row, expandedIDs: $expandedIDs)
+          }
         }
+        .onAppear { revealCurrentSection(proxy) }
+        .onChange(of: reader.currentOutlineNodeID) { _, _ in revealCurrentSection(proxy) }
       }
     }
   }
 
+  /// Selecting a row navigates; the selection itself always mirrors the
+  /// current section, as Preview's sidebar does.
+  private var outlineSelection: Binding<String?> {
+    Binding(
+      get: { reader.currentOutlineNodeID },
+      set: { id in
+        guard let id, let page = Self.page(for: id, in: reader.outlineRows) else { return }
+        reader.goToPage(page)
+      }
+    )
+  }
+
+  private var pageSelection: Binding<Int?> {
+    Binding(get: { reader.currentPage }, set: { if let page = $0 { reader.goToPage(page) } })
+  }
+
+  private func revealCurrentSection(_ proxy: ScrollViewProxy) {
+    guard let id = reader.currentOutlineNodeID else { return }
+    expandedIDs.formUnion(OutlineRow.ancestorIDs(of: id))
+    DispatchQueue.main.async { withAnimation { proxy.scrollTo(id, anchor: .center) } }
+  }
+
+  private static func page(for id: String, in rows: [OutlineRow]) -> Int? {
+    for row in rows {
+      if row.id == id { return row.page }
+      if let page = page(for: id, in: row.children) { return page }
+    }
+    return nil
+  }
+
   private var searchResults: some View {
     VStack(spacing: 0) {
-      if reader.searchResults.isEmpty {
+      if let error = reader.searchError {
+        ContentUnavailableView("Search Failed", systemImage: "exclamationmark.triangle", description: Text(error))
+      } else if reader.searchResults.isEmpty {
         ContentUnavailableView.search(text: reader.searchQuery)
       } else {
         List(reader.searchResults.indices, id: \.self) { index in
@@ -79,34 +112,36 @@ struct LeftPaneView: View {
       }
     }
   }
-
-  @ViewBuilder private func outlineLabel(_ node: OutlineRowNode) -> some View {
-    if let page = node.page {
-      Button {
-        reader.goToPage(page)
-      } label: {
-        Text(node.title)
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .foregroundStyle(reader.currentOutlineNodeID == node.id ? Color.accentColor : Color.primary)
-      }
-      .buttonStyle(.plain)
-    } else {
-      Text(node.title)
-    }
-  }
 }
 
-private struct OutlineRowNode: Identifiable {
-  let id: String
-  let title: String
-  let page: Int?
-  let children: [OutlineRowNode]
-  var optionalChildren: [OutlineRowNode]? { children.isEmpty ? nil : children }
+/// A recursive outline row whose expansion state is shared, so the current
+/// section's ancestors can be opened programmatically.
+private struct OutlineRowView: View {
+  let row: OutlineRow
+  @Binding var expandedIDs: Set<String>
 
-  static func make(_ nodes: [OutlineNode], prefix: String = "") -> [OutlineRowNode] {
-    nodes.enumerated().map { index, node in
-      let id = prefix.isEmpty ? String(index) : "\(prefix).\(index)"
-      return OutlineRowNode(id: id, title: node.title, page: node.page, children: make(node.children, prefix: id))
+  var body: some View {
+    if row.children.isEmpty {
+      label.tag(row.id).id(row.id)
+    } else {
+      DisclosureGroup(isExpanded: Binding(
+        get: { expandedIDs.contains(row.id) },
+        set: { if $0 { expandedIDs.insert(row.id) } else { expandedIDs.remove(row.id) } }
+      )) {
+        ForEach(row.children) { child in
+          OutlineRowView(row: child, expandedIDs: $expandedIDs)
+        }
+      } label: {
+        label
+      }
+      .tag(row.id)
+      .id(row.id)
     }
+  }
+
+  private var label: some View {
+    Text(row.title)
+      .foregroundStyle(row.page == nil ? Color.secondary : Color.primary)
+      .frame(maxWidth: .infinity, alignment: .leading)
   }
 }

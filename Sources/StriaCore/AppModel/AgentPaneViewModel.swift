@@ -33,10 +33,36 @@ public final class AgentPaneViewModel {
 
   private let library: StriaLibrary
   private let reader: ReaderViewModel
+  private var sendTask: Task<Void, Never>?
+  private var historyReloadTask: Task<Void, Never>?
+  private let historyDebounce: Duration
 
-  public init(library: StriaLibrary, reader: ReaderViewModel) {
+  public init(library: StriaLibrary, reader: ReaderViewModel, historyDebounce: Duration = .milliseconds(300)) {
     self.library = library
     self.reader = reader
+    self.historyDebounce = historyDebounce
+  }
+
+  /// Starts `send()` as a cancellable task (the view's Send button).
+  public func submit() {
+    sendTask = Task { [weak self] in await self?.send() }
+  }
+
+  /// Cancels the in-flight question; nothing is persisted for it.
+  public func cancel() {
+    sendTask?.cancel()
+  }
+
+  /// Reloads history after a short pause; page changes while scrolling
+  /// collapse into one query, and "This PDF" mode needs none.
+  public func scheduleHistoryReload() {
+    guard historyMode == .page else { return }
+    historyReloadTask?.cancel()
+    historyReloadTask = Task { [weak self, historyDebounce] in
+      try? await Task.sleep(for: historyDebounce)
+      guard !Task.isCancelled else { return }
+      await self?.reloadHistory()
+    }
   }
 
   public var scopeDescription: String {
@@ -79,6 +105,10 @@ public final class AgentPaneViewModel {
     }
 
     streamingAnswer = ""
+    // Show the question immediately; the persisted record replaces it.
+    transcript.append(ChatMessageRecord(id: Self.pendingMessageID, threadId: requestThreadId, role: .user, status: .ok,
+                                        content: question, documentId: reader.documentId, pageNumber: reader.currentPage,
+                                        createdAt: Date()))
     let request = AskRequest(question: question, context: context, threadId: requestThreadId) { [weak self] chunk in
       Task { @MainActor in self?.appendStreamedChunk(chunk) }
     }
@@ -90,14 +120,22 @@ public final class AgentPaneViewModel {
     } catch let error as StriaError where error.code == .serviceFailed {
       await reloadTranscript()
       await reloadHistory()
+    } catch is CancellationError {
+      transcript.removeAll { $0.id == Self.pendingMessageID }
+      notice = "Cancelled"
     } catch let error as StriaError where error.code == .serviceUnavailable {
+      transcript.removeAll { $0.id == Self.pendingMessageID }
       notice = error.message
     } catch {
+      transcript.removeAll { $0.id == Self.pendingMessageID }
       notice = error.localizedDescription
     }
     streamingAnswer = nil
     inFlight = false
   }
+
+  /// Id of the not-yet-persisted user message shown while a question is in flight.
+  public static let pendingMessageID: Int64 = -1
 
   private func appendStreamedChunk(_ chunk: String) {
     guard inFlight else { return }
@@ -110,6 +148,7 @@ public final class AgentPaneViewModel {
   }
 
   public func newChat() {
+    guard !inFlight else { return }
     threadId = nil
     transcript = []
     notice = nil

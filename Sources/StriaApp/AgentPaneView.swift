@@ -25,7 +25,8 @@ struct AgentPaneView: View {
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
         Button("New Chat") { agent.newChat() }
-          .keyboardShortcut("n", modifiers: [.command, .shift])
+          .disabled(agent.inFlight)
+          .help("Start a new conversation (Cmd-Shift-N)")
       }
     }
   }
@@ -53,15 +54,18 @@ struct AgentPaneView: View {
             VStack(alignment: .leading, spacing: 8) {
               Text("Try asking").font(.headline)
               ForEach(agent.suggestedQuestions, id: \.self) { question in
-                Button(question) { Task { await agent.send(suggestion: question) } }
-                  .buttonStyle(.link)
+                Button(question) {
+                  agent.input = question
+                  agent.submit()
+                }
+                .buttonStyle(.link)
               }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
           }
           ForEach(agent.transcript, id: \.id) { message in
-            MessageView(message: message, citationPages: agent.citationPages(in: message)) {
+            MessageView(message: message, documentId: reader.documentId) {
               reader.goToPage($0)
             }
             .id(message.id)
@@ -87,10 +91,15 @@ struct AgentPaneView: View {
       TextField("Ask about this PDF…", text: $agent.input, axis: .vertical)
         .lineLimit(2...6)
         .textFieldStyle(.roundedBorder)
-        .onSubmit { Task { await agent.send() } }
-      Button("Send") { Task { await agent.send() } }
-        .disabled(agent.inFlight || agent.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        .keyboardShortcut(.return, modifiers: .command)
+        .onSubmit { agent.submit() }
+      if agent.inFlight {
+        Button("Cancel") { agent.cancel() }
+          .help("Stop waiting for this answer (Cmd-.)")
+      } else {
+        Button("Send") { agent.submit() }
+          .disabled(agent.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+          .keyboardShortcut(.return, modifiers: .command)
+      }
     }
     .padding()
   }
@@ -126,9 +135,12 @@ struct AgentPaneView: View {
   }
 }
 
+/// One transcript bubble. `[<docId> p.<n>]` markers for the open document
+/// are rendered inline as "p. n" links that scroll the PDF to that page;
+/// markers for other documents stay as text.
 private struct MessageView: View {
   let message: ChatMessageRecord
-  let citationPages: [Int]
+  let documentId: String
   let onCitation: (Int) -> Void
 
   var body: some View {
@@ -136,24 +148,42 @@ private struct MessageView: View {
       Text(message.role == .user ? "You" : "Assistant")
         .font(.caption.bold())
         .foregroundStyle(.secondary)
-      Text(message.content)
+      Text(Self.attributedContent(message.content, documentId: documentId))
         .textSelection(.enabled)
         .foregroundStyle(message.status == .error ? Color.red : Color.primary)
-      if !citationPages.isEmpty {
-        HStack {
-          ForEach(citationPages, id: \.self) { page in
-            Button("p. \(page)") { onCitation(page) }
-              .buttonStyle(.bordered)
-              .controlSize(.small)
-          }
-        }
-      }
+        .environment(\.openURL, OpenURLAction { url in
+          guard url.scheme == Self.citationScheme, let page = Int(url.host() ?? "") else { return .systemAction }
+          onCitation(page)
+          return .handled
+        })
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(10)
     .background(message.role == .user ? Color.accentColor.opacity(0.08) : Color.secondary.opacity(0.06))
     .clipShape(RoundedRectangle(cornerRadius: 8))
     .padding(.horizontal)
+  }
+
+  private static let citationScheme = "stria-page"
+
+  static func attributedContent(_ content: String, documentId: String) -> AttributedString {
+    var result = AttributedString()
+    var cursor = content.startIndex
+    for marker in CitationParser.markers(in: content) {
+      result += AttributedString(String(content[cursor..<marker.range.lowerBound]))
+      if marker.docId == documentId, let url = URL(string: "\(citationScheme)://\(marker.page)") {
+        var link = AttributedString("p. \(marker.page)")
+        link.link = url
+        link.foregroundColor = .accentColor
+        link.underlineStyle = .single
+        result += link
+      } else {
+        result += AttributedString(String(content[marker.range]))
+      }
+      cursor = marker.range.upperBound
+    }
+    result += AttributedString(String(content[cursor...]))
+    return result
   }
 }
 

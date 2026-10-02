@@ -3,8 +3,8 @@ import Foundation
 public enum ConfigKeyPath {
   public static let keys = [
     "agent.apiKeyEnvironment", "agent.maxContextCharacters", "agent.maxImages", "agent.model",
-    "agent.neighborPages", "agent.systemPrompt", "agent.vendor", "ocr.apiKeyEnvironment",
-    "ocr.concurrency", "ocr.model", "ocr.prompt", "ocr.vendor", "render.dpi",
+    "agent.neighborPages", "agent.systemPrompt", "agent.timeoutSeconds", "agent.vendor", "ocr.apiKeyEnvironment",
+    "ocr.concurrency", "ocr.model", "ocr.prompt", "ocr.timeoutSeconds", "ocr.vendor", "render.dpi",
     "render.imageFormat", "render.maxPixelDimension", "render.quality"
   ]
 
@@ -19,6 +19,8 @@ public enum ConfigKeyPath {
     case "ocr.apiKeyEnvironment": config.ocr.apiKeyEnvironment.map(JSONValue.string) ?? .null
     case "ocr.concurrency": .int(config.ocr.concurrency)
     case "ocr.prompt": config.ocr.prompt.map(JSONValue.string) ?? .null
+    case "ocr.timeoutSeconds": .int(config.ocr.timeoutSeconds)
+    case "agent.timeoutSeconds": .int(config.agent.timeoutSeconds)
     case "agent.vendor": .string(config.agent.vendor)
     case "agent.model": config.agent.model.map(JSONValue.string) ?? .null
     case "agent.apiKeyEnvironment": config.agent.apiKeyEnvironment.map(JSONValue.string) ?? .null
@@ -58,6 +60,8 @@ public enum ConfigKeyPath {
       case "ocr.apiKeyEnvironment": updated.ocr.apiKeyEnvironment = raw
       case "ocr.concurrency": updated.ocr.concurrency = try integer(raw, key: key)
       case "ocr.prompt": updated.ocr.prompt = raw
+      case "ocr.timeoutSeconds": updated.ocr.timeoutSeconds = try integer(raw, key: key)
+      case "agent.timeoutSeconds": updated.agent.timeoutSeconds = try integer(raw, key: key)
       case "agent.vendor": updated.agent.vendor = raw
       case "agent.model": updated.agent.model = raw
       case "agent.apiKeyEnvironment": updated.agent.apiKeyEnvironment = raw

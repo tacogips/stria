@@ -161,8 +161,9 @@ public struct AskOutput: Encodable {
   public let model: String?
   public let runId: String
   public let citations: [OutputCitation]
+  public let contextPages: [OutputCitation]
 
-  enum CodingKeys: String, CodingKey { case threadId, answer, vendor, model, runId, citations }
+  enum CodingKeys: String, CodingKey { case threadId, answer, vendor, model, runId, citations, contextPages }
 
   public func encode(to encoder: Encoder) throws {
     var container = encoder.container(keyedBy: CodingKeys.self)
@@ -172,6 +173,7 @@ public struct AskOutput: Encodable {
     try container.encode(model, forKey: .model)
     try container.encode(runId, forKey: .runId)
     try container.encode(citations, forKey: .citations)
+    try container.encode(contextPages, forKey: .contextPages)
   }
 }
 

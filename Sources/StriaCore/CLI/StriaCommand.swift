@@ -48,8 +48,10 @@ public enum StriaCommand {
       return output
     } catch let error as StriaError {
       return CLIJSON.failure(error)
+    } catch is CancellationError {
+      return CLIJSON.failure(.io("Cancelled"))
     } catch {
-      return CLIJSON.failure(.io(error.localizedDescription))
+      return CLIJSON.failure(.io(String(describing: error)))
     }
   }
 }

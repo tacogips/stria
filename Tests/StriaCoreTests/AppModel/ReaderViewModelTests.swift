@@ -84,4 +84,23 @@ import Testing
     await closingReader.close()
   }
 }
+
+@Test func outlineRowsAndZoomRequests() async throws {
+  try await withAppModelDataRoot { paths in
+    let (library, source) = try makeAppModelFixture(paths: paths, pageTexts: ["1", "2"])
+    let imported = try await library.importDocument(at: source, runOCR: false)
+    let reader = ReaderViewModel(library: library, documentId: imported.document.id)
+    try await reader.open()
+    #expect(reader.outlineRows.count == reader.outline.count)
+    #expect(OutlineRow.ancestorIDs(of: "0.2.1") == ["0", "0.2"])
+    #expect(OutlineRow.ancestorIDs(of: "3").isEmpty)
+    #expect(reader.zoom == nil)
+    reader.requestZoom(.zoomIn)
+    let first = reader.zoom
+    #expect(first?.kind == .zoomIn)
+    reader.requestZoom(.zoomIn)
+    #expect(reader.zoom?.id != first?.id)
+    await reader.close()
+  }
+}
 }

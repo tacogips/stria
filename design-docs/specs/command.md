@@ -16,7 +16,9 @@ JSON object on success and uses stable exit codes. Humans use the app.
 - JSON is the default and only output format. `--json` is accepted on every
   command and has no effect.
 - `stria --help` and `stria <command> --help` print plain-text usage on
-  stdout with exit 0. `stria --version` prints `Version.current`. None of
+  stdout with exit 0. The general help also states the output contract
+  (JSON, error envelope, exit codes) and the search -> page image -> answer
+  workflow, so an agent needs nothing else to use the tool. `stria --version` prints `Version.current`. None of
   these touch the data root.
 - Success output: one JSON object plus a newline on stdout, exit 0.
   - Keys are camelCase and sorted (`JSONEncoder` `.sortedKeys`,
@@ -140,17 +142,23 @@ whether that file already exists. In `like` mode `score` is the number of
 times the terms occur on the page. Search semantics are in
 `design-storage.md#search`.
 
-### `stria ask <question> [--doc <docId>] [--page <n>] [--query <terms>] [--limit <n>]`
+### `stria ask <question> [--doc <docId>] [--page <n>] [--query <terms>] [--limit <n>] [--thread <id>]`
 
 Returns the built-in RAG answer (`design-agent-integration.md#ask`).
 `--page` requires `--doc`. `--limit` caps the number of context pages
-(default `agent.maxImages`).
+(default `agent.maxImages`). `--thread <id>` continues the thread returned by
+an earlier `ask`, so the model sees the previous turns.
 
 ```json
 {"threadId": "...", "answer": "...", "vendor": "...", "model": "...",
  "runId": "...",
- "citations": [{"docId": "...", "title": "...", "page": 3, "imagePath": "..."}]}
+ "citations": [{"docId": "...", "title": "...", "page": 3, "imagePath": "..."}],
+ "contextPages": [{"docId": "...", "title": "...", "page": 3, "imagePath": "..."}]}
 ```
+
+`contextPages` lists every page that was sent to the model. `citations` lists
+the subset the answer cites with `[<docId> p.<page>]` markers, in order of
+first mention, or all context pages when the answer cites none.
 
 If the agent call fails, the exchange is still persisted and the command
 exits 5.
@@ -215,7 +223,7 @@ version of this section.
    because the real binary has no offline agent.
 7. Remove the temp dir.
 
-Every step checks the exit code and parses the JSON with `/usr/bin/plutil`,
+Every step checks the exit code and parses the JSON with `/usr/bin/python3`,
 failing fast. The script never touches `~/.local/stria`.
 
 `CLIEndToEndTests` in `StriaCoreTests` runs the same flow in-process through

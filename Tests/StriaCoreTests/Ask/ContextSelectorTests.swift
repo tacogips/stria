@@ -1,5 +1,5 @@
 import Foundation
-import StriaCore
+@testable import StriaCore
 import Testing
 
 @Suite("ContextSelectorTests") struct ContextSelectorTests {
@@ -44,5 +44,15 @@ import Testing
         Issue.record("Expected empty retrieval")
       } catch let error as StriaError { #expect(error.code == .noRelevantPages) }
     }
+  }
+
+  @Test func libraryRetrievalSpreadsSlotsAcrossDocuments() {
+    let ranked = [PageRef(docId: "a", page: 1), PageRef(docId: "a", page: 2), PageRef(docId: "a", page: 3),
+                  PageRef(docId: "b", page: 1), PageRef(docId: "c", page: 1)]
+    #expect(ContextSelector.spreadAcrossDocuments(ranked, limit: 4) == [
+      PageRef(docId: "a", page: 1), PageRef(docId: "a", page: 2), PageRef(docId: "b", page: 1), PageRef(docId: "c", page: 1)
+    ])
+    #expect(ContextSelector.spreadAcrossDocuments(Array(ranked.prefix(3)), limit: 4) == Array(ranked.prefix(3)))
+    #expect(ContextSelector.spreadAcrossDocuments(ranked, limit: 1) == [PageRef(docId: "a", page: 1)])
   }
 }

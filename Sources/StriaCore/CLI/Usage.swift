@@ -13,13 +13,25 @@ public enum Usage {
     page image <docId> <page> [--output <path>]
     page text <docId> <page>
     search <query> [--doc <docId>] [--limit <n>]
-    ask <question> [--doc <docId>] [--page <n>] [--query <terms>] [--limit <n>]
+    ask <question> [--doc <docId>] [--page <n>] [--query <terms>] [--limit <n>] [--thread <id>]
     history [--doc <docId>] [--page <n>] [--limit <n>]
     config get [<key>]
     config set <key> <value>
     paths
 
   Global options: --home <path>, --json, --help / -h, --version
+
+  Output: every command prints one JSON object on stdout (keys sorted, paths absolute,
+  dates ISO-8601 UTC). On failure stdout is empty and stderr gets
+  {"error":{"code":"...","message":"..."}}. Exit codes: 0 ok, 1 io/database,
+  2 usage or invalid PDF, 3 not found, 4 OCR/agent unavailable (config or credentials),
+  5 OCR/agent call failed.
+
+  Workflow for agents (RAG over imported PDFs):
+    - Find pages: search "<phrase>" [--doc <docId>] -> results[].docId, page, snippet, imagePath
+    - Read a page: page image <docId> <page> -> path of a PNG to view; page text -> OCR text
+    - Answer and cite docId + page; show <docId> gives the outline for context
+    - Or let stria answer: ask "<question>" [--doc <docId>] [--thread <id>] -> answer, citations
   """
 
   public static func text(for topic: String?) -> String {

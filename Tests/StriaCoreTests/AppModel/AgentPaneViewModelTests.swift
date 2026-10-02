@@ -79,4 +79,34 @@ import Testing
     await reader.close()
   }
 }
+
+@Test func pendingQuestionIsShownThenReplacedOrRemoved() async throws {
+  try await withAppModelDataRoot { paths in
+    let fakeAgent = FakeAgentService()
+    await fakeAgent.enqueue(.failure(.unavailable("no credentials")))
+    let (library, source) = try makeAppModelFixture(paths: paths, pageTexts: ["one"], agent: fakeAgent)
+    let imported = try await library.importDocument(at: source, runOCR: false)
+    let reader = ReaderViewModel(library: library, documentId: imported.document.id)
+    try await reader.open()
+    let pane = AgentPaneViewModel(library: library, reader: reader, historyDebounce: .milliseconds(10))
+    pane.input = "first"
+    await pane.send()
+    #expect(pane.transcript.isEmpty)
+    #expect(pane.notice == "no credentials")
+
+    pane.input = "second"
+    pane.submit()
+    try await Task.sleep(for: .milliseconds(50))
+    await pane.send()
+    #expect(pane.transcript.map(\.role) == [.user, .assistant])
+    #expect(pane.transcript.allSatisfy { $0.id != AgentPaneViewModel.pendingMessageID })
+
+    pane.historyMode = .page
+    pane.scheduleHistoryReload()
+    pane.scheduleHistoryReload()
+    try await Task.sleep(for: .milliseconds(100))
+    #expect(pane.history.count == 2)
+    await reader.close()
+  }
+}
 }

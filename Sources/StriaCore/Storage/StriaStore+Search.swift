@@ -37,14 +37,18 @@ extension StriaStore {
   }
 
   private func ftsSearch(terms: [String], documentId: String?, limit: Int) throws -> [SearchHit] {
+    let longTerms = terms.filter(SearchQueryBuilder.isTrigramTerm)
+    let shortTerms = terms.filter { !SearchQueryBuilder.isTrigramTerm($0) }
+    let shortFilters = String(repeating: " AND page_fts.body LIKE ? ESCAPE '\\'", count: shortTerms.count)
     let statement = try database.prepare("""
       SELECT documents.id,documents.title,CAST(page_fts.page_number AS INTEGER),snippet(page_fts,2,'[',']','...',16),-bm25(page_fts)
       FROM page_fts JOIN documents ON documents.id=page_fts.document_id WHERE page_fts MATCH ?
-      \(documentId == nil ? "" : "AND page_fts.document_id=?") ORDER BY bm25(page_fts) LIMIT ?
+      \(documentId == nil ? "" : "AND page_fts.document_id=?")\(shortFilters) ORDER BY bm25(page_fts) LIMIT ?
       """)
-    try statement.bind(SearchQueryBuilder.ftsMatchExpression(terms: terms), at: 1)
+    try statement.bind(SearchQueryBuilder.ftsMatchExpression(terms: longTerms), at: 1)
     var index: Int32 = 2
     if let documentId { try statement.bind(documentId, at: index); index += 1 }
+    for term in shortTerms { try statement.bind(SearchQueryBuilder.likePattern(term: term), at: index); index += 1 }
     try statement.bind(limit, at: index)
     var hits: [SearchHit] = []
     while try statement.step() {
@@ -106,8 +110,7 @@ extension StriaStore {
     let clauses = tokens.map { _ in "(search_text LIKE ? ESCAPE '\\')" }.joined(separator: "+")
     let statement = try database.prepare("""
       SELECT document_id,page_number,\(clauses) AS score FROM pages
-      WHERE search_text IS NOT NULL \(documentId == nil ? "" : "AND document_id=?")
-      GROUP BY document_id,page_number HAVING score >= 1
+      WHERE search_text IS NOT NULL \(documentId == nil ? "" : "AND document_id=?") AND score >= 1
       ORDER BY score DESC,document_id,page_number LIMIT ?
       """)
     var index: Int32 = 1

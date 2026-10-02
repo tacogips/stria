@@ -47,15 +47,32 @@ public struct AskResponse: Sendable, Equatable {
   public var vendor: String
   public var model: String?
   public var runId: String
+  /// Pages the answer actually cites with `[<docId> p.<page>]` markers, in
+  /// order of first mention; all context pages when the answer cites none.
   public var citations: [Citation]
+  /// Every page that was sent to the model.
+  public var contextPages: [Citation]
 
-  public init(threadId: String, answer: String, vendor: String, model: String?, runId: String, citations: [Citation]) {
+  public init(threadId: String, answer: String, vendor: String, model: String?, runId: String,
+              citations: [Citation], contextPages: [Citation]) {
     self.threadId = threadId
     self.answer = answer
     self.vendor = vendor
     self.model = model
     self.runId = runId
     self.citations = citations
+    self.contextPages = contextPages
+  }
+
+  /// Picks the context pages cited in `answer`, falling back to all of them.
+  public static func citedPages(in answer: String, contextPages: [Citation]) -> [Citation] {
+    var seen = Set<PageRef>()
+    let cited = CitationParser.markers(in: answer).compactMap { marker -> Citation? in
+      let ref = PageRef(docId: marker.docId, page: marker.page)
+      guard seen.insert(ref).inserted else { return nil }
+      return contextPages.first { $0.docId == ref.docId && $0.page == ref.page }
+    }
+    return cited.isEmpty ? contextPages : cited
   }
 }
 

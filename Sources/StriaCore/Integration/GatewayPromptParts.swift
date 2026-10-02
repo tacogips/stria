@@ -30,11 +30,18 @@ enum GatewayPromptParts {
       parts.append(.text("Previous conversation:\n" + turns))
     }
     for page in request.contextPages {
-      let text = page.ocrText ?? "OCR text not available"
-      parts.append(.text("Document \"\(page.title)\" (\(page.docId)) page \(page.page)\n" + text))
+      parts.append(.text(pageBlock(page)))
       parts.append(.image(page.pngPath))
     }
     parts.append(.text(request.question))
     return parts
+  }
+
+  /// Page text is fenced so the model can tell document content from
+  /// instructions; the system prompt tells it to treat the block as data.
+  static func pageBlock(_ page: ContextPage) -> String {
+    let title = page.title.replacingOccurrences(of: "\"", with: "'")
+    let text = page.ocrText ?? "OCR text not available"
+    return "<page docId=\"\(page.docId)\" page=\"\(page.page)\" title=\"\(title)\">\n\(text)\n</page>"
   }
 }

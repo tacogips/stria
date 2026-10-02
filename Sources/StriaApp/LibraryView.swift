@@ -10,6 +10,22 @@ struct LibraryView: View {
 
   var body: some View {
     List(selection: $selection) {
+      ForEach(model.library.rows) { row in
+        LibraryRowView(row: row)
+          .tag(row.id)
+          .contentShape(Rectangle())
+          .onTapGesture(count: 2) { open(row.id) }
+          .contextMenu {
+            Button("Open") { open(row.id) }
+            Divider()
+            Button("Run OCR") { Task { await model.library.runOCR(documentId: row.id, retryFailed: false) } }
+            Button("Retry Failed OCR") { Task { await model.library.runOCR(documentId: row.id, retryFailed: true) } }
+            Divider()
+            Button("Remove…", role: .destructive) { pendingRemoval = row }
+          }
+      }
+    }
+    .overlay {
       if model.library.rows.isEmpty {
         ContentUnavailableView {
           Label("Your Library Is Empty", systemImage: "books.vertical")
@@ -17,25 +33,10 @@ struct LibraryView: View {
           Text("Import a PDF to start reading. You can also drop PDF files here.")
         } actions: {
           Button("Import PDF…") { importAction?() }
-            .keyboardShortcut("o", modifiers: .command)
-        }
-      } else {
-        ForEach(model.library.rows) { row in
-          LibraryRowView(row: row)
-            .tag(row.id)
-            .contentShape(Rectangle())
-            .onTapGesture(count: 2) { open(row.id) }
-            .contextMenu {
-              Button("Open") { open(row.id) }
-              Divider()
-              Button("Run OCR") { Task { await model.library.runOCR(documentId: row.id, retryFailed: false) } }
-              Button("Retry Failed OCR") { Task { await model.library.runOCR(documentId: row.id, retryFailed: true) } }
-              Divider()
-              Button("Remove…", role: .destructive) { pendingRemoval = row }
-            }
         }
       }
     }
+    .navigationTitle("Library")
     .onKeyPress(.return) {
       guard let selection else { return .ignored }
       open(selection)
@@ -52,10 +53,10 @@ struct LibraryView: View {
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
         Button { importAction?() } label: { Label("Import", systemImage: "square.and.arrow.down") }
-          .keyboardShortcut("o", modifiers: .command)
+          .help("Import PDF files (Cmd-O)")
       }
     }
-    .alert("Import Error", isPresented: Binding(
+    .alert("Error", isPresented: Binding(
       get: { model.library.alert != nil },
       set: { if !$0 { model.library.alert = nil } }
     )) {
@@ -95,13 +96,18 @@ private struct LibraryRowView: View {
   let row: LibraryRow
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 4) {
-      HStack {
-        Text(row.title).font(.headline)
-        Spacer()
-        Text("\(row.pageCount) pages").foregroundStyle(.secondary)
+    HStack(spacing: 10) {
+      VStack(alignment: .leading, spacing: 4) {
+        HStack {
+          Text(row.title).font(.headline)
+          Spacer()
+          Text("\(row.pageCount) pages").foregroundStyle(.secondary)
+        }
+        Text(statusText).font(.caption).foregroundStyle(.secondary)
       }
-      Text(statusText).font(.caption).foregroundStyle(.secondary)
+      if row.isBusy {
+        ProgressView().controlSize(.small)
+      }
     }
     .padding(.vertical, 4)
     .accessibilityElement(children: .combine)

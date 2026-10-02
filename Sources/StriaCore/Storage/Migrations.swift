@@ -8,15 +8,21 @@ enum Migrations {
   static let version = 1
 
   static func run(_ database: SQLiteConnection, forceLikeSearch: Bool) throws -> MigrationResult {
+    // busy_timeout comes first: even reading user_version can hit the lock of
+    // another process (the CLI mid-import while the app opens the store).
+    try database.execute("PRAGMA busy_timeout=5000")
+    try database.execute("PRAGMA foreign_keys=ON")
     let version = try userVersion(database)
     guard version <= Self.version else {
       throw StriaError.databaseTooNew("Database schema version \(version) is newer than supported version \(self.version)")
     }
-    try database.execute("PRAGMA busy_timeout=5000")
-    try database.execute("PRAGMA foreign_keys=ON")
+    // Only now touch the file: a too-new database must stay byte-identical.
     let journal = try database.prepare("PRAGMA journal_mode=WAL")
     _ = try journal.step()
     _ = try journal.step()
+    // NORMAL is durable against application crashes in WAL mode and avoids
+    // one fsync per page insert during import.
+    try database.execute("PRAGMA synchronous=NORMAL")
     if version == 0 {
       try database.transaction {
         let current = try userVersion(database)

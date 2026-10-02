@@ -6,6 +6,7 @@ private struct PageSheetFocusedKey: FocusedValueKey { typealias Value = Binding<
 private struct AgentVisibilityFocusedKey: FocusedValueKey { typealias Value = Binding<Bool> }
 private struct LibraryActionFocusedKey: FocusedValueKey { typealias Value = () -> Void }
 private struct ImportActionFocusedKey: FocusedValueKey { typealias Value = () -> Void }
+private struct AgentFocusedKey: FocusedValueKey { typealias Value = AgentPaneViewModel }
 
 extension FocusedValues {
   var striaReader: ReaderViewModel? {
@@ -31,5 +32,10 @@ extension FocusedValues {
   var striaImport: (() -> Void)? {
     get { self[ImportActionFocusedKey.self] }
     set { self[ImportActionFocusedKey.self] = newValue }
+  }
+
+  var striaAgent: AgentPaneViewModel? {
+    get { self[AgentFocusedKey.self] }
+    set { self[AgentFocusedKey.self] = newValue }
   }
 }

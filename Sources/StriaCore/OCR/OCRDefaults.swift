@@ -4,5 +4,8 @@ public enum OCRDefaults {
     + "Preserve the reading order and line breaks. Keep numbers, dates and names exactly as printed and do not translate. "
     + "Write each table row on one line with cells separated by \" | \". "
     + "Output only the transcribed text with no commentary, headings or code fences. "
-    + "If the page has no text, output nothing."
+    + "If the page has no text at all, output exactly \(noTextSentinel)."
+
+  /// What the model writes for a page without text; stored as empty text.
+  public static let noTextSentinel = "[NO TEXT]"
 }

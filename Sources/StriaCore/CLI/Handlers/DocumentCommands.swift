@@ -49,7 +49,6 @@ enum DocumentCommands {
   }
 
   private static func resolve(_ path: String, relativeTo directory: URL) -> URL {
-    let candidate = URL(fileURLWithPath: path)
-    return (candidate.path.hasPrefix("/") ? candidate : directory.appendingPathComponent(path)).standardizedFileURL
+    URL(fileURLWithPath: path, relativeTo: directory).standardizedFileURL
   }
 }

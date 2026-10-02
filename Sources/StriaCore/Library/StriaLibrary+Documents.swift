@@ -33,17 +33,20 @@ public extension StriaLibrary {
   func pageImage(documentId: String, page: Int, output: URL? = nil) async throws -> PageImageResult {
     let record = try await document(id: documentId)
     guard (1...record.pageCount).contains(page),
-          let info = try await store.pageInfo(documentId: documentId, page: page),
-          let image = try await store.pageImage(documentId: documentId, page: page) else {
+          let info = try await store.pageInfo(documentId: documentId, page: page) else {
       throw StriaError.pageNotFound("Page \(page) not found in document \(documentId)")
     }
     let cache = PageImageCache(paths: paths)
+    // Check the cache before touching the BLOB: a valid PNG costs no DB read.
+    if output == nil, let cachedURL = cache.validCachedURL(docId: documentId, page: page, width: info.width, height: info.height) {
+      return PageImageResult(docId: documentId, page: page, path: cachedURL, width: info.width, height: info.height, cached: true)
+    }
+    guard let image = try await store.pageImage(documentId: documentId, page: page) else {
+      throw StriaError.pageNotFound("Page \(page) not found in document \(documentId)")
+    }
     if let output {
       try cache.write(image: image, to: output)
       return PageImageResult(docId: documentId, page: page, path: output, width: info.width, height: info.height, cached: false)
-    }
-    if let cachedURL = cache.validCachedURL(docId: documentId, page: page, width: info.width, height: info.height) {
-      return PageImageResult(docId: documentId, page: page, path: cachedURL, width: info.width, height: info.height, cached: true)
     }
     let expanded = try cache.expand(docId: documentId, page: page, image: image)
     return PageImageResult(docId: documentId, page: page, path: expanded, width: info.width, height: info.height, cached: false)

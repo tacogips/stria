@@ -48,10 +48,31 @@ public struct ContextSelector: Sendable {
       guard !refs.isEmpty else { throw StriaError.noRelevantPages("No relevant pages were found") }
       return refs
     case .library:
-      let refs = try await store.fuzzyRetrieve(question: request.retrievalQuery ?? request.question, documentId: nil, limit: cap)
+      let candidates = try await store.fuzzyRetrieve(question: request.retrievalQuery ?? request.question,
+                                                     documentId: nil, limit: min(100, cap * 4))
+      let refs = Self.spreadAcrossDocuments(candidates, limit: cap)
       guard !refs.isEmpty else { throw StriaError.noRelevantPages("No relevant pages were found") }
       return refs
     }
+  }
+
+  /// Library-wide retrieval keeps the ranked order but lets no single document
+  /// take more than half of the slots while other documents still have hits.
+  static func spreadAcrossDocuments(_ ranked: [PageRef], limit: Int) -> [PageRef] {
+    let perDocumentCap = max(1, (limit + 1) / 2)
+    var counts: [String: Int] = [:]
+    var chosen: [PageRef] = []
+    var deferred: [PageRef] = []
+    for ref in ranked where chosen.count < limit {
+      if counts[ref.docId, default: 0] < perDocumentCap {
+        counts[ref.docId, default: 0] += 1
+        chosen.append(ref)
+      } else {
+        deferred.append(ref)
+      }
+    }
+    for ref in deferred where chosen.count < limit { chosen.append(ref) }
+    return chosen
   }
 
   private func requiredDocument(_ id: String) async throws -> DocumentRecord {

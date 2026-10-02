@@ -7,8 +7,10 @@ public enum KnownVendors {
 }
 
 private enum RenderConfigCodingKeys: String, CodingKey { case dpi, imageFormat, quality, maxPixelDimension }
-private enum OCRConfigCodingKeys: String, CodingKey { case vendor, model, apiKeyEnvironment, concurrency, prompt }
-private enum AgentConfigCodingKeys: String, CodingKey { case vendor, model, apiKeyEnvironment, neighborPages, maxImages, maxContextCharacters, systemPrompt }
+private enum OCRConfigCodingKeys: String, CodingKey { case vendor, model, apiKeyEnvironment, concurrency, prompt, timeoutSeconds }
+private enum AgentConfigCodingKeys: String, CodingKey {
+  case vendor, model, apiKeyEnvironment, neighborPages, maxImages, maxContextCharacters, systemPrompt, timeoutSeconds
+}
 private enum StriaConfigCodingKeys: String, CodingKey { case version, render, ocr, agent }
 
 public struct StriaConfig: Codable, Equatable, Sendable {
@@ -36,10 +38,13 @@ public struct StriaConfig: Codable, Equatable, Sendable {
     public var apiKeyEnvironment: String?
     public var concurrency: Int
     public var prompt: String?
+    /// Upper bound for one page's model call.
+    public var timeoutSeconds: Int
 
-    public init(vendor: String, model: String?, apiKeyEnvironment: String?, concurrency: Int, prompt: String?) {
+    public init(vendor: String, model: String?, apiKeyEnvironment: String?, concurrency: Int, prompt: String?,
+                timeoutSeconds: Int = 300) {
       self.vendor = vendor; self.model = model; self.apiKeyEnvironment = apiKeyEnvironment
-      self.concurrency = concurrency; self.prompt = prompt
+      self.concurrency = concurrency; self.prompt = prompt; self.timeoutSeconds = timeoutSeconds
     }
     public init(from decoder: Decoder) throws {
       let c = try decoder.container(keyedBy: OCRConfigCodingKeys.self)
@@ -47,13 +52,14 @@ public struct StriaConfig: Codable, Equatable, Sendable {
                 model: try decodeOptional(String.self, key: .model, in: c, defaultValue: "claude-sonnet-5-5"),
                 apiKeyEnvironment: try decodeOptional(String.self, key: .apiKeyEnvironment, in: c, defaultValue: "ANTHROPIC_API_KEY"),
                 concurrency: try c.decodeIfPresent(Int.self, forKey: .concurrency) ?? 2,
-                prompt: try decodeOptional(String.self, key: .prompt, in: c, defaultValue: nil))
+                prompt: try decodeOptional(String.self, key: .prompt, in: c, defaultValue: nil),
+                timeoutSeconds: try c.decodeIfPresent(Int.self, forKey: .timeoutSeconds) ?? 300)
     }
     public func encode(to encoder: Encoder) throws {
       var c = encoder.container(keyedBy: OCRConfigCodingKeys.self)
       try c.encode(vendor, forKey: .vendor); try c.encode(model, forKey: .model)
       try c.encode(apiKeyEnvironment, forKey: .apiKeyEnvironment); try c.encode(concurrency, forKey: .concurrency)
-      try c.encode(prompt, forKey: .prompt)
+      try c.encode(prompt, forKey: .prompt); try c.encode(timeoutSeconds, forKey: .timeoutSeconds)
     }
   }
 
@@ -65,12 +71,14 @@ public struct StriaConfig: Codable, Equatable, Sendable {
     public var maxImages: Int
     public var maxContextCharacters: Int
     public var systemPrompt: String?
+    /// Upper bound for one question's model call.
+    public var timeoutSeconds: Int
 
     public init(vendor: String, model: String?, apiKeyEnvironment: String?, neighborPages: Int, maxImages: Int,
-                maxContextCharacters: Int, systemPrompt: String?) {
+                maxContextCharacters: Int, systemPrompt: String?, timeoutSeconds: Int = 600) {
       self.vendor = vendor; self.model = model; self.apiKeyEnvironment = apiKeyEnvironment
       self.neighborPages = neighborPages; self.maxImages = maxImages; self.maxContextCharacters = maxContextCharacters
-      self.systemPrompt = systemPrompt
+      self.systemPrompt = systemPrompt; self.timeoutSeconds = timeoutSeconds
     }
     public init(from decoder: Decoder) throws {
       let c = try decoder.container(keyedBy: AgentConfigCodingKeys.self)
@@ -80,14 +88,15 @@ public struct StriaConfig: Codable, Equatable, Sendable {
                 neighborPages: try c.decodeIfPresent(Int.self, forKey: .neighborPages) ?? 1,
                 maxImages: try c.decodeIfPresent(Int.self, forKey: .maxImages) ?? 4,
                 maxContextCharacters: try c.decodeIfPresent(Int.self, forKey: .maxContextCharacters) ?? 60_000,
-                systemPrompt: try decodeOptional(String.self, key: .systemPrompt, in: c, defaultValue: nil))
+                systemPrompt: try decodeOptional(String.self, key: .systemPrompt, in: c, defaultValue: nil),
+                timeoutSeconds: try c.decodeIfPresent(Int.self, forKey: .timeoutSeconds) ?? 600)
     }
     public func encode(to encoder: Encoder) throws {
       var c = encoder.container(keyedBy: AgentConfigCodingKeys.self)
       try c.encode(vendor, forKey: .vendor); try c.encode(model, forKey: .model)
       try c.encode(apiKeyEnvironment, forKey: .apiKeyEnvironment); try c.encode(neighborPages, forKey: .neighborPages)
       try c.encode(maxImages, forKey: .maxImages); try c.encode(maxContextCharacters, forKey: .maxContextCharacters)
-      try c.encode(systemPrompt, forKey: .systemPrompt)
+      try c.encode(systemPrompt, forKey: .systemPrompt); try c.encode(timeoutSeconds, forKey: .timeoutSeconds)
     }
   }
 
@@ -117,7 +126,8 @@ public struct StriaConfig: Codable, Equatable, Sendable {
     guard version == 1, (72...600).contains(render.dpi), (0.1...1.0).contains(render.quality),
           (1024...8192).contains(render.maxPixelDimension), (1...8).contains(ocr.concurrency),
           (0...5).contains(agent.neighborPages), (1...10).contains(agent.maxImages),
-          (1000...500_000).contains(agent.maxContextCharacters) else {
+          (1000...500_000).contains(agent.maxContextCharacters),
+          (10...3600).contains(ocr.timeoutSeconds), (10...3600).contains(agent.timeoutSeconds) else {
       throw .config("Configuration values are outside their allowed ranges")
     }
     guard KnownVendors.gateway.contains(ocr.vendor) || ocr.vendor == KnownVendors.pdfTextLayer,

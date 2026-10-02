@@ -14,7 +14,9 @@ enum GatewayPreflight {
     guard vendor != .cursorAPI else {
       throw .unavailable("vendor cursor-api does not support image input")
     }
-    if KnownVendors.apiKeyVendors.contains(settings.vendor), settings.model == nil {
+    // agent-gateway rejects a session without a model for every vendor, CLI
+    // vendors included, so a null model is a config problem, not a call failure.
+    if settings.model == nil {
       throw .unavailable("model is required for vendor \(settings.vendor)")
     }
     if KnownVendors.apiKeyVendors.contains(settings.vendor), settings.apiKeyEnvironment == nil {

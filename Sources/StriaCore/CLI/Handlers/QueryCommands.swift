@@ -13,7 +13,7 @@ enum QueryCommands {
                             score: $0.score, imagePath: $0.imagePath, imageCached: $0.imageCached)
       }
       return SearchOutput(query: response.query, matchMode: response.matchMode, results: results)
-    case .ask(let question, let docId, let page, let query, let limit):
+    case .ask(let question, let docId, let page, let query, let limit, let thread):
       let context: AskContext
       if let docId, let page {
         context = .page(docId: docId, page: page)
@@ -23,12 +23,15 @@ enum QueryCommands {
         context = .library
       }
       let response = try await library.ask(AskRequest(question: question, context: context, retrievalQuery: query,
-                                                      limit: limit, threadId: nil))
+                                                      limit: limit, threadId: thread))
       let citations = response.citations.map {
         AskOutput.OutputCitation(docId: $0.docId, title: $0.title, page: $0.page, imagePath: $0.imagePath)
       }
+      let contextPages = response.contextPages.map {
+        AskOutput.OutputCitation(docId: $0.docId, title: $0.title, page: $0.page, imagePath: $0.imagePath)
+      }
       return AskOutput(threadId: response.threadId, answer: response.answer, vendor: response.vendor,
-                       model: response.model, runId: response.runId, citations: citations)
+                       model: response.model, runId: response.runId, citations: citations, contextPages: contextPages)
     case .history(let docId, let page, let limit):
       let messages = try await library.history(documentId: docId, page: page, limit: limit ?? 50).map { item in
         HistoryMessageOutput(

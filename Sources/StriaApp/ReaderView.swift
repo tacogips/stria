@@ -7,15 +7,15 @@ struct ReaderView: View {
   @Bindable var agent: AgentPaneViewModel
   @AppStorage("showAgentInspector") private var showAgent = true
   @State private var showPageSheet = false
-  @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
   var body: some View {
-    NavigationSplitView(columnVisibility: $columnVisibility) {
+    NavigationSplitView {
       LeftPaneView(reader: reader)
         .navigationSplitViewColumnWidth(min: 210, ideal: 260, max: 360)
     } detail: {
       PDFKitView(reader: reader)
         .background(.background)
+        .navigationTitle(reader.title)
     }
     .inspector(isPresented: $showAgent) {
       AgentPaneView(agent: agent, reader: reader)
@@ -26,22 +26,15 @@ struct ReaderView: View {
     .onChange(of: reader.searchQuery) { _, query in
       if query.isEmpty { reader.clearSearch() }
     }
-    .onChange(of: reader.currentPage) { _, _ in Task { await agent.reloadHistory() } }
+    .onChange(of: reader.currentPage) { _, _ in agent.scheduleHistoryReload() }
     .focusedSceneValue(\.striaReader, reader)
+    .focusedSceneValue(\.striaAgent, agent)
     .focusedSceneValue(\.striaPageSheet, $showPageSheet)
     .focusedSceneValue(\.striaAgentVisibility, $showAgent)
     .toolbar {
       ToolbarItem(placement: .navigation) {
-        Button {
-          columnVisibility = columnVisibility == .all ? .detailOnly : .all
-        } label: {
-          Label("Toggle Sidebar", systemImage: "sidebar.left")
-        }
-        .help("Show or hide the sidebar")
-      }
-      ToolbarItem(placement: .navigation) {
         Button("Library") { Task { await model.showLibrary() } }
-          .keyboardShortcut("l", modifiers: [.command, .shift])
+          .help("Back to the library (Cmd-Shift-L)")
       }
       ToolbarItem(placement: .principal) {
         PageFieldView(reader: reader)
@@ -50,7 +43,7 @@ struct ReaderView: View {
         Button { showAgent.toggle() } label: {
           Label("Agent", systemImage: "sidebar.right")
         }
-        .keyboardShortcut("0", modifiers: [.command, .option])
+        .help("Show or hide the agent pane (Cmd-Opt-0)")
       }
     }
     .sheet(isPresented: $showPageSheet) {

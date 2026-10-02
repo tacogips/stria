@@ -10,9 +10,11 @@ public struct LibraryRow: Identifiable, Equatable, Sendable {
   public var ocr: OCRCounts
   public var unavailableReason: String?
   public var lastOpenedAt: Date?
+  /// True while this app process is rendering or OCRing the document.
+  public var isBusy: Bool
 
   public init(id: String, title: String, pageCount: Int, importStatus: ImportStatus, rendered: Int,
-              ocr: OCRCounts, unavailableReason: String? = nil, lastOpenedAt: Date? = nil) {
+              ocr: OCRCounts, unavailableReason: String? = nil, lastOpenedAt: Date? = nil, isBusy: Bool = false) {
     self.id = id
     self.title = title
     self.pageCount = pageCount
@@ -21,6 +23,7 @@ public struct LibraryRow: Identifiable, Equatable, Sendable {
     self.ocr = ocr
     self.unavailableReason = unavailableReason
     self.lastOpenedAt = lastOpenedAt
+    self.isBusy = isBusy
   }
 }
 
@@ -36,6 +39,7 @@ public final class LibraryViewModel {
   private var importTasks: [UUID: Task<Void, Never>] = [:]
   private var unavailableReasons: [String: String] = [:]
   private var renderedPages: [String: Int] = [:]
+  private var busyIDs: Set<String> = []
 
   public init(library: StriaLibrary) {
     self.library = library
@@ -43,10 +47,9 @@ public final class LibraryViewModel {
 
   public func refresh() async {
     do {
-      let summaries = try await library.listDocuments(order: .recents)
       var refreshedRows: [LibraryRow] = []
-      for summary in summaries {
-        let record = try await library.document(id: summary.id)
+      for record in try await library.store.listDocuments(order: .recents) {
+        let summary = try await library.summary(of: record)
         refreshedRows.append(LibraryRow(
           id: summary.id,
           title: summary.title,
@@ -55,7 +58,8 @@ public final class LibraryViewModel {
           rendered: renderedPages[summary.id] ?? (summary.importStatus == .ready ? summary.pageCount : 0),
           ocr: summary.ocr,
           unavailableReason: unavailableReasons[summary.id],
-          lastOpenedAt: record.lastOpenedAt
+          lastOpenedAt: record.lastOpenedAt,
+          isBusy: busyIDs.contains(summary.id)
         ))
       }
       rows = refreshedRows
@@ -79,6 +83,8 @@ public final class LibraryViewModel {
   }
 
   public func runOCR(documentId: String, retryFailed: Bool) async {
+    setBusy(documentId, true)
+    defer { setBusy(documentId, false) }
     do {
       let summary = try await library.runOCR(
         documentId: documentId,
@@ -121,6 +127,7 @@ public final class LibraryViewModel {
       case .copied(let docId):
         eventDocumentId = docId
         selectedID = docId
+        busyIDs.insert(docId)
         await refresh()
       case .rendered(let page, let total):
         if let id = eventDocumentId {
@@ -134,6 +141,7 @@ public final class LibraryViewModel {
       case .finished(let result):
         eventDocumentId = result.document.id
         selectedID = result.document.id
+        busyIDs.remove(result.document.id)
         if result.alreadyImported { await refresh() }
         if result.ocr.status == .unavailable, let reason = result.ocr.reason {
           unavailableReasons[result.document.id] = reason
@@ -143,9 +151,16 @@ public final class LibraryViewModel {
           await refresh()
         }
       case .failed(let error):
+        if let id = eventDocumentId { busyIDs.remove(id) }
         alert = error.message
       }
     }
+    if let id = eventDocumentId, busyIDs.remove(id) != nil { await refresh() }
+  }
+
+  private func setBusy(_ documentId: String, _ busy: Bool) {
+    if busy { busyIDs.insert(documentId) } else { busyIDs.remove(documentId) }
+    update(documentId) { $0.isBusy = busy }
   }
 
   private func update(_ id: String, mutate: (inout LibraryRow) -> Void) {

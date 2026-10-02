@@ -63,11 +63,11 @@ OCR and agent calls go through [agent-gateway](https://github.com/tacogips/agent
 
 API vendors (`openai`, `anthropic`, `gemini`, `openrouter`) receive page images as image content. The CLI vendors (`claude-code`, `codex`, `cursor`) cannot receive image content through agent-gateway, so for them stria puts the absolute path of each page PNG under `cache/` in the prompt and tells the agent to open the file. The agent session runs in `cache/`, so the CLI agent needs permission to read files there. See [vendor image capability](design-docs/specs/design-agent-integration.md#vendor-image-capability).
 
-A gateway OCR reply that is empty, or that says no image was received, is recorded as a `failed` page with a fixed error instead of `done`, and `stria ocr <docId> --retry-failed` runs it again. With a gateway vendor, a truly blank page is therefore also `failed`; `pdf-text-layer` still stores blank pages as `done`. See [OCR reply check](design-docs/specs/design-agent-integration.md#ocr-reply-check) and [empty OCR replies](design-docs/user-qa/ocr-empty-reply.md).
+A gateway OCR reply that is empty, or that says no image was received, is recorded as a `failed` page with a fixed error instead of `done`, and `stria ocr <docId> --retry-failed` runs it again. The OCR prompt asks the model to answer exactly `[NO TEXT]` for a page without text; that reply is stored as `done` with empty text, so blank and figure-only pages are not retried forever. Every model call is bounded by `ocr.timeoutSeconds` (default 300) and `agent.timeoutSeconds` (default 600); a call that exceeds its bound is cancelled and recorded as failed. Every gateway vendor, including the CLI vendors, needs a `model`; a null model is reported as unavailable before any call. See [OCR reply check](design-docs/specs/design-agent-integration.md#ocr-reply-check) and [empty OCR replies](design-docs/user-qa/ocr-empty-reply.md).
 
 ## CLI for agents
 
-`stria [--home <path>] <command> ...` prints one JSON object on stdout for success and is intended primarily for agent tools. `--json` is accepted and has no effect; `--help` and `--version` never create the data root.
+`stria [--home <path>] <command> ...` prints one JSON object on stdout for success and is intended primarily for agent tools. `stria --help` carries the output contract and the agent workflow, so an agent can learn the tool from the help text alone. `--json` is accepted and has no effect; `--help` and `--version` never create the data root.
 
 - `stria import <pdf> [--no-ocr]`: import a PDF and optionally run OCR; prints the document ID
 - `stria ocr <docId> [--pages <list>] [--retry-failed]`: run or retry page OCR
@@ -77,7 +77,7 @@ A gateway OCR reply that is empty, or that says no image was received, is record
 - `stria page image <docId> <page> [--output <path>]`: expand and return a page PNG path
 - `stria page text <docId> <page>`: return page OCR text
 - `stria search <query> [--doc <docId>] [--limit <n>]`: search OCR text across PDFs or within one PDF; terms shorter than 3 characters use LIKE matching ranked by occurrence count
-- `stria ask <question> [--doc <docId>] [--page <n>] [--query <terms>] [--limit <n>]`: retrieve context pages and ask the configured agent; `--page` requires `--doc`, and `--limit` caps the context pages
+- `stria ask <question> [--doc <docId>] [--page <n>] [--query <terms>] [--limit <n>] [--thread <id>]`: retrieve context pages and ask the configured agent; `--page` requires `--doc`, `--limit` caps the context pages, and `--thread` continues an earlier conversation. The output lists `citations` (pages the answer cites) and `contextPages` (every page sent)
 - `stria history [--doc <docId>] [--page <n>] [--limit <n>]`: read saved conversations
 - `stria config get [<key>]` / `stria config set <key> <value>`: inspect or edit configuration
 - `stria paths`: print resolved data-root paths

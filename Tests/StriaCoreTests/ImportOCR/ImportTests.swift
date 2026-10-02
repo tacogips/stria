@@ -145,10 +145,24 @@ import Testing
         for await succeeded in group where succeeded { count += 1 }
         return count
       }
-      #expect(successes >= 1)
+      #expect(successes == copies.count)
       #expect(FileManager.default.fileExists(atPath: paths.original(docId: id).path))
       #expect(try Data(contentsOf: paths.original(docId: id)) == sourceBytes)
       #expect(try await library.store.document(id: id)?.importStatus == .ready)
+    }
+  }
+
+  @Test func reimportRestoresMissingOriginalWithoutRerendering() async throws {
+    try await withTestDataRoot { paths in
+      let (library, source) = try await makeImportFixture(paths: paths, pageTexts: ["one", "two"])
+      let first = try await library.importDocument(at: source, runOCR: false)
+      let original = paths.original(docId: first.document.id)
+      let pagesBefore = try await library.store.pageInfos(documentId: first.document.id).map(\.pageNumber)
+      try FileManager.default.removeItem(at: original)
+      let second = try await library.importDocument(at: source, runOCR: false)
+      #expect(second.alreadyImported)
+      #expect(FileManager.default.fileExists(atPath: original.path))
+      #expect(try await library.store.pageInfos(documentId: first.document.id).map(\.pageNumber) == pagesBefore)
     }
   }
 }

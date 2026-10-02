@@ -6,11 +6,14 @@ extension StriaLibrary {
       throw StriaError.documentNotFound("Document not found: \(documentId)")
     }
     let outcome = try await store.search(text: query, documentId: documentId, limit: limit)
-    let results = outcome.hits.map { hit in
+    let cache = PageImageCache(paths: paths)
+    var results: [SearchResultItem] = []
+    for hit in outcome.hits {
       let imageURL = paths.cachedPage(docId: hit.docId, page: hit.page)
-      return SearchResultItem(docId: hit.docId, title: hit.title, page: hit.page, snippet: hit.snippet,
-                              score: hit.score, imagePath: imageURL.path,
-                              imageCached: FileManager.default.fileExists(atPath: imageURL.path))
+      let info = try await store.pageInfo(documentId: hit.docId, page: hit.page)
+      let cached = info.map { cache.validCachedURL(docId: hit.docId, page: hit.page, width: $0.width, height: $0.height) != nil } ?? false
+      results.append(SearchResultItem(docId: hit.docId, title: hit.title, page: hit.page, snippet: hit.snippet,
+                                      score: hit.score, imagePath: imageURL.path, imageCached: cached))
     }
     return SearchResponse(query: query, matchMode: outcome.matchMode, results: results)
   }

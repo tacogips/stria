@@ -40,6 +40,9 @@ struct AskCoordinator: Sendable {
       try await handle(error, request: request, refs: refs, threadId: threadId, newThread: thread,
                        runId: runId, settings: settings, startedAt: startedAt)
       throw StriaError.serviceFailed("Ask failed")
+    } catch is CancellationError {
+      // The user cancelled: no call result to record, nothing persisted.
+      throw CancellationError()
     } catch {
       let message = SecretRedactor.truncate(error.localizedDescription)
       let finishedAt = environment.clock()
@@ -65,9 +68,9 @@ struct AskCoordinator: Sendable {
       model: settings.model, citations: refs, run: run, createdAt: finishedAt
     ))
     appendRunLog(run)
-    let citations = contextPages.map { Citation(docId: $0.docId, title: $0.title, page: $0.page, imagePath: $0.pngPath.path) }
+    let sent = contextPages.map { Citation(docId: $0.docId, title: $0.title, page: $0.page, imagePath: $0.pngPath.path) }
     return AskResponse(threadId: threadId, answer: answer.text, vendor: settings.vendor, model: settings.model,
-                       runId: runId, citations: citations)
+                       runId: runId, citations: AskResponse.citedPages(in: answer.text, contextPages: sent), contextPages: sent)
   }
 
   private func handle(
@@ -112,7 +115,7 @@ struct AskCoordinator: Sendable {
         imageURL = try cache.expand(docId: ref.docId, page: ref.page, image: image)
       }
       let ocrText: String?
-      if page.ocrStatus == .done {
+      if page.ocrStatus == .done, remainingCharacters > 0 {
         let text = page.ocrText ?? ""
         ocrText = String(text.prefix(remainingCharacters))
         remainingCharacters -= ocrText?.count ?? 0

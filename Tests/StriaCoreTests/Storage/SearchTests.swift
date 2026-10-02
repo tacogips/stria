@@ -91,6 +91,41 @@ import Testing
     }
   }
 
+  @Test(arguments: [false, true]) func japaneseTermWrappedAcrossLinesStillMatches(forceLike: Bool) async throws {
+    try await withTestDataRoot { paths in
+      let store = try openStorage(paths: paths, like: forceLike)
+      try await store.insertDocument(storageDocument("doc"))
+      for (page, text) in [(1, "本書は機械\n学習の基礎を\n説明する"), (2, "unrelated english\ntext here")] {
+        try await store.insertPage(documentId: "doc", pageNumber: page, image: storageImage())
+        try await store.recordOCRSuccess(documentId: "doc", page: page, text: text, vendor: "test", model: nil,
+                                         run: storageRun("wrap-\(page)", documentId: "doc", page: page))
+      }
+      let wrapped = try await store.search(text: "機械学習", documentId: nil, limit: 10)
+      #expect(wrapped.hits.map(\.page) == [1])
+      let english = try await store.search(text: "english text", documentId: nil, limit: 10)
+      #expect(english.hits.map(\.page) == [2])
+      let stored = try await store.pageInfo(documentId: "doc", page: 1)
+      #expect(stored?.ocrText == "本書は機械\n学習の基礎を\n説明する")
+    }
+  }
+
+  @Test func mixedLengthQueryKeepsFTSRankingAndFiltersShortTerms() async throws {
+    try await withTestDataRoot { paths in
+      let store = try openStorage(paths: paths)
+      guard await store.searchBackend == .fts5 else { return }
+      try await store.insertDocument(storageDocument("doc"))
+      for (page, text) in [(1, "transformer の encoder"), (2, "transformer encoder only"), (3, "nothing")] {
+        try await store.insertPage(documentId: "doc", pageNumber: page, image: storageImage())
+        try await store.recordOCRSuccess(documentId: "doc", page: page, text: text, vendor: "test", model: nil,
+                                         run: storageRun("mixed-\(page)", documentId: "doc", page: page))
+      }
+      let result = try await store.search(text: "transformer の", documentId: nil, limit: 10)
+      #expect(result.matchMode == .fts)
+      #expect(result.hits.map(\.page) == [1])
+      #expect(result.hits.first?.snippet.contains("[transformer]") == true)
+    }
+  }
+
   @Test func likeRanksPagesByOccurrenceCount() async throws {
     try await withTestDataRoot { paths in
       let store = try openStorage(paths: paths, like: true)

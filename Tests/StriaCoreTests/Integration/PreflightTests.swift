@@ -32,7 +32,7 @@ struct PreflightTests {
       environment: ["ANTHROPIC_API_KEY": "sk-test-123"]
     )
     #expect(api.secretValue == "sk-test-123")
-    let cli = try GatewayPreflight.check(.init(vendor: "claude-code", model: nil, apiKeyEnvironment: nil), environment: [:])
+    let cli = try GatewayPreflight.check(.init(vendor: "claude-code", model: "m", apiKeyEnvironment: nil), environment: [:])
     #expect(cli.secretValue == nil)
   }
 
@@ -44,7 +44,7 @@ struct PreflightTests {
 
   @Test func configuredCLIKeyMustBePresent() throws {
     #expect(throws: ServiceError.unavailable("environment variable FOO_KEY is not set")) {
-      try GatewayPreflight.check(.init(vendor: "claude-code", model: nil, apiKeyEnvironment: "FOO_KEY"), environment: [:])
+      try GatewayPreflight.check(.init(vendor: "claude-code", model: "m", apiKeyEnvironment: "FOO_KEY"), environment: [:])
     }
   }
 
@@ -56,7 +56,8 @@ struct PreflightTests {
       UnavailableCase(settings: .init(vendor: "anthropic", model: "m", apiKeyEnvironment: nil), environment: [:], expectedMessage: "apiKeyEnvironment is required for vendor anthropic"),
       UnavailableCase(settings: .init(vendor: "anthropic", model: "m", apiKeyEnvironment: "ANTHROPIC_API_KEY"), environment: [:], expectedMessage: "environment variable ANTHROPIC_API_KEY is not set"),
       UnavailableCase(settings: .init(vendor: "cursor-api", model: "m", apiKeyEnvironment: "CURSOR_API_KEY"), environment: ["CURSOR_API_KEY": secret], expectedMessage: "vendor cursor-api does not support image input"),
-      UnavailableCase(settings: .init(vendor: "claude-code", model: nil, apiKeyEnvironment: "FOO_KEY"), environment: [:], expectedMessage: "environment variable FOO_KEY is not set")
+      UnavailableCase(settings: .init(vendor: "claude-code", model: "m", apiKeyEnvironment: "FOO_KEY"), environment: [:], expectedMessage: "environment variable FOO_KEY is not set"),
+      UnavailableCase(settings: .init(vendor: "codex", model: nil, apiKeyEnvironment: nil), environment: [:], expectedMessage: "model is required for vendor codex")
     ]
 
     for testCase in cases {
@@ -67,6 +68,13 @@ struct PreflightTests {
         #expect(error == .unavailable(testCase.expectedMessage))
         #expect(!String(describing: error).contains(secret))
       }
+    }
+  }
+
+  @Test func cliVendorWithoutModelIsUnavailableNotFailed() {
+    let settings = ServiceSettings(vendor: "claude-code", model: nil, apiKeyEnvironment: nil)
+    #expect(throws: ServiceError.unavailable("model is required for vendor claude-code")) {
+      try GatewayPreflight.check(settings, environment: [:])
     }
   }
 }

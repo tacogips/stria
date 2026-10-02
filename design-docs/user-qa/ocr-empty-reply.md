@@ -1,3 +1,8 @@
+> Update: resolved by the `[NO TEXT]` sentinel. The OCR prompt asks the model
+> to answer exactly `[NO TEXT]` for a page without text, and that reply is
+> stored as `done` with empty text. Only a truly empty reply is still
+> rejected. See `../specs/design-agent-integration.md#ocr-reply-check`.
+
 # Empty OCR Replies From Gateway Vendors
 
 ## Status

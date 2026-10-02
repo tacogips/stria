@@ -27,4 +27,23 @@ import Testing
       do { _ = try await store.history(documentId: nil, page: 2, limit: 5); Issue.record("Expected page filter validation") } catch let error as StriaError { #expect(error.code == .usageError) }
     }
   }
+
+  @Test func libraryWideAskAppearsInHistoryOfCitedDocumentsAndPages() async throws {
+    try await withTestDataRoot { paths in
+      let store = try openStorage(paths: paths)
+      try await store.insertDocument(storageDocument("doc1"))
+      try await store.insertDocument(storageDocument("doc2"))
+      let now = Date(timeIntervalSince1970: 1_800_000_020)
+      try await store.persistAskExchange(AskExchange(
+        threadId: "lib", newThread: NewChatThread(documentId: nil, pageNumber: nil, scope: .library), question: "across?",
+        anchorDocumentId: nil, anchorPage: nil, assistantStatus: .ok, assistantContent: "answer", vendor: "test", model: nil,
+        citations: [PageRef(docId: "doc1", page: 3), PageRef(docId: "doc2", page: 1)],
+        run: storageRun("lib-run", documentId: nil, page: nil, kind: .ask, date: now), createdAt: now))
+      #expect(try await store.history(documentId: "doc1", page: nil, limit: 50).map(\.role) == [.user, .assistant])
+      #expect(try await store.history(documentId: "doc1", page: 3, limit: 50).count == 2)
+      #expect(try await store.history(documentId: "doc1", page: 2, limit: 50).isEmpty)
+      #expect(try await store.history(documentId: "doc2", page: 1, limit: 50).count == 2)
+      #expect(try await store.history(documentId: "doc3", page: nil, limit: 50).isEmpty)
+    }
+  }
 }

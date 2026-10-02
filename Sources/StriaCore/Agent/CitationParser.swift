@@ -14,7 +14,7 @@ public struct CitationMarker: Equatable {
 
 public enum CitationParser {
   public static func markers(in text: String) -> [CitationMarker] {
-    text.matches(of: /\[([0-9a-f]{16}) p\.([0-9]+)\]/).compactMap { match in
+    text.matches(of: /\[([0-9a-f]{16})\s+p\.\s*([0-9]+)\]/).compactMap { match in
       guard let page = Int(match.2) else { return nil }
       return CitationMarker(docId: String(match.1), page: page, range: match.range)
     }

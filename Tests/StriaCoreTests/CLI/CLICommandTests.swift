@@ -37,9 +37,9 @@ import Testing
       let pageScope = try CommandLineParser.parse(["ask", "q", "--doc", id, "--page", "2"]).command
       let documentScope = try CommandLineParser.parse(["ask", "q", "--doc", id]).command
       let libraryScope = try CommandLineParser.parse(["ask", "q"]).command
-      #expect(pageScope == .ask(question: "q", docId: id, page: 2, query: nil, limit: nil))
-      #expect(documentScope == .ask(question: "q", docId: id, page: nil, query: nil, limit: nil))
-      #expect(libraryScope == .ask(question: "q", docId: nil, page: nil, query: nil, limit: nil))
+      #expect(pageScope == .ask(question: "q", docId: id, page: 2, query: nil, limit: nil, thread: nil))
+      #expect(documentScope == .ask(question: "q", docId: id, page: nil, query: nil, limit: nil, thread: nil))
+      #expect(libraryScope == .ask(question: "q", docId: nil, page: nil, query: nil, limit: nil, thread: nil))
     }
   }
 
@@ -109,7 +109,7 @@ import Testing
       #expect(Set(search.keys) == Set(["query", "matchMode", "results"]))
       #expect(search["results"]?.arrayValue?.first?.objectValue?.keySet == Set(["docId", "title", "page", "snippet", "score", "imagePath", "imageCached"]))
       let asked = try json((await execute(["ask", "summarize", "--doc", id, "--query", "unique key phrase"], home: home, paths: paths, ocr: ocr, agent: agent)).stdout)
-      #expect(Set(asked.keys) == Set(["threadId", "answer", "vendor", "model", "runId", "citations"]))
+      #expect(Set(asked.keys) == Set(["threadId", "answer", "vendor", "model", "runId", "citations", "contextPages"]))
       let history = try json((await execute(["history", "--doc", id], home: home, paths: paths, ocr: ocr, agent: agent)).stdout)
       #expect(Set(history.keys) == Set(["messages"]))
       #expect(history["messages"]?.arrayValue?.first?.objectValue?.keySet == Set(["id", "threadId", "role", "status", "content", "docId", "page", "vendor", "model", "runId", "citations", "createdAt"]))

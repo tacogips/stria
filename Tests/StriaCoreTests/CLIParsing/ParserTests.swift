@@ -10,6 +10,7 @@ import Testing
     #expect(try CommandLineParser.parse(["search", "foo", "--doc", "d", "--limit", "5"]).command == .search(query: "foo", docId: "d", limit: 5))
     #expect(try CommandLineParser.parse(["history", "--doc", "d", "--page", "2"]).command == .history(docId: "d", page: 2, limit: nil))
     #expect(try CommandLineParser.parse(["remove", "d"]).command == .remove(docId: "d"))
+    #expect(try CommandLineParser.parse(["ask", "q", "--thread", "t1"]).command == .ask(question: "q", docId: nil, page: nil, query: nil, limit: nil, thread: "t1"))
     #expect(try CommandLineParser.parse(["config"]).command == .configGet(key: nil))
     #expect(try CommandLineParser.parse(["config", "set", "ocr.concurrency", "4"]).command == .configSet(key: "ocr.concurrency", value: "4"))
     #expect(try CommandLineParser.parse(["ocr", "d", "--pages", "1,3-5", "--retry-failed"]).command == .ocr(docId: "d", pages: "1,3-5", retryFailed: true))
@@ -42,7 +43,7 @@ import Testing
   }
 
   @Test func parsesRemainingCommandForms() throws {
-    #expect(try CommandLineParser.parse(["ask", "q", "--doc", "d", "--page", "2", "--query", "x y", "--limit", "3"]).command == .ask(question: "q", docId: "d", page: 2, query: "x y", limit: 3))
+    #expect(try CommandLineParser.parse(["ask", "q", "--doc", "d", "--page", "2", "--query", "x y", "--limit", "3"]).command == .ask(question: "q", docId: "d", page: 2, query: "x y", limit: 3, thread: nil))
     #expect(try CommandLineParser.parse(["page", "text", "abc", "2"]).command == .pageText(docId: "abc", page: 2))
     #expect(try CommandLineParser.parse(["show", "abc"]).command == .show(docId: "abc"))
     #expect(try CommandLineParser.parse(["paths"]).command == .paths)

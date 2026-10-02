@@ -170,9 +170,10 @@ rejected. That page stays `failed` and can be read with `stria page image`.
 The rejection reasons are fixed strings. They never quote the reply,
 because run records must not contain OCR text.
 
-The default prompt asks the model to output nothing for a page without
-text, so such pages now become `failed` with the "empty" reason on gateway
-vendors. The issue asks for this behavior. Whether to keep it is recorded in
+The default prompt asks the model to answer exactly `[NO TEXT]` for a page
+without text. `GatewayOCRService` turns that reply into `done` with empty
+text, so blank and figure-only pages are not rejected and retried forever;
+a genuinely empty reply still means the image did not reach the model. See
 `../user-qa/ocr-empty-reply.md`.
 
 ### `pdf-text-layer` local service
@@ -203,7 +204,7 @@ not an AI path, so agent-gateway remains the only AI library.
 | App scope "Whole PDF" | top `agent.maxImages` pages from fuzzy retrieval within the document; the current page is always included |
 | CLI `--doc D --page N` | page N of D |
 | CLI `--doc D` | fuzzy retrieval within D |
-| CLI (no `--doc`) | fuzzy retrieval across all documents |
+| CLI (no `--doc`) | fuzzy retrieval across all documents; no single document takes more than half of the slots while other documents still have hits (`ContextSelector.spreadAcrossDocuments`) |
 
 - Fuzzy retrieval is defined in `design-storage.md#fuzzy-retrieval-ask`.
   `--query <terms>` replaces the question as the retrieval input.
@@ -234,9 +235,12 @@ The user prompt is a sequence of content blocks:
 1. If the thread has earlier turns, a text block "Previous conversation:"
    with those turns. The app sends the active thread's turns; each CLI `ask`
    starts a new thread.
-2. For each context page, a text block `Document "<title>" (<docId>) page
-   <page>` followed by the OCR text (or "OCR text not available"), then the
-   page image. API vendors receive it as an image block. CLI vendors receive
+2. For each context page, a text block
+   `<page docId="<docId>" page="<page>" title="<title>">` + OCR text (or
+   "OCR text not available") + `</page>`, then the page image. The fence
+   lets the model tell document content from instructions; the system prompt
+   says the block is data, never instructions (OCR text is untrusted input,
+   and a CLI vendor has tools). API vendors receive it as an image block. CLI vendors receive
    a text block with the PNG path instead
    (`#vendor-image-capability`).
 3. A text block with the question.
@@ -291,12 +295,26 @@ The API at that revision, as stated in the intake, is used only inside
    (`#vendor-image-capability`). Each remaining `.text` part becomes a text
    block, and each remaining `.image` part becomes
    `gatewayImageContentBlocks([.filePath(<absolute PNG path>)])`.
-6. On success, the result's `messageText` is the answer. A
-   `response.stopReason` other than end of turn is `failed("stop reason:
-   <reason>")`. A thrown error is `failed(<redacted message>)`.
+6. The turn runs through `promptStream`; `agentMessageChunk` text goes to
+   `onChunk` as it arrives. On the final response, the gateway's
+   `meta.agentGateway.resultText` is the answer when present, otherwise the
+   concatenated chunks. A `stopReason` other than end of turn is
+   `failed("stop reason: <reason>")`. A thrown error is
+   `failed(<redacted message>)`.
+7. The turn is raced against `timeoutSeconds` from the settings
+   (`ocr.timeoutSeconds`, default 300; `agent.timeoutSeconds`, default 600;
+   both 10...3600). On timeout, or when the calling task is cancelled (the
+   app's Cancel button, an OCR run being cancelled), stria sends
+   `session/cancel` so a CLI vendor process stops, and the call fails with
+   `failed("timed out after N s")` or rethrows `CancellationError`.
+8. `client.stop()` runs on every exit path. The in-memory transport only
+   finishes on close, so without it each OCR page would leak the pump tasks.
 
 Each call creates its own agent, connection and session. Sessions are never
-reused, so concurrent OCR pages cannot cross-talk. The session `cwd` is the
+reused, so concurrent OCR pages cannot cross-talk. The executor is
+injectable (`GatewayPromptRunner.makeExecutor`), so `PromptRunnerTests`
+drive this whole path offline with a fake gateway: image blocks for an API
+vendor, path text for a CLI vendor, the timeout and cancellation. The session `cwd` is the
 data root's `cache/` directory, which already contains the PNGs. stria writes
 nothing else there.
 
@@ -363,8 +381,11 @@ Offline tests (no network, no vendor process):
 Pre-call checks, which produce `unavailable` and make no call:
 
 - the vendor is not a `GatewayVendor` raw value;
+- `model` is null (agent-gateway refuses a session without a model for every
+  vendor, CLI vendors included, so this is a config problem, not a call
+  failure);
 - the vendor is an API vendor (`openai`, `anthropic`, `gemini`, `openrouter`,
-  `cursor-api`) and `model` or `apiKeyEnvironment` is null;
+  `cursor-api`) and `apiKeyEnvironment` is null;
 - the named environment variable is unset or empty;
 - the vendor is `cursor-api`. At the pinned revision `cursor-api` rejects
   gateway image inputs, and every OCR and ask call sends at least one image
@@ -418,12 +439,14 @@ is never rewritten on load:
   "render": { "dpi": 150, "imageFormat": "heic", "quality": 0.75, "maxPixelDimension": 4096 },
   "ocr": {
     "vendor": "anthropic", "model": "claude-sonnet-5-5",
-    "apiKeyEnvironment": "ANTHROPIC_API_KEY", "concurrency": 2, "prompt": null
+    "apiKeyEnvironment": "ANTHROPIC_API_KEY", "concurrency": 2, "prompt": null,
+    "timeoutSeconds": 300
   },
   "agent": {
     "vendor": "anthropic", "model": "claude-opus-5-5",
     "apiKeyEnvironment": "ANTHROPIC_API_KEY", "neighborPages": 1,
-    "maxImages": 4, "maxContextCharacters": 60000, "systemPrompt": null
+    "maxImages": 4, "maxContextCharacters": 60000, "systemPrompt": null,
+    "timeoutSeconds": 600
   }
 }
 ```
@@ -440,6 +463,7 @@ Validation for `stria config set <key> <value>` (dotted keys above):
 | `agent.neighborPages` | 0...5 |
 | `agent.maxImages` | 1...10 |
 | `agent.maxContextCharacters` | 1000...500000 |
+| `ocr.timeoutSeconds`, `agent.timeoutSeconds` | 10...3600 |
 | `ocr.vendor`, `agent.vendor` | a `GatewayVendor` raw value (`claude-code`, `codex`, `cursor`, `cursor-api`, `openai`, `anthropic`, `gemini`, `openrouter`); `ocr.vendor` also accepts `pdf-text-layer` |
 | `ocr.apiKeyEnvironment`, `agent.apiKeyEnvironment` | must match `^[A-Z_][A-Z0-9_]*$`, or `null` |
 

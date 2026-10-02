@@ -22,4 +22,12 @@ import Testing
     #expect(!accentSnippet.contains("[café]"))
     #expect(SearchQueryBuilder.likePattern(term: "a%_\\b") == "%a\\%\\_\\\\b%")
   }
+
+  @Test func stopWordsDoNotContributeTrigrams() {
+    let terms = SearchQueryBuilder.trigrams(question: "What does the document say about zebra?")
+    #expect(terms.trigrams == ["zeb", "ebr", "bra"])
+    #expect(SearchQueryBuilder.trigrams(question: "What is this?").trigrams.isEmpty)
+    let japanese = SearchQueryBuilder.trigrams(question: "機械学習とは")
+    #expect(japanese.trigrams.first == "機械学")
+  }
 }

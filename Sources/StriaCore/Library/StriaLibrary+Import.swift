@@ -17,7 +17,10 @@ public extension StriaLibrary {
       case .copied, .rendered, .ocr: break
       }
     }
-    guard let result else { throw StriaError.io("Import stream ended without a result") }
+    guard let result else {
+      try Task.checkCancellation()
+      throw StriaError.io("Import stream ended without a result")
+    }
     return result
   }
 }

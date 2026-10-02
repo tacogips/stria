@@ -24,15 +24,18 @@ public final class AppModel {
   }
 
   public func open(documentId: String) async {
+    // Route first: the reader screen shows its opening indicator while the
+    // PDF loads; on failure the library comes back with the error.
+    route = .reader(docId: documentId)
     do {
-      try await striaLibrary.markOpened(documentId: documentId)
       let reader = ReaderViewModel(library: striaLibrary, documentId: documentId, debounce: debounce)
       try await reader.open()
+      try await striaLibrary.markOpened(documentId: documentId)
       self.reader = reader
       agent = AgentPaneViewModel(library: striaLibrary, reader: reader)
-      route = .reader(docId: documentId)
     } catch {
-      library.alert = error.localizedDescription
+      route = .library
+      library.alert = (error as? StriaError)?.message ?? error.localizedDescription
     }
   }
 

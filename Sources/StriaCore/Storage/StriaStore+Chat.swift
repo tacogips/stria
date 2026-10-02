@@ -45,8 +45,24 @@ extension StriaStore {
   public func history(documentId: String?, page: Int?, limit: Int) throws -> [ChatMessageRecord] {
     guard page == nil || documentId != nil else { throw StriaError.usage("A page filter requires a document id") }
     guard limit > 0 else { throw StriaError.usage("History limit must be positive") }
+    // A library-wide ask has no anchor document, but it still belongs to the
+    // history of every document (and page) it cited; both messages of such an
+    // exchange share the thread, so the user question is matched through the
+    // assistant message's citations.
     let filter: String
-    if documentId != nil, page != nil { filter = "WHERE document_id=? AND page_number=?" } else if documentId != nil { filter = "WHERE document_id=?" } else { filter = "" }
+    if documentId != nil, page != nil {
+      filter = """
+        WHERE (document_id=? AND page_number=?) OR (document_id IS NULL AND thread_id IN
+          (SELECT thread_id FROM chat_messages WHERE document_id IS NULL AND citations_json LIKE ? ESCAPE '\\'))
+        """
+    } else if documentId != nil {
+      filter = """
+        WHERE document_id=? OR (document_id IS NULL AND thread_id IN
+          (SELECT thread_id FROM chat_messages WHERE document_id IS NULL AND citations_json LIKE ? ESCAPE '\\'))
+        """
+    } else {
+      filter = ""
+    }
     let statement = try database.prepare("""
       SELECT id,thread_id,role,status,content,document_id,page_number,vendor,model,agent_run_id,citations_json,created_at
       FROM chat_messages \(filter) ORDER BY created_at DESC,id DESC LIMIT ?
@@ -54,6 +70,11 @@ extension StriaStore {
     var index: Int32 = 1
     if let documentId { try statement.bind(documentId, at: index); index += 1 }
     if let page { try statement.bind(page, at: index); index += 1 }
+    if let documentId {
+      let citation = page.map { "{\"docId\":\"\(documentId)\",\"page\":\($0)}" } ?? "{\"docId\":\"\(documentId)\","
+      try statement.bind(SearchQueryBuilder.likePattern(term: citation), at: index)
+      index += 1
+    }
     try statement.bind(limit, at: index)
     var messages: [ChatMessageRecord] = []
     while try statement.step() { messages.append(try chatMessage(statement)) }
@@ -74,7 +95,7 @@ extension StriaStore {
   public func agentRuns(documentId: String?) throws -> [AgentRunRecord] {
     let sql = """
       SELECT id,kind,document_id,page_number,vendor,model,status,error,image_count,started_at,finished_at,duration_ms
-      FROM agent_runs \(documentId == nil ? "" : "WHERE document_id=?") ORDER BY started_at,id
+      FROM agent_runs \(documentId == nil ? "" : "WHERE document_id=?") ORDER BY started_at,rowid
       """
     let statement = try database.prepare(sql)
     if let documentId { try statement.bind(documentId, at: 1) }
@@ -97,7 +118,14 @@ extension StriaStore {
       VALUES(?,?,?,?,?,?,?,?,?,?,?)
       """)
     let json: String?
-    if let citations = message.citations { json = String(data: try JSONEncoder().encode(citations), encoding: .utf8) } else { json = nil }
+    if let citations = message.citations {
+      // Sorted keys keep the stored form `{"docId":"...","page":N}` stable for history matching.
+      let encoder = JSONEncoder()
+      encoder.outputFormatting = [.sortedKeys]
+      json = String(data: try encoder.encode(citations), encoding: .utf8)
+    } else {
+      json = nil
+    }
     try statement.bind(message.threadId, at: 1).bind(message.role.rawValue, at: 2).bind(message.status.rawValue, at: 3)
       .bind(message.content, at: 4).bind(message.documentId, at: 5).bind(message.page, at: 6)
       .bind(message.vendor, at: 7).bind(message.model, at: 8).bind(message.runId, at: 9)
