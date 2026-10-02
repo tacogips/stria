@@ -11,6 +11,9 @@ struct StriaCommands: Commands {
   @FocusedValue(\.striaImport) private var importAction
   @FocusedValue(\.striaAgent) private var agent
   @FocusedValue(\.striaShortcutHelp) private var shortcutHelp
+  @FocusedValue(\.striaSidebar) private var sidebar
+  @FocusedValue(\.striaLibraryViewMode) private var libraryViewMode
+  @FocusedValue(\.striaRunOCR) private var runOCR
   @AppStorage(Appearance.storageKey) private var appearance = Appearance.default
   @Environment(\.openSettings) private var openSettings
 
@@ -31,6 +34,10 @@ struct StriaCommands: Commands {
     }
 
     CommandGroup(after: .sidebar) {
+      Button("Show/Hide Sidebar") { sidebar?.wrappedValue = sidebar?.wrappedValue == .detailOnly ? .all : .detailOnly }
+        .keyboardShortcut("s", modifiers: [.command, .control])
+        .disabled(sidebar == nil)
+
       Button("Show/Hide Agent") {
         if let agentVisibility { agentVisibility.wrappedValue.toggle() }
       }
@@ -40,6 +47,14 @@ struct StriaCommands: Commands {
       Button("Library") { libraryAction?() }
         .keyboardShortcut("l", modifiers: [.command, .shift])
         .disabled(reader == nil)
+
+      Divider()
+      Button("Library as List") { libraryViewMode?.wrappedValue = .list }
+        .keyboardShortcut("1", modifiers: .command)
+        .disabled(libraryViewMode == nil)
+      Button("Library as Cards") { libraryViewMode?.wrappedValue = .card }
+        .keyboardShortcut("2", modifiers: .command)
+        .disabled(libraryViewMode == nil)
 
       Divider()
       Picker("Appearance", selection: $appearance) {
@@ -84,6 +99,9 @@ struct StriaCommands: Commands {
     CommandGroup(replacing: .newItem) {
       Button("Import PDF…") { importAction?() }
         .keyboardShortcut("o", modifiers: .command)
+      Button("Run OCR on Selected Document") { runOCR?() }
+        .keyboardShortcut("o", modifiers: [.command, .shift])
+        .disabled(runOCR == nil)
     }
   }
 }

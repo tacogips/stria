@@ -36,7 +36,15 @@ struct ReaderView: View {
     .focusedSceneValue(\.striaPageSheet, $showPageSheet)
     .focusedSceneValue(\.striaAgentVisibility, $showAgent)
     .focusedSceneValue(\.striaShortcutHelp, $showShortcutHelp)
+    .focusedSceneValue(\.striaSidebar, $columnVisibility)
+    .toolbar(removing: .sidebarToggle)
     .toolbar {
+      ToolbarItem(placement: .navigation) {
+        Button { toggleSidebar() } label: {
+          Label(columnVisibility == .detailOnly ? "Show Sidebar" : "Hide Sidebar", systemImage: "sidebar.left")
+        }
+        .help((columnVisibility == .detailOnly ? "Show the sidebar" : "Hide the sidebar") + " (Ctrl-Cmd-S or Shift+L)")
+      }
       ToolbarItem(placement: .navigation) {
         Button { Task { await model.showLibrary() } } label: {
           Label("Library", systemImage: "chevron.left")
@@ -51,7 +59,7 @@ struct ReaderView: View {
         Button { showAgent.toggle() } label: {
           Label("Agent", systemImage: "sidebar.right")
         }
-        .help("Show or hide the agent pane (Cmd-Opt-0)")
+        .help((showAgent ? "Hide the agent pane" : "Show the agent pane") + " (Cmd-Opt-0 or Shift+R)")
       }
     }
     .sheet(isPresented: $showPageSheet) {
@@ -65,10 +73,14 @@ struct ReaderView: View {
     .onDisappear { shortcuts.remove() }
   }
 
+  private func toggleSidebar() {
+    columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
+  }
+
   private func handle(_ shortcut: ReaderShortcut) {
     switch shortcut {
     case .backToLibrary: Task { await model.showLibrary() }
-    case .toggleLeftPane: columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
+    case .toggleLeftPane: toggleSidebar()
     case .toggleAgentPane: showAgent.toggle()
     case .focusAgentInput:
       showAgent = true

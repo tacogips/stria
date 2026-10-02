@@ -12,7 +12,7 @@ struct PageFieldView: View {
     HStack(spacing: 6) {
       Button { reader.previousPage() } label: { Image(systemName: "chevron.left") }
         .disabled(reader.currentPage <= 1)
-        .help("Previous Page")
+        .help("Previous page (Cmd-Opt-Up)")
         .accessibilityLabel("Previous page")
       TextField("Page", text: $text)
         .frame(width: 48)
@@ -26,10 +26,11 @@ struct PageFieldView: View {
           isFocused = false
         }
         .accessibilityLabel("Page number")
+        .help("Type a page number and press Return (Cmd-Opt-G opens Go to Page)")
       Text("of \(reader.pageCount)").foregroundStyle(.secondary)
       Button { reader.nextPage() } label: { Image(systemName: "chevron.right") }
         .disabled(reader.currentPage >= reader.pageCount)
-        .help("Next Page")
+        .help("Next page (Cmd-Opt-Down)")
         .accessibilityLabel("Next page")
     }
     .onAppear { text = String(reader.currentPage) }

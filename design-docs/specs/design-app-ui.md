@@ -34,8 +34,9 @@ or answers.
 
 The reader toolbar contains:
 
-- leading: the built-in sidebar toggle (no second one is added), and a
-  "< Library" back button that returns home (also `Esc`, `Cmd-Shift-L` via
+- leading: one sidebar toggle (Stria's own, the built-in one is removed
+  with `.toolbar(removing: .sidebarToggle)` so its tooltip can name the
+  shortcuts), and a "< Library" back button that returns home (also `Esc`, `Cmd-Shift-L` via
   the View menu, and a "< Library" row at the top of the left pane);
 - principal: a page field showing `n of N` with previous and next buttons;
 - trailing: a `.searchable(placement: .toolbar)` search field and an
@@ -278,7 +279,9 @@ Commands are disabled when no reader is focused.
 | Menu | Item | Shortcut |
 | --- | --- | --- |
 | File | Import PDF... | `Cmd-O` |
-| View | Show/Hide Sidebar (built-in `SidebarCommands`) | `Ctrl-Cmd-S` |
+| View | Show/Hide Sidebar | `Ctrl-Cmd-S` |
+| View | Library as List / Library as Cards | `Cmd-1` / `Cmd-2` |
+| File | Run OCR on Selected Document | `Cmd-Shift-O` |
 | View | Show/Hide Agent | `Cmd-Opt-0` |
 | View | Library | `Cmd-Shift-L` |
 | Go | Go to Page... | `Cmd-Opt-G` |
@@ -292,6 +295,8 @@ Commands are disabled when no reader is focused.
 Every shortcut is declared once, on the menu command. Toolbar buttons call
 the same action without a shortcut of their own, so a key press never fires
 twice (which would, for example, toggle the inspector off and on again).
+Every toolbar button's tooltip (`.help`) names its shortcut, for example
+"Hide the sidebar (Ctrl-Cmd-S or Shift+L)".
 
 ## View Models (StriaCore/AppModel)
 

@@ -8,6 +8,9 @@ private struct LibraryActionFocusedKey: FocusedValueKey { typealias Value = () -
 private struct ImportActionFocusedKey: FocusedValueKey { typealias Value = () -> Void }
 private struct AgentFocusedKey: FocusedValueKey { typealias Value = AgentPaneViewModel }
 private struct ShortcutHelpFocusedKey: FocusedValueKey { typealias Value = Binding<Bool> }
+private struct LibraryViewModeFocusedKey: FocusedValueKey { typealias Value = Binding<LibraryViewMode> }
+private struct RunOCRFocusedKey: FocusedValueKey { typealias Value = () -> Void }
+private struct SidebarFocusedKey: FocusedValueKey { typealias Value = Binding<NavigationSplitViewVisibility> }
 
 extension FocusedValues {
   var striaReader: ReaderViewModel? {
@@ -43,5 +46,20 @@ extension FocusedValues {
   var striaShortcutHelp: Binding<Bool>? {
     get { self[ShortcutHelpFocusedKey.self] }
     set { self[ShortcutHelpFocusedKey.self] = newValue }
+  }
+
+  var striaLibraryViewMode: Binding<LibraryViewMode>? {
+    get { self[LibraryViewModeFocusedKey.self] }
+    set { self[LibraryViewModeFocusedKey.self] = newValue }
+  }
+
+  var striaRunOCR: (() -> Void)? {
+    get { self[RunOCRFocusedKey.self] }
+    set { self[RunOCRFocusedKey.self] = newValue }
+  }
+
+  var striaSidebar: Binding<NavigationSplitViewVisibility>? {
+    get { self[SidebarFocusedKey.self] }
+    set { self[SidebarFocusedKey.self] = newValue }
   }
 }

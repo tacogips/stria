@@ -97,6 +97,8 @@ struct LibraryView: View {
       }
     }
     .navigationTitle("Library")
+    .focusedSceneValue(\.striaLibraryViewMode, $viewMode)
+    .focusedSceneValue(\.striaRunOCR, { runOCRForSelection() })
     .toolbar {
       ToolbarItem(placement: .principal) {
         Picker("View", selection: $viewMode) {
@@ -106,7 +108,7 @@ struct LibraryView: View {
         }
         .pickerStyle(.segmented)
         .labelsHidden()
-        .help("List or card view")
+        .help("List or card view (Cmd-1 / Cmd-2)")
       }
     }
     .onKeyPress(.return) {
@@ -128,14 +130,11 @@ struct LibraryView: View {
           .help("Import PDF files (Cmd-O)")
       }
       ToolbarItem(placement: .primaryAction) {
-        Button {
-          guard let selection else { return }
-          Task { await model.library.runOCR(documentId: selection, retryFailed: true) }
-        } label: {
+        Button { runOCRForSelection() } label: {
           Label("Run OCR", systemImage: "text.viewfinder")
         }
         .disabled(selection == nil || !model.library.ocrConfigured)
-        .help(model.library.ocrConfigured ? "OCR the pending and failed pages of the selected document" : "Choose an OCR vendor in Settings first")
+        .help(model.library.ocrConfigured ? "OCR the pending and failed pages of the selected document (Cmd-Shift-O)" : "Choose an OCR vendor in Settings first (Agent > Settings…)")
       }
     }
     .alert("Error", isPresented: Binding(
@@ -182,6 +181,11 @@ struct LibraryView: View {
     Button("Retry Failed OCR") { Task { await model.library.runOCR(documentId: row.id, retryFailed: true) } }
     Divider()
     Button("Remove…", role: .destructive) { pendingRemoval = row }
+  }
+
+  private func runOCRForSelection() {
+    guard let selection, model.library.ocrConfigured else { return }
+    Task { await model.library.runOCR(documentId: selection, retryFailed: true) }
   }
 
   private func open(_ id: String) {

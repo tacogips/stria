@@ -42,7 +42,6 @@ struct StriaReaderApp: App {
       .preferredColorScheme(appearance.colorScheme)
     }
     .commands {
-      SidebarCommands()
       StriaCommands()
     }
     Settings {

@@ -112,6 +112,8 @@ struct ShortcutHelpSheet: View {
           }
         }
         Divider().gridCellColumns(2)
+        GridRow { Text("Ctrl-Cmd-S").font(.system(.body, design: .monospaced)); Text("Hide / show the sidebar") }
+        GridRow { Text("Cmd-Opt-0").font(.system(.body, design: .monospaced)); Text("Hide / show the agent pane") }
         GridRow { Text("Cmd-Opt-G").font(.system(.body, design: .monospaced)); Text("Go to page") }
         GridRow { Text("Cmd-Opt-Up/Down").font(.system(.body, design: .monospaced)); Text("Previous / next page") }
         GridRow { Text("Cmd-+ / Cmd--").font(.system(.body, design: .monospaced)); Text("Zoom in / out") }

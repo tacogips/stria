@@ -142,6 +142,7 @@ struct AgentPaneView: View {
         Button("Send") { agent.submit() }
           .disabled(agent.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
           .keyboardShortcut(.return, modifiers: .command)
+          .help("Send the question (Cmd-Return); / focuses this field")
       }
     }
     .padding()
