@@ -1,5 +1,21 @@
+import CoreGraphics
 import Foundation
 import Observation
+
+/// How the library shows its documents.
+public enum LibraryViewMode: String, CaseIterable, Sendable {
+  case list
+  case card
+
+  public static let storageKey = "libraryViewMode"
+
+  public var title: String {
+    switch self {
+    case .list: "List"
+    case .card: "Cards"
+    }
+  }
+}
 
 public struct LibraryRow: Identifiable, Equatable, Sendable {
   public let id: String
@@ -39,12 +55,16 @@ public final class LibraryViewModel {
   public private(set) var searchResults: [SearchResultItem] = []
   public private(set) var searchError: String?
   public private(set) var isSearching = false
+  /// First-page thumbnails by document id, loaded on demand.
+  public private(set) var thumbnails: [String: CGImage] = [:]
+  public static let thumbnailMaxPixel = 320
 
   private let library: StriaLibrary
   private var importTasks: [UUID: Task<Void, Never>] = [:]
   private var unavailableReasons: [String: String] = [:]
   private var renderedPages: [String: Int] = [:]
   private var busyIDs: Set<String> = []
+  private var thumbnailLoads: Set<String> = []
 
   public init(library: StriaLibrary) {
     self.library = library
@@ -113,6 +133,17 @@ public final class LibraryViewModel {
   public var agentConfigured: Bool { library.environment.config.agent.isConfigured }
   public var ocrRunsAutomatically: Bool { library.environment.config.ocr.autoRunOnImport }
 
+  /// Loads the first-page thumbnail once; a document still rendering is
+  /// retried when its row refreshes as ready.
+  public func loadThumbnail(documentId: String) async {
+    guard thumbnails[documentId] == nil, !thumbnailLoads.contains(documentId) else { return }
+    thumbnailLoads.insert(documentId)
+    defer { thumbnailLoads.remove(documentId) }
+    if let image = try? await library.firstPageThumbnail(documentId: documentId, maxPixel: Self.thumbnailMaxPixel) {
+      thumbnails[documentId] = image
+    }
+  }
+
   public func submitSearch() async {
     let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !query.isEmpty else { clearSearch(); return }
@@ -138,6 +169,7 @@ public final class LibraryViewModel {
       try await library.removeDocument(id: documentId)
       unavailableReasons[documentId] = nil
       renderedPages[documentId] = nil
+      thumbnails[documentId] = nil
       if selectedID == documentId { selectedID = nil }
       await refresh()
     } catch {

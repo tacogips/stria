@@ -23,6 +23,22 @@ public enum ImageCodec {
     return image
   }
 
+  /// A downscaled copy whose longest side is at most `maxPixel` (the image
+  /// itself when it is already small enough).
+  public static func thumbnail(of image: CGImage, maxPixel: Int) -> CGImage {
+    let longest = max(image.width, image.height)
+    guard longest > maxPixel, maxPixel > 0 else { return image }
+    let scale = CGFloat(maxPixel) / CGFloat(longest)
+    let width = max(1, Int((CGFloat(image.width) * scale).rounded()))
+    let height = max(1, Int((CGFloat(image.height) * scale).rounded()))
+    guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+          let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: colorSpace, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return image }
+    context.interpolationQuality = .high
+    context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+    return context.makeImage() ?? image
+  }
+
   public static func pngData(_ image: CGImage) throws -> Data {
     guard let data = encoded(image, type: .png, quality: nil) else {
       throw StriaError.io("ImageIO could not encode the page as PNG")

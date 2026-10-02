@@ -8,6 +8,7 @@ struct LibraryView: View {
   @State private var selection: String?
   @State private var pendingRemoval: LibraryRow?
   @State private var hoveredID: String?
+  @AppStorage(LibraryViewMode.storageKey) private var viewMode = LibraryViewMode.list
 
   var body: some View {
     VStack(spacing: 0) {
@@ -17,6 +18,8 @@ struct LibraryView: View {
       }
       if model.library.isSearching {
         searchResults
+      } else if viewMode == .card {
+        documentCards
       } else {
         documentList
       }
@@ -63,10 +66,11 @@ struct LibraryView: View {
     }
   }
 
+  /// A single click opens the document; the context menu holds the rest.
   private var documentList: some View {
     List(selection: $selection) {
       ForEach(model.library.rows) { row in
-        LibraryRowView(row: row)
+        LibraryRowView(row: row, thumbnail: model.library.thumbnails[row.id])
           .tag(row.id)
           .contentShape(Rectangle())
           .listRowBackground(
@@ -75,15 +79,9 @@ struct LibraryView: View {
               : Color.clear
           )
           .onHover { hovering in hoveredID = hovering ? row.id : (hoveredID == row.id ? nil : hoveredID) }
-          .onTapGesture(count: 2) { open(row.id) }
-          .contextMenu {
-            Button("Open") { open(row.id) }
-            Divider()
-            Button("Run OCR") { Task { await model.library.runOCR(documentId: row.id, retryFailed: false) } }
-            Button("Retry Failed OCR") { Task { await model.library.runOCR(documentId: row.id, retryFailed: true) } }
-            Divider()
-            Button("Remove…", role: .destructive) { pendingRemoval = row }
-          }
+          .onTapGesture { open(row.id) }
+          .contextMenu { rowMenu(row) }
+          .task(id: row.importStatus) { await model.library.loadThumbnail(documentId: row.id) }
       }
     }
     .listStyle(.inset(alternatesRowBackgrounds: true))
@@ -99,6 +97,18 @@ struct LibraryView: View {
       }
     }
     .navigationTitle("Library")
+    .toolbar {
+      ToolbarItem(placement: .principal) {
+        Picker("View", selection: $viewMode) {
+          ForEach(LibraryViewMode.allCases, id: \.self) { mode in
+            Label(mode.title, systemImage: mode == .list ? "list.bullet" : "square.grid.2x2").tag(mode)
+          }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .help("List or card view")
+      }
+    }
     .onKeyPress(.return) {
       guard let selection else { return .ignored }
       open(selection)
@@ -149,6 +159,31 @@ struct LibraryView: View {
     }
   }
 
+  private var documentCards: some View {
+    ScrollView {
+      LazyVGrid(columns: [GridItem(.adaptive(minimum: 180, maximum: 220), spacing: 16)], spacing: 16) {
+        ForEach(model.library.rows) { row in
+          LibraryCardView(row: row, thumbnail: model.library.thumbnails[row.id], hovered: hoveredID == row.id)
+            .onHover { hovering in hoveredID = hovering ? row.id : (hoveredID == row.id ? nil : hoveredID) }
+            .onTapGesture { open(row.id) }
+            .contextMenu { rowMenu(row) }
+            .task(id: row.importStatus) { await model.library.loadThumbnail(documentId: row.id) }
+        }
+      }
+      .padding(16)
+    }
+    .background(Flat.panel)
+  }
+
+  @ViewBuilder private func rowMenu(_ row: LibraryRow) -> some View {
+    Button("Open") { open(row.id) }
+    Divider()
+    Button("Run OCR") { Task { await model.library.runOCR(documentId: row.id, retryFailed: false) } }
+    Button("Retry Failed OCR") { Task { await model.library.runOCR(documentId: row.id, retryFailed: true) } }
+    Divider()
+    Button("Remove…", role: .destructive) { pendingRemoval = row }
+  }
+
   private func open(_ id: String) {
     model.library.selectedID = id
     Task { await model.open(documentId: id) }
@@ -164,15 +199,36 @@ struct LibraryView: View {
   }
 }
 
-private struct LibraryRowView: View {
-  let row: LibraryRow
+/// The first page as a small solid-bordered image, or a placeholder.
+private struct PageThumbnail: View {
+  let image: CGImage?
+  let width: CGFloat
+  let height: CGFloat
 
   var body: some View {
-    HStack(spacing: 10) {
-      Image(systemName: "doc.richtext")
-        .font(.title2)
-        .foregroundStyle(.secondary)
-        .frame(width: 28)
+    Group {
+      if let image {
+        Image(decorative: image, scale: 1)
+          .resizable()
+          .aspectRatio(contentMode: .fit)
+      } else {
+        Rectangle().fill(Flat.assistantBubble)
+          .overlay { Image(systemName: "doc.text").foregroundStyle(.secondary) }
+      }
+    }
+    .frame(width: width, height: height)
+    .background(Color.white)
+    .overlay(Rectangle().stroke(Flat.border, lineWidth: 1))
+  }
+}
+
+private struct LibraryRowView: View {
+  let row: LibraryRow
+  let thumbnail: CGImage?
+
+  var body: some View {
+    HStack(spacing: 12) {
+      PageThumbnail(image: thumbnail, width: 44, height: 58)
       VStack(alignment: .leading, spacing: 4) {
         HStack {
           Text(row.title).font(.headline)
@@ -226,5 +282,41 @@ private struct SetupBanner: View {
     .padding(.vertical, 10)
     .background(Flat.banner)
     Divider()
+  }
+}
+
+/// Card mode: the first page large, then the title and status.
+private struct LibraryCardView: View {
+  let row: LibraryRow
+  let thumbnail: CGImage?
+  let hovered: Bool
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      PageThumbnail(image: thumbnail, width: 164, height: 212)
+        .frame(maxWidth: .infinity)
+      Text(row.title).font(.headline).lineLimit(2)
+      HStack {
+        Text("\(row.pageCount) pages").font(.caption).foregroundStyle(.secondary)
+        Spacer()
+        if row.isBusy { ProgressView().controlSize(.mini) }
+      }
+      Text(statusText).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
+    }
+    .padding(10)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(hovered ? Flat.hover : Flat.assistantBubble)
+    .overlay(Rectangle().stroke(Flat.border, lineWidth: 1))
+    .contentShape(Rectangle())
+    .accessibilityElement(children: .combine)
+  }
+
+  private var statusText: String {
+    if row.importStatus == .rendering { return "Rendering \(row.rendered)/\(row.pageCount)" }
+    if row.unavailableReason == "not configured" { return "OCR not run (\(row.ocr.pending) pages)" }
+    if let reason = row.unavailableReason { return "OCR unavailable: \(reason)" }
+    if row.ocr.failed > 0 { return "OCR \(row.ocr.done)/\(row.pageCount), \(row.ocr.failed) failed" }
+    if row.ocr.pending > 0 { return "OCR \(row.ocr.done)/\(row.pageCount)" }
+    return "OCR \(row.ocr.done)/\(row.pageCount)"
   }
 }

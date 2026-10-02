@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 public extension StriaLibrary {
@@ -103,6 +104,13 @@ public extension StriaLibrary {
         throw StriaError.io("Removed document \(id) from the database but could not delete \(url.path): \(error.localizedDescription)")
       }
     }
+  }
+
+  /// The stored first page, decoded and downscaled for library rows and
+  /// cards; nil while the page is not rendered yet.
+  func firstPageThumbnail(documentId: String, maxPixel: Int) async throws -> CGImage? {
+    guard let image = try await store.pageImage(documentId: documentId, page: 1) else { return nil }
+    return ImageCodec.thumbnail(of: try ImageCodec.decode(image.data), maxPixel: maxPixel)
   }
 
   func markOpened(documentId: String) async throws {

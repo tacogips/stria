@@ -63,7 +63,16 @@ The reader toolbar contains:
   - A row can be opened as soon as `copied(docId)` arrives. Reading uses the
     original file, so it never waits for rendering or OCR.
   - Importing the same file again selects the existing row.
-- To open a document, double-click the row or select it and press Return.
+- The library has two modes, chosen with a segmented control in the toolbar
+  and remembered in `UserDefaults` (`libraryViewMode`): **List** rows with a
+  44 x 58 first-page thumbnail at the left, and **Cards**, an adaptive grid
+  of 180-220 point cards with a 164 x 212 first-page image, the title, page
+  count and status. Thumbnails are the stored first page decoded and
+  downscaled (`StriaLibrary.firstPageThumbnail`, longest side 320 px),
+  loaded on demand and cached in `LibraryViewModel.thumbnails`; a document
+  still rendering shows a placeholder and loads when it becomes ready.
+- To open a document, click its row or card once (or select it and press
+  Return).
   The route switches to the reader first (its "Opening document" indicator
   shows), the `PDFDocument` is parsed off the main actor, `last_opened_at`
   is set, and background cache expansion of all pages starts. A failed open

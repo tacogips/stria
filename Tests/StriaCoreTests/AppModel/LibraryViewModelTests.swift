@@ -102,3 +102,22 @@ import Testing
   }
 }
 }
+
+@Suite @MainActor struct LibraryThumbnailTests {
+  @Test func firstPageThumbnailIsDownscaledAndCached() async throws {
+    try await withAppModelDataRoot { paths in
+      let (library, source) = try makeAppModelFixture(paths: paths, pageTexts: ["one", "two"])
+      let imported = try await library.importDocument(at: source, runOCR: false)
+      let image = try #require(try await library.firstPageThumbnail(documentId: imported.document.id, maxPixel: 100))
+      #expect(max(image.width, image.height) == 100)
+      #expect(try await library.firstPageThumbnail(documentId: "missing", maxPixel: 100) == nil)
+      let model = LibraryViewModel(library: library)
+      await model.refresh()
+      await model.loadThumbnail(documentId: imported.document.id)
+      #expect(model.thumbnails[imported.document.id] != nil)
+      #expect(max(model.thumbnails[imported.document.id]?.width ?? 0, model.thumbnails[imported.document.id]?.height ?? 0) == LibraryViewModel.thumbnailMaxPixel)
+      await model.remove(documentId: imported.document.id)
+      #expect(model.thumbnails[imported.document.id] == nil)
+    }
+  }
+}
