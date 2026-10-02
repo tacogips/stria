@@ -16,6 +16,8 @@ enum Flat {
 
 /// A square text field with a solid 1-point border.
 struct FlatTextFieldStyle: TextFieldStyle {
+  // The protocol requirement is spelled with the underscore.
+  // swiftlint:disable:next identifier_name
   func _body(configuration: TextField<Self._Label>) -> some View {
     configuration
       .textFieldStyle(.plain)
