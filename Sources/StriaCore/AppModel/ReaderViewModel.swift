@@ -8,6 +8,13 @@ public enum SidebarMode: Equatable, Sendable {
   case search
 }
 
+/// One programmatic navigation request. The id makes a repeated request for
+/// the same page distinguishable, so the PDF view never has to clear state.
+public struct PageNavigation: Equatable, Sendable {
+  public let id: UUID
+  public let page: Int
+}
+
 @MainActor
 @Observable
 public final class ReaderViewModel {
@@ -15,7 +22,8 @@ public final class ReaderViewModel {
   public private(set) var title = ""
   public private(set) var pageCount = 0
   public private(set) var currentPage = 1
-  public var requestedPage: Int?
+  public private(set) var navigation: PageNavigation?
+  public var requestedPage: Int? { navigation?.page }
   public private(set) var outline: [OutlineNode] = []
   public private(set) var currentOutlineNodeID: String?
   public private(set) var pdfDocument: PDFDocument?
@@ -49,7 +57,7 @@ public final class ReaderViewModel {
     if outline.isEmpty, record.importStatus == .rendering {
       outline = OutlineExtractor.extract(from: pdf)
     }
-    requestedPage = min(max(record.lastReadPage ?? 1, 1), max(pageCount, 1))
+    navigation = PageNavigation(id: UUID(), page: min(max(record.lastReadPage ?? 1, 1), max(pageCount, 1)))
     updateOutlineSelection()
     expansionTask = Task { [library, documentId] in
       _ = try? await library.expandAllPages(documentId: documentId, concurrency: 2)
@@ -87,7 +95,7 @@ public final class ReaderViewModel {
 
   public func goToPage(_ page: Int) {
     guard pageCount > 0 else { return }
-    requestedPage = min(max(page, 1), pageCount)
+    navigation = PageNavigation(id: UUID(), page: min(max(page, 1), pageCount))
   }
 
   public func commitPageField() {
@@ -108,11 +116,6 @@ public final class ReaderViewModel {
   public func previousPage() {
     guard currentPage > 1 else { return }
     goToPage(currentPage - 1)
-  }
-
-  public func consumeRequestedPage() -> Int? {
-    defer { requestedPage = nil }
-    return requestedPage
   }
 
   public func submitSearch(_ query: String) async {

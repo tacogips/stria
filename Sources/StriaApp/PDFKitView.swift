@@ -15,7 +15,7 @@ struct PDFKitView: NSViewRepresentable {
     pdfView.autoScales = true
     context.coordinator.observePageChanges(of: pdfView)
     pdfView.document = reader.pdfDocument
-    navigate(pdfView)
+    navigate(pdfView, coordinator: context.coordinator)
     return pdfView
   }
 
@@ -25,18 +25,23 @@ struct PDFKitView: NSViewRepresentable {
     pdfView.autoScales = true
     if pdfView.document !== reader.pdfDocument {
       pdfView.document = reader.pdfDocument
+      context.coordinator.handledNavigationID = nil
     }
-    navigate(pdfView)
+    navigate(pdfView, coordinator: context.coordinator)
   }
 
   static func dismantleNSView(_ pdfView: PDFView, coordinator: Coordinator) {
     coordinator.stopObserving()
   }
 
-  private func navigate(_ pdfView: PDFView) {
-    guard let pageNumber = reader.consumeRequestedPage(),
+  /// Applies the view model's navigation request once per request id. The
+  /// coordinator remembers the handled id, so no observable state is mutated
+  /// during a SwiftUI update.
+  private func navigate(_ pdfView: PDFView, coordinator: Coordinator) {
+    guard let navigation = reader.navigation, navigation.id != coordinator.handledNavigationID,
           let document = pdfView.document,
-          let page = document.page(at: pageNumber - 1) else { return }
+          let page = document.page(at: navigation.page - 1) else { return }
+    coordinator.handledNavigationID = navigation.id
     pdfView.go(to: page)
   }
 
@@ -44,6 +49,7 @@ struct PDFKitView: NSViewRepresentable {
   final class Coordinator {
     private let reader: ReaderViewModel
     private var pageObserver: NSObjectProtocol?
+    var handledNavigationID: UUID?
 
     init(reader: ReaderViewModel) { self.reader = reader }
 

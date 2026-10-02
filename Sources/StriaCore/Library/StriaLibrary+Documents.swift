@@ -84,6 +84,24 @@ public extension StriaLibrary {
     }
   }
 
+  /// Removes a document and everything derived from it: the DB rows (pages,
+  /// OCR text, chats), the stored original and the expanded page cache.
+  /// Files are removed after the DB commit, so a crash leaves orphan files
+  /// rather than rows that point at missing files.
+  func removeDocument(id: String) async throws {
+    guard try await store.deleteDocument(id: id) else {
+      throw StriaError.documentNotFound("Document not found: \(id)")
+    }
+    let manager = FileManager.default
+    for url in [paths.original(docId: id), paths.cacheDirectory(docId: id)] where manager.fileExists(atPath: url.path) {
+      do {
+        try manager.removeItem(at: url)
+      } catch {
+        throw StriaError.io("Removed document \(id) from the database but could not delete \(url.path): \(error.localizedDescription)")
+      }
+    }
+  }
+
   func markOpened(documentId: String) async throws {
     try await store.markOpened(documentId: documentId)
   }

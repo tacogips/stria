@@ -34,7 +34,7 @@ public enum StriaCommand {
       let library = try StriaLibrary.open(environment: env)
       let value: any Encodable
       switch invocation.command {
-      case .importPDF, .ocr, .list, .show, .pageImage, .pageText:
+      case .importPDF, .ocr, .list, .show, .remove, .pageImage, .pageText:
         value = try await DocumentCommands.run(invocation.command, library: library, currentDirectory: currentDirectory)
       case .search, .ask, .history:
         value = try await QueryCommands.run(invocation.command, library: library)

@@ -2,7 +2,7 @@
 
 ## Status
 
-Draft (stria v0.1). The layout follows existing macOS PDF readers instead of
+Implemented (stria v0.1). The layout follows existing macOS PDF readers instead of
 inventing new patterns. See [References](#references).
 
 ## Scope
@@ -52,7 +52,11 @@ The reader toolbar contains:
 - To open a document, double-click the row or select it and press Return.
   This sets `last_opened_at`, routes to the reader, and starts background
   cache expansion of all pages.
-- Row context menu: "Run OCR" (pending pages) and "Retry Failed OCR".
+- Row context menu: "Run OCR" (pending pages), "Retry Failed OCR" and
+  "Remove..." (also the Delete key on the selected row). Removal asks for
+  confirmation, names what is deleted (stored copy, page images, OCR text,
+  chat history) and states that the imported file itself is untouched. It
+  calls `StriaLibrary.removeDocument` (`design-storage.md#document-removal`).
 - Import errors (`invalidPDF`, IO) appear in an alert. A failed copy leaves
   no row in the list.
 - An empty library shows the import button and a drop hint.
@@ -70,8 +74,9 @@ active.
   node, in document order, whose page is at or before the current page. If
   the PDF has no outline, the mode shows the flat list "Page 1 ... Page N".
 - **Thumbnails**: a lazy list of page thumbnails rendered from the open
-  `PDFDocument` (`PDFPage.thumbnail(of:for:)`) for visible rows only, each
-  labelled with its page number. The current page is highlighted and kept
+  `PDFDocument` (`PDFPage.thumbnail(of:for:)`) for visible rows only, off the
+  main actor so scanned pages do not stutter the sidebar, each labelled with
+  its page number. The current page is highlighted and kept
   scrolled into view. Clicking a thumbnail navigates to that page.
 - **Search**: submitting the toolbar search field (Return) runs the shared
   OCR search scoped to the open document (`design-storage.md#search`). The
@@ -90,8 +95,12 @@ active.
   `ReaderViewModel.currentPage` (1-based).
 - Programmatic navigation (outline, thumbnail, search result, citation chip,
   history entry, page field, Go to Page) sets
-  `ReaderViewModel.requestedPage`. The wrapper calls `go(to:)` and then clears
-  the request, which avoids feedback loops.
+  `ReaderViewModel.navigation` to a `PageNavigation {id, page}` with a fresh
+  id. The wrapper's coordinator remembers the last handled id and calls
+  `go(to:)` once per id, so repeated requests for the same page work and no
+  observable state is mutated during a SwiftUI update (which would otherwise
+  trigger feedback loops and runtime warnings). `requestedPage` is a
+  read-only view of `navigation?.page`.
 - Page jump works three ways:
   - the toolbar `n of N` field, committed with Return;
   - Go > Go to Page... (`Cmd-Opt-G`), which opens a small sheet with a number
@@ -126,8 +135,11 @@ active.
   this page", "Explain the key terms on this page" and "What should I read
   next to understand this?". Clicking one sends it.
 - Input: a multi-line text field. Send with the Send button or
-  `Cmd-Return`. Sending is disabled while a request is in flight, during
-  which a progress indicator shows. "New Chat" starts a new thread. A thread
+  `Cmd-Return`. Sending is disabled while a request is in flight. During the
+  request an assistant bubble with a small progress indicator shows the
+  answer as it streams (`AgentPaneViewModel.streamingAnswer`); when the
+  answer completes, the bubble is replaced by the persisted transcript
+  message. "New Chat" starts a new thread. A thread
   is anchored to the page that was current at its first question.
 - `unavailable` errors (for example, a credential env var is unset) show an
   inline notice naming the reason and are not persisted.

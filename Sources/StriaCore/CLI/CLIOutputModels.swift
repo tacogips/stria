@@ -53,6 +53,11 @@ public struct OCROutput: Encodable {
 
 public struct ListOutput: Encodable { public let documents: [DocumentSummary] }
 
+public struct RemoveOutput: Encodable {
+  public let docId: String
+  public let removed: Bool
+}
+
 public struct ShowDocumentOutput: Encodable {
   public let id: String
   public let title: String

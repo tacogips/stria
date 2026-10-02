@@ -2,7 +2,7 @@
 
 ## Status
 
-Draft (stria v0.1). Replaces the scaffold CLI usage.
+Implemented (stria v0.1). Replaces the scaffold CLI usage.
 
 ## Purpose
 
@@ -94,6 +94,21 @@ even if some pages failed, and exits 4 when the service is unavailable.
 `{"document": DocumentSummary + {sha256, byteSize, renderDpi, imageFormat,
 ocrVendor, ocrModel}, "outline": [OutlineNode]}`
 
+### `stria remove <docId>`
+
+Deletes the document row (pages, OCR text, FTS rows, chat threads and
+messages cascade; `agent_runs` rows keep their data with `document_id`
+set to null), then removes `originals/<docId>.pdf` and `cache/<docId>/`.
+The file that was originally imported is not touched. The DB row goes first,
+so an interrupted removal leaves orphan files, never rows that point at
+missing files.
+
+```json
+{"docId": "...", "removed": true}
+```
+
+Unknown ids exit 3 (`documentNotFound`).
+
 ### `stria page image <docId> <page> [--output <path>]`
 
 Expands the stored image to PNG, either into the cache or only to the
@@ -121,7 +136,8 @@ file was written now or when `--output` is used.
 ```
 
 `imagePath` is where `stria page image` puts the PNG, and `imageCached` says
-whether that file already exists. Search semantics are in
+whether that file already exists. In `like` mode `score` is the number of
+times the terms occur on the page. Search semantics are in
 `design-storage.md#search`.
 
 ### `stria ask <question> [--doc <docId>] [--page <n>] [--query <terms>] [--limit <n>]`

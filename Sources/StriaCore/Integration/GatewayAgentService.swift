@@ -9,7 +9,7 @@ public struct GatewayAgentService: AgentService {
     self.environment = environment
   }
 
-  public func ask(_ request: AgentRequest) async throws -> AgentAnswer {
+  public func ask(_ request: AgentRequest, onChunk: @escaping AnswerChunkHandler) async throws -> AgentAnswer {
     let preflight = try GatewayPreflight.check(request.settings, environment: environment)
     let text = try await GatewayPromptRunner().run(
       settings: request.settings,
@@ -17,7 +17,8 @@ public struct GatewayAgentService: AgentService {
       parts: GatewayPromptParts.agentParts(request),
       cwd: paths.cache,
       environment: environment,
-      secretValue: preflight.secretValue
+      secretValue: preflight.secretValue,
+      onChunk: onChunk
     )
     return AgentAnswer(text: text)
   }

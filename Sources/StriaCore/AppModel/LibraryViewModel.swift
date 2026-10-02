@@ -95,6 +95,18 @@ public final class LibraryViewModel {
     }
   }
 
+  public func remove(documentId: String) async {
+    do {
+      try await library.removeDocument(id: documentId)
+      unavailableReasons[documentId] = nil
+      renderedPages[documentId] = nil
+      if selectedID == documentId { selectedID = nil }
+      await refresh()
+    } catch {
+      alert = error.localizedDescription
+    }
+  }
+
   public func waitForImports() async {
     while !importTasks.isEmpty {
       let tasks = Array(importTasks.values)

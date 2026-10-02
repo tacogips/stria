@@ -2,7 +2,7 @@
 
 ## Status
 
-Draft (stria v0.1).
+Implemented (stria v0.1).
 
 ## Data Root Layout
 
@@ -239,7 +239,10 @@ Search is shared by `stria search`, ask retrieval and the app's search mode.
   a two-character Japanese word):
   - match: every term must match `pages.search_text LIKE '%term%' ESCAPE '\'`,
     with `%`, `_` and `\` escaped;
-  - order: `document_id, page_number`, and `score = 0`;
+  - order: `score` descending, then `document_id, page_number`, where
+    `score` is the summed occurrence count of every term in `search_text`
+    (computed in SQL with `LENGTH`/`REPLACE` on the lowercased text, so it
+    folds ASCII case the same way LIKE does);
   - snippet: computed in Swift as up to 40 characters on either side of the
     first match, with the term wrapped in `[` `]`.
 - An empty query is a `usageError`. Options: a `docId` filter, and `limit`
@@ -268,6 +271,16 @@ retrieval query built from the question:
   per trigram summed in SQL), ordered by score descending, then
   `document_id, page_number`.
 - If no token has 3 or more characters, `like` mode is used with the tokens.
+
+## Document Removal
+
+`StriaStore.deleteDocument(id:)` deletes the `page_fts` rows (FTS tables do
+not cascade) and the `documents` row in one transaction; `pages`,
+`chat_threads` and `chat_messages` cascade and `agent_runs.document_id`
+becomes null. `StriaLibrary.removeDocument(id:)` then deletes
+`originals/<docId>.pdf` and `cache/<docId>/`. The CLI exposes it as
+`stria remove`, and the library screen as a context-menu action (and the
+Delete key) behind a confirmation dialog.
 
 ## Chat History Queries
 

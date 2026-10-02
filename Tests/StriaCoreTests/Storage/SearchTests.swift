@@ -91,6 +91,22 @@ import Testing
     }
   }
 
+  @Test func likeRanksPagesByOccurrenceCount() async throws {
+    try await withTestDataRoot { paths in
+      let store = try openStorage(paths: paths, like: true)
+      try await store.insertDocument(storageDocument("doc"))
+      for (page, text) in [(1, "学習 once"), (2, "学習 学習 学習 three times"), (3, "nothing"), (4, "学習 学習 twice")] {
+        try await store.insertPage(documentId: "doc", pageNumber: page, image: storageImage())
+        try await store.recordOCRSuccess(documentId: "doc", page: page, text: text, vendor: "test", model: nil,
+                                         run: storageRun("rank-\(page)", documentId: "doc", page: page))
+      }
+      let result = try await store.search(text: "学習", documentId: nil, limit: 10)
+      #expect(result.matchMode == .like)
+      #expect(result.hits.map(\.page) == [2, 4, 1])
+      #expect(result.hits.map(\.score) == [3, 2, 1])
+    }
+  }
+
   @Test func likeSnippetBracketsTheLiteralMatch() async throws {
     try await withTestDataRoot { paths in
       let store = try openStorage(paths: paths, like: true)

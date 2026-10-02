@@ -66,12 +66,18 @@ struct AgentPaneView: View {
             }
             .id(message.id)
           }
-          if agent.inFlight { ProgressView().frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal) }
+          if agent.inFlight {
+            StreamingAnswerView(text: agent.streamingAnswer ?? "")
+              .id("streaming")
+          }
         }
         .padding(.vertical, 8)
       }
       .onChange(of: agent.transcript.count) { _, _ in
         if let id = agent.transcript.last?.id { withAnimation { proxy.scrollTo(id, anchor: .bottom) } }
+      }
+      .onChange(of: agent.streamingAnswer) { _, answer in
+        if answer != nil { proxy.scrollTo("streaming", anchor: .bottom) }
       }
     }
   }
@@ -146,6 +152,28 @@ private struct MessageView: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(10)
     .background(message.role == .user ? Color.accentColor.opacity(0.08) : Color.secondary.opacity(0.06))
+    .clipShape(RoundedRectangle(cornerRadius: 8))
+    .padding(.horizontal)
+  }
+}
+
+/// The assistant bubble while an answer is still arriving.
+private struct StreamingAnswerView: View {
+  let text: String
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      HStack(spacing: 6) {
+        Text("Assistant").font(.caption.bold()).foregroundStyle(.secondary)
+        ProgressView().controlSize(.mini)
+      }
+      if !text.isEmpty {
+        Text(text).textSelection(.enabled)
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(10)
+    .background(Color.secondary.opacity(0.06))
     .clipShape(RoundedRectangle(cornerRadius: 8))
     .padding(.horizontal)
   }

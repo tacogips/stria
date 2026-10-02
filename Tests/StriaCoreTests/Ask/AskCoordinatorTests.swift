@@ -61,6 +61,20 @@ import Testing
     }
   }
 
+  @Test func streamedChunksConcatenateToTheAnswer() async throws {
+    try await withTestDataRoot { paths in
+      _ = try await prepareAskDocument(paths: paths, id: "doc", texts: [1: "OCR text"])
+      let fake = FakeAgentService()
+      await fake.enqueue(.success("streamed answer [doc p.1]"))
+      let library = try StriaLibrary.open(environment: makeTestEnvironment(paths: paths, agent: fake))
+      let chunks = ChunkRecorder()
+      let request = AskRequest(question: "What?", context: .page(docId: "doc", page: 1)) { chunks.append($0) }
+      let response = try await library.ask(request)
+      #expect(chunks.joined() == response.answer)
+      #expect(chunks.count == 2)
+    }
+  }
+
   @Test func documentAnchorAndTextBudgetAreHonored() async throws {
     try await withTestDataRoot { paths in
       var config = StriaConfig.defaults
@@ -75,4 +89,12 @@ import Testing
       #expect(contexts?.map(\.ocrText) == ["12345678", "ab"])
     }
   }
+}
+
+private final class ChunkRecorder: @unchecked Sendable {
+  private let lock = NSLock()
+  private var chunks: [String] = []
+  func append(_ chunk: String) { lock.lock(); chunks.append(chunk); lock.unlock() }
+  func joined() -> String { lock.lock(); defer { lock.unlock() }; return chunks.joined() }
+  var count: Int { lock.lock(); defer { lock.unlock() }; return chunks.count }
 }

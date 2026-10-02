@@ -15,6 +15,7 @@ public enum CLICommand: Equatable, Sendable {
   case ocr(docId: String, pages: String?, retryFailed: Bool)
   case list
   case show(docId: String)
+  case remove(docId: String)
   case pageImage(docId: String, page: Int, output: String?)
   case pageText(docId: String, page: Int)
   case search(query: String, docId: String?, limit: Int?)

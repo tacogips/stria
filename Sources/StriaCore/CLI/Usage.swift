@@ -9,6 +9,7 @@ public enum Usage {
     ocr <docId> [--pages <list>] [--retry-failed]
     list
     show <docId>
+    remove <docId>
     page image <docId> <page> [--output <path>]
     page text <docId> <page>
     search <query> [--doc <docId>] [--limit <n>]

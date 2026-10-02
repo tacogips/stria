@@ -6,6 +6,7 @@ struct LibraryView: View {
   @Bindable var model: AppModel
   @FocusedValue(\.striaImport) private var importAction
   @State private var selection: String?
+  @State private var pendingRemoval: LibraryRow?
 
   var body: some View {
     List(selection: $selection) {
@@ -29,6 +30,8 @@ struct LibraryView: View {
               Divider()
               Button("Run OCR") { Task { await model.library.runOCR(documentId: row.id, retryFailed: false) } }
               Button("Retry Failed OCR") { Task { await model.library.runOCR(documentId: row.id, retryFailed: true) } }
+              Divider()
+              Button("Remove…", role: .destructive) { pendingRemoval = row }
             }
         }
       }
@@ -37,6 +40,10 @@ struct LibraryView: View {
       guard let selection else { return .ignored }
       open(selection)
       return .handled
+    }
+    .onDeleteCommand {
+      guard let selection, let row = model.library.rows.first(where: { $0.id == selection }) else { return }
+      pendingRemoval = row
     }
     .dropDestination(for: URL.self) { urls, _ in
       importDropped(urls)
@@ -57,6 +64,16 @@ struct LibraryView: View {
       Text(model.library.alert ?? "")
     }
     .onChange(of: model.library.selectedID) { _, id in selection = id }
+    .confirmationDialog(
+      "Remove \"\(pendingRemoval?.title ?? "")\"?",
+      isPresented: Binding(get: { pendingRemoval != nil }, set: { if !$0 { pendingRemoval = nil } }),
+      presenting: pendingRemoval
+    ) { row in
+      Button("Remove", role: .destructive) { Task { await model.library.remove(documentId: row.id) } }
+      Button("Cancel", role: .cancel) {}
+    } message: { _ in
+      Text("This deletes the stored copy, page images, OCR text and chat history for this document. The file you imported is not touched.")
+    }
   }
 
   private func open(_ id: String) {

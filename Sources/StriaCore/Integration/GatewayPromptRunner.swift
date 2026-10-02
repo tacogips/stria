@@ -10,7 +10,8 @@ struct GatewayPromptRunner {
     parts: [PromptPart],
     cwd: URL,
     environment: [String: String],
-    secretValue: String?
+    secretValue: String?,
+    onChunk: AnswerChunkHandler? = nil
   ) async throws(ServiceError) -> String {
     guard let vendor = GatewayVendor(rawValue: settings.vendor) else {
       throw .unavailable("unknown vendor \(settings.vendor)")
@@ -35,11 +36,23 @@ struct GatewayPromptRunner {
           content.append(contentsOf: try gatewayImageContentBlocks([.filePath(url.path)]))
         }
       }
-      let result = try await client.promptCollecting(ACPPromptRequest(sessionId: session.sessionId, prompt: content))
-      guard result.response.stopReason == .endTurn else {
-        throw ServiceError.failed("stop reason: \(result.response.stopReason.rawValue)")
+      let request = ACPPromptRequest(sessionId: session.sessionId, prompt: content)
+      var messageText = ""
+      var stopReason: ACPStopReason?
+      for try await event in client.promptStream(request) {
+        switch event {
+        case .update(.agentMessageChunk(.text(let chunk))):
+          messageText += chunk.text
+          onChunk?(chunk.text)
+        case .update:
+          break
+        case .response(let response):
+          stopReason = response.stopReason
+        }
       }
-      return result.messageText
+      guard let stopReason else { throw ServiceError.failed("prompt stream ended without a response") }
+      guard stopReason == .endTurn else { throw ServiceError.failed("stop reason: \(stopReason.rawValue)") }
+      return messageText
     } catch let error as ServiceError {
       throw error
     } catch {

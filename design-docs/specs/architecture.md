@@ -2,9 +2,8 @@
 
 ## Status
 
-Accepted (stria v0.1 design, commit `72246dd`). Replaces the ign scaffold
-description. Wave 1 is implemented and accepted. Wave 2 code exists but is not
-accepted. See [Implementation Rollout](#implementation-rollout).
+Implemented (stria v0.1). Replaces the ign scaffold description. See
+[Implementation Status](#implementation-status).
 
 ## Overview
 
@@ -171,16 +170,17 @@ Required test coverage:
 | Secrets | error redaction replaces the resolved value; no secret value appears in config, DB, logs or JSON output |
 | View models | jump parsing and clamping; current outline node; last-read restore; scope indicator; citation chip parsing; history modes |
 
-## Implementation Rollout
+## Implementation Status
 
-Status: wave 1 is done in commit `2ea8582`. It covers P01 (foundation
-contracts: `Paths/`, `Config/`, `Errors/`, `Models/`, the `OCRService` and
-`AgentService` protocols, `StriaEnvironment`, test fakes and the sample PDF
-factory) and P02 (the rename below). The remaining plans P03-P11 build on
-those contracts and do not redefine them. Their dependency order is:
+All v0.1 plans (P01-P11) are implemented, reviewed and merged on `main`;
+their plan files live under `impl-plans/completed/`. The build order they
+followed is kept here because it still describes the dependency structure of
+the modules:
 
 | Plan | Scope | Depends on |
 | --- | --- | --- |
+| P01 | Foundation contracts: `Paths/`, `Config/`, `Errors/`, `Models/`, the `OCRService` and `AgentService` protocols, `StriaEnvironment`, test fakes, sample PDF factory | - |
+| P02 | Repository rename (below) | - |
 | P03 | `Storage/` (SQLite wrapper, migration 1, search backend, queries), `StriaLibrary` core | P01 |
 | P04 | `Import/` renderer and image codec, `Cache/` | P01 |
 | P05 | `Integration/` (gateway services, run recorder, redaction), `pdf-text-layer` | P01 |
@@ -191,28 +191,8 @@ those contracts and do not redefine them. Their dependency order is:
 | P10 | `AppModel/` view models | P07, P08 |
 | P11 | `StriaApp` SwiftUI views and PDFKit wrapper | P10 |
 
-Wave 2 status: commit `0082491` contains unreviewed code for P03-P06. `swift
-build` passes, swiftlint reports 0 violations, and `swift test` has 7
-failures out of 51. Those plans are re-issued as stabilization plans. Each
-one fixes the failing tests it owns by fixing behaviour, finishes any
-requirement from its original plan text that is still missing, and passes
-the test-integrity and adversarial review gates before acceptance. The
-known failures and their design-level fixes:
-
-| Owner | Failing tests | Fix (design rule) |
-| --- | --- | --- |
-| P04 | `IdentityTests`, `InspectorTests`, `OutlineTests`, `RenderCodecTests` | `withTestDataRoot` creates the root first ([Testing Strategy](#testing-strategy)). P04 owns `Tests/StriaCoreTests/Support/` in the stabilization wave |
-| P03 | `SearchQueryBuilderTests.quotingTrigramsAndSnippets` | The builder already follows the dedup-then-cap rule (`design-storage.md#fuzzy-retrieval-ask`). The test's cap case is corrected to use a question with more than 64 distinct trigrams, and the test also asserts that the repeated question yields exactly 4 |
-| P05 | `LiveRoutingTests.routesPDFTextLayerOffline` | `pdf-text-layer` NFKC-normalizes the extracted text (`design-agent-integration.md#pdf-text-layer-local-service`). The assertion is unchanged |
-
-P07-P11 start only after the P03-P06 stabilization wave passes `swift build
---build-tests` and `swift test`. Because every plan shares the one
-`StriaCoreTests` target, an implementer finishes only after `swift build
---build-tests` passes with its own files and its focused tests have been
-re-run at the end of its run. If another plan's file breaks the build, the
-implementer waits and re-runs before reporting a blocker.
-
-Rules for every plan and dispatch manifest:
+Rules for future plans and dispatch manifests run through the riela
+workflow:
 
 - `writePaths`, `sharedPaths` and `trackedPaths` list only repository source
   paths (`Sources/`, `Tests/`, `scripts/`, `design-docs/`, `impl-plans/`,
@@ -222,14 +202,17 @@ Rules for every plan and dispatch manifest:
   or any directory that contains a nested `.git`. The agent-gateway API is
   referenced through `../references/agent-gateway-c7f2697.md`.
 - Within one wave, plans have disjoint `writePaths`. A file that two plans
-  need (for example `Tests/StriaCoreTests/Support/`) has one owner per wave.
+  need has one owner per wave.
+- Because every plan shares the one `StriaCoreTests` target, an implementer
+  finishes only after `swift build --build-tests` passes with its own files
+  and its focused tests have been re-run at the end of its run.
 - Declared paths stay small: each file is at most 8 MB and the total at most
   64 MB. Test PDFs and page images are generated at test time in temp
   directories and are never committed.
 
 ## Rename and Repository Changes
 
-Done in wave 1 (`2ea8582`). Every `KaibaViewer` / `kaiba-viewer` name became
+Done (`2ea8582`). Every `KaibaViewer` / `kaiba-viewer` name became
 `stria`:
 
 - `Package.swift`, `Sources/`, `Tests/`; `Command.swift` becomes `StriaCommand`

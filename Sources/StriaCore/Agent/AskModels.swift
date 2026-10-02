@@ -13,13 +13,17 @@ public struct AskRequest: Sendable {
   public var retrievalQuery: String?
   public var limit: Int?
   public var threadId: String?
+  /// Receives the answer as it streams. Optional; the CLI leaves it nil.
+  public var onChunk: AnswerChunkHandler?
 
-  public init(question: String, context: AskContext, retrievalQuery: String? = nil, limit: Int? = nil, threadId: String? = nil) {
+  public init(question: String, context: AskContext, retrievalQuery: String? = nil, limit: Int? = nil,
+              threadId: String? = nil, onChunk: AnswerChunkHandler? = nil) {
     self.question = question
     self.context = context
     self.retrievalQuery = retrievalQuery
     self.limit = limit
     self.threadId = threadId
+    self.onChunk = onChunk
   }
 }
 

@@ -50,6 +50,10 @@ public enum CommandLineParser {
       let parsed = try options(arguments, flags: [], values: [], command: command)
       try requirePositionals(parsed.positionals, count: 1, command: command)
       return .show(docId: parsed.positionals[0])
+    case "remove":
+      let parsed = try options(arguments, flags: [], values: [], command: command)
+      try requirePositionals(parsed.positionals, count: 1, command: command)
+      return .remove(docId: parsed.positionals[0])
     case "page":
       guard let subcommand = arguments.first else { throw .usage("page requires image or text") }
       let rest = Array(arguments.dropFirst())

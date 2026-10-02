@@ -55,14 +55,24 @@ extension StriaStore {
     return hits
   }
 
+  /// LIKE mode ranks pages by how many times the terms occur on the page
+  /// (`lower()` keeps the count consistent with LIKE's ASCII case folding).
   private func likeSearch(terms: [String], documentId: String?, limit: Int) throws -> [SearchHit] {
     let predicates = Array(repeating: "p.search_text LIKE ? ESCAPE '\\'", count: terms.count).joined(separator: " AND ")
+    let occurrences = Array(repeating: "(LENGTH(p.search_text)-LENGTH(REPLACE(lower(p.search_text),lower(?),'')))/LENGTH(?)",
+                            count: terms.count).joined(separator: "+")
     let statement = try database.prepare("""
-      SELECT d.id,d.title,p.page_number,p.search_text FROM pages p JOIN documents d ON d.id=p.document_id
+      SELECT d.id,d.title,p.page_number,p.search_text,\(occurrences) AS score
+      FROM pages p JOIN documents d ON d.id=p.document_id
       WHERE \(predicates) \(documentId == nil ? "" : "AND p.document_id=?")
-      ORDER BY p.document_id,p.page_number LIMIT ?
+      ORDER BY score DESC,p.document_id,p.page_number LIMIT ?
       """)
     var index: Int32 = 1
+    for term in terms {
+      try statement.bind(term, at: index)
+      try statement.bind(term, at: index + 1)
+      index += 2
+    }
     for term in terms { try statement.bind(SearchQueryBuilder.likePattern(term: term), at: index); index += 1 }
     if let documentId { try statement.bind(documentId, at: index); index += 1 }
     try statement.bind(limit, at: index)
@@ -70,7 +80,7 @@ extension StriaStore {
     while try statement.step() {
       guard let doc = statement.string(0), let title = statement.string(1), let text = statement.string(3) else { continue }
       hits.append(SearchHit(docId: doc, title: title, page: statement.int(2),
-                            snippet: SearchQueryBuilder.swiftSnippet(text: text, term: terms[0]), score: 0))
+                            snippet: SearchQueryBuilder.swiftSnippet(text: text, term: terms[0]), score: statement.double(4)))
     }
     return hits
   }

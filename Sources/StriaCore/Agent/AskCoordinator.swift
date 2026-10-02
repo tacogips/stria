@@ -35,7 +35,7 @@ struct AskCoordinator: Sendable {
 
     let answer: AgentAnswer
     do {
-      answer = try await environment.agentService.ask(agentRequest)
+      answer = try await environment.agentService.ask(agentRequest, onChunk: request.onChunk ?? { _ in })
     } catch let error as ServiceError {
       try await handle(error, request: request, refs: refs, threadId: threadId, newThread: thread,
                        runId: runId, settings: settings, startedAt: startedAt)

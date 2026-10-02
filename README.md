@@ -73,9 +73,10 @@ A gateway OCR reply that is empty, or that says no image was received, is record
 - `stria ocr <docId> [--pages <list>] [--retry-failed]`: run or retry page OCR
 - `stria list`: list imported PDFs and OCR progress
 - `stria show <docId>`: show document metadata and outline
+- `stria remove <docId>`: delete a document with its stored copy, page images, OCR text and chat history
 - `stria page image <docId> <page> [--output <path>]`: expand and return a page PNG path
 - `stria page text <docId> <page>`: return page OCR text
-- `stria search <query> [--doc <docId>] [--limit <n>]`: search OCR text across PDFs or within one PDF
+- `stria search <query> [--doc <docId>] [--limit <n>]`: search OCR text across PDFs or within one PDF; terms shorter than 3 characters use LIKE matching ranked by occurrence count
 - `stria ask <question> [--doc <docId>] [--page <n>] [--query <terms>] [--limit <n>]`: retrieve context pages and ask the configured agent; `--page` requires `--doc`, and `--limit` caps the context pages
 - `stria history [--doc <docId>] [--page <n>] [--limit <n>]`: read saved conversations
 - `stria config get [<key>]` / `stria config set <key> <value>`: inspect or edit configuration

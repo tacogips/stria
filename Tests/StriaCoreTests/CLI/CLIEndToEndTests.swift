@@ -40,6 +40,23 @@ import Testing
       #expect(try json(ask.stdout)["answer"]?.stringValue != nil)
       let history = await execute(["history", "--doc", idB, "--page", "2"], home: home, paths: paths, ocr: ocr, agent: agent)
       #expect(try json(history.stdout)["messages"]?.arrayValue?.count == 2)
+
+      let homePaths = StriaPaths(root: home)
+      #expect(FileManager.default.fileExists(atPath: homePaths.original(docId: idB).path))
+      #expect(FileManager.default.fileExists(atPath: homePaths.cacheDirectory(docId: idB).path))
+      let removed = await execute(["remove", idB], home: home, paths: paths, ocr: ocr, agent: agent)
+      #expect(removed.exitCode == 0)
+      #expect(try json(removed.stdout)["removed"] == .bool(true))
+      #expect(!FileManager.default.fileExists(atPath: homePaths.original(docId: idB).path))
+      #expect(!FileManager.default.fileExists(atPath: homePaths.cacheDirectory(docId: idB).path))
+      let listAfter = await execute(["list"], home: home, paths: paths, ocr: ocr, agent: agent)
+      #expect(try json(listAfter.stdout)["documents"]?.arrayValue?.count == 1)
+      let missing = await execute(["remove", idB], home: home, paths: paths, ocr: ocr, agent: agent)
+      #expect(missing.exitCode == 3)
+      let historyAfter = await execute(["history", "--doc", idB], home: home, paths: paths, ocr: ocr, agent: agent)
+      #expect(historyAfter.exitCode == 3)
+      let allHistory = await execute(["history"], home: home, paths: paths, ocr: ocr, agent: agent)
+      #expect(try json(allHistory.stdout)["messages"]?.arrayValue?.isEmpty == true)
     }
   }
 }

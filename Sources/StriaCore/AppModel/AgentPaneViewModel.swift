@@ -20,6 +20,8 @@ public final class AgentPaneViewModel {
   public private(set) var threadId: String?
   public private(set) var transcript: [ChatMessageRecord] = []
   public private(set) var inFlight = false
+  /// The partial answer while a request streams; nil otherwise.
+  public private(set) var streamingAnswer: String?
   public var notice: String?
   public var historyMode: HistoryMode = .page
   public private(set) var history: [ChatMessageRecord] = []
@@ -76,8 +78,12 @@ public final class AgentPaneViewModel {
       context = .document(docId: reader.documentId, anchorPage: reader.currentPage)
     }
 
+    streamingAnswer = ""
+    let request = AskRequest(question: question, context: context, threadId: requestThreadId) { [weak self] chunk in
+      Task { @MainActor in self?.appendStreamedChunk(chunk) }
+    }
     do {
-      _ = try await library.ask(AskRequest(question: question, context: context, threadId: requestThreadId))
+      _ = try await library.ask(request)
       input = ""
       await reloadTranscript()
       await reloadHistory()
@@ -89,7 +95,13 @@ public final class AgentPaneViewModel {
     } catch {
       notice = error.localizedDescription
     }
+    streamingAnswer = nil
     inFlight = false
+  }
+
+  private func appendStreamedChunk(_ chunk: String) {
+    guard inFlight else { return }
+    streamingAnswer = (streamingAnswer ?? "") + chunk
   }
 
   public func send(suggestion: String) async {

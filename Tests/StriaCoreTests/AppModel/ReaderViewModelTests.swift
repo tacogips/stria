@@ -9,23 +9,27 @@ import Testing
     let imported = try await library.importDocument(at: source, runOCR: false)
     let reader = ReaderViewModel(library: library, documentId: imported.document.id, debounce: .milliseconds(10))
     try await reader.open()
-    #expect(reader.consumeRequestedPage() == 1)
+    #expect(reader.requestedPage == 1)
+    let opened = reader.navigation
     reader.previousPage()
-    #expect(reader.requestedPage == nil)
+    #expect(reader.navigation == opened)
     reader.pageFieldText = "7"
     reader.commitPageField()
     #expect(reader.requestedPage == 5)
-    #expect(reader.consumeRequestedPage() == 5)
-    #expect(reader.requestedPage == nil)
+    #expect(reader.navigation != opened)
+    let clamped = reader.navigation
     reader.pageFieldText = "abc"
     reader.commitPageField()
-    #expect(reader.requestedPage == nil)
+    #expect(reader.navigation == clamped)
     #expect(reader.pageFieldText == "1")
     reader.pageDidChange(to: 5)
     reader.nextPage()
-    #expect(reader.requestedPage == nil)
+    #expect(reader.navigation == clamped)
     reader.previousPage()
     #expect(reader.requestedPage == 4)
+    reader.goToPage(4)
+    #expect(reader.requestedPage == 4)
+    #expect(reader.navigation?.id != clamped?.id)
     await reader.close()
   }
 }

@@ -32,7 +32,7 @@ struct ThumbnailListView: View {
             }
             .buttonStyle(.plain)
             .id(pageNumber)
-            .task { loadThumbnail(pageNumber) }
+            .task { await loadThumbnail(pageNumber) }
           }
         }
         .padding(8)
@@ -43,9 +43,17 @@ struct ThumbnailListView: View {
     }
   }
 
-  private func loadThumbnail(_ pageNumber: Int) {
+  /// Renders off the main actor: PDFKit page drawing is thread-safe, and a
+  /// scanned page can take long enough to stutter the sidebar otherwise.
+  private func loadThumbnail(_ pageNumber: Int) async {
     guard thumbnails[pageNumber] == nil,
           let page = reader.pdfDocument?.page(at: pageNumber - 1) else { return }
-    thumbnails[pageNumber] = page.thumbnail(of: CGSize(width: 120, height: 160), for: .cropBox)
+    nonisolated(unsafe) let unsafePage = page
+    let rendered = await Task.detached(priority: .utility) {
+      nonisolated(unsafe) let image = unsafePage.thumbnail(of: CGSize(width: 120, height: 160), for: .cropBox)
+      return image
+    }.value
+    guard !Task.isCancelled else { return }
+    thumbnails[pageNumber] = rendered
   }
 }

@@ -30,6 +30,9 @@ enum DocumentCommands {
         imageFormat: record.imageFormat, ocrVendor: record.ocrVendor, ocrModel: record.ocrModel
       )
       return ShowOutput(document: shown, outline: try await library.outline(documentId: docId))
+    case .remove(let docId):
+      try await library.removeDocument(id: docId)
+      return RemoveOutput(docId: docId, removed: true)
     case .pageImage(let docId, let page, let output):
       let destination = output.map { resolve($0, relativeTo: currentDirectory) }
       let result = try await library.pageImage(documentId: docId, page: page, output: destination)

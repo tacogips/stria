@@ -23,6 +23,22 @@ import Testing
   }
 }
 
+@Test func removeDeletesRowAndClearsSelection() async throws {
+  try await withAppModelDataRoot { paths in
+    let (library, source) = try makeAppModelFixture(paths: paths, pageTexts: ["one"])
+    let imported = try await library.importDocument(at: source, runOCR: false)
+    let model = LibraryViewModel(library: library)
+    await model.refresh()
+    model.selectedID = imported.document.id
+    await model.remove(documentId: imported.document.id)
+    #expect(model.rows.isEmpty)
+    #expect(model.selectedID == nil)
+    #expect(model.alert == nil)
+    await model.remove(documentId: imported.document.id)
+    #expect(model.alert != nil)
+  }
+}
+
 @Test func runOCRRetriesFailedPagesWhenRequested() async throws {
   try await withAppModelDataRoot { paths in
     let ocr = FakeOCRService()

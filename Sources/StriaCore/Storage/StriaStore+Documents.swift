@@ -65,6 +65,22 @@ extension StriaStore {
     guard database.changes > 0 else { throw StriaError.documentNotFound("Document not found: \(documentId)") }
   }
 
+  /// Deletes the document row. Pages, chat threads and messages cascade;
+  /// agent runs keep their rows with `document_id` set to null.
+  public func deleteDocument(id: String) throws -> Bool {
+    try database.transaction {
+      if searchBackend == .fts5 {
+        let fts = try database.prepare("DELETE FROM page_fts WHERE document_id=?")
+        try fts.bind(id, at: 1)
+        _ = try fts.step()
+      }
+      let statement = try database.prepare("DELETE FROM documents WHERE id=?")
+      try statement.bind(id, at: 1)
+      _ = try statement.step()
+      return database.changes > 0
+    }
+  }
+
   public func markOpened(documentId: String) throws {
     let statement = try database.prepare("UPDATE documents SET last_opened_at=?,updated_at=? WHERE id=?")
     let now = nowString()

@@ -20,4 +20,15 @@ public struct AgentAnswer: Equatable, Sendable {
   public var text: String
   public init(text: String) { self.text = text }
 }
-public protocol AgentService: Sendable { func ask(_ request: AgentRequest) async throws -> AgentAnswer }
+/// Receives answer text as it streams in. Chunks concatenate to the final answer.
+public typealias AnswerChunkHandler = @Sendable (String) -> Void
+
+public protocol AgentService: Sendable {
+  /// Asks the model. `onChunk` is called with each streamed piece of the
+  /// answer; services that cannot stream call it once with the whole text.
+  func ask(_ request: AgentRequest, onChunk: @escaping AnswerChunkHandler) async throws -> AgentAnswer
+}
+
+public extension AgentService {
+  func ask(_ request: AgentRequest) async throws -> AgentAnswer { try await ask(request) { _ in } }
+}
