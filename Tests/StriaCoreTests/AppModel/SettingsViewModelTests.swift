@@ -80,3 +80,13 @@ import Testing
   }
 }
 }
+
+@Suite struct AppearanceTests {
+  @Test func lightIsDefaultAndToggleAlwaysChangesScheme() {
+    #expect(Appearance.default == .light)
+    #expect(Appearance.light.toggled == .dark)
+    #expect(Appearance.dark.toggled == .light)
+    #expect(Appearance.system.toggled == .dark)
+    #expect(Appearance(rawValue: "light") == .light)
+  }
+}

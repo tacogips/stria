@@ -110,6 +110,7 @@ Single keys, in the style of chilla, that pause while a text field is being edit
 - `Shift+L` / `Shift+R`: collapse or expand the left pane / the agent pane
 - `/`: focus the agent chat input
 - `Ctrl+D` / `Ctrl+U`: page the PDF down / up; `j` / `k`: scroll one line
+- `Shift+D`: toggle light and dark mode (light is the default; Settings > Appearance also offers "System")
 - `?` (or Help > Keyboard Shortcuts, `Cmd-/`): show the full list, including the menu shortcuts (`Cmd-Opt-G` go to page, `Cmd-Opt-Up/Down` previous/next page, `Cmd-+`/`Cmd--` zoom, `Cmd-Return` send, `Cmd-.` cancel, `Cmd-Shift-L` library)
 
 ## Packaging

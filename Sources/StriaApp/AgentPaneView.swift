@@ -132,7 +132,7 @@ struct AgentPaneView: View {
     HStack(alignment: .bottom, spacing: 8) {
       TextField("Ask about this PDF…", text: $agent.input, axis: .vertical)
         .lineLimit(2...6)
-        .textFieldStyle(.roundedBorder)
+        .textFieldStyle(FlatTextFieldStyle())
         .focused($inputFocused)
         .onSubmit { agent.submit() }
       if agent.inFlight {
@@ -211,10 +211,10 @@ private struct MessageView: View {
       VStack(alignment: .leading, spacing: 6) {
         Text(isUser ? "You" : "Assistant")
           .font(.caption.bold())
-          .foregroundStyle(.secondary)
+          .foregroundStyle(isUser ? Flat.userBubbleText.opacity(0.85) : Color.secondary)
         Text(Self.attributedContent(message.content, documentId: documentId))
           .textSelection(.enabled)
-          .foregroundStyle(message.status == .error ? Color.red : Color.primary)
+          .foregroundStyle(message.status == .error ? Color.red : (isUser ? Flat.userBubbleText : Color.primary))
           .environment(\.openURL, OpenURLAction { url in
             guard url.scheme == Self.citationScheme, let page = Int(url.host() ?? "") else { return .systemAction }
             onCitation(page)
@@ -222,8 +222,8 @@ private struct MessageView: View {
           })
       }
       .padding(10)
-      .background(isUser ? Color.accentColor.opacity(0.18) : Color.secondary.opacity(0.1))
-      .clipShape(RoundedRectangle(cornerRadius: 12))
+      .background(isUser ? Flat.userBubble : Flat.assistantBubble)
+      .foregroundStyle(isUser ? Flat.userBubbleText : Color.primary)
       if !isUser { Spacer(minLength: 40) }
     }
     .padding(.horizontal)
@@ -268,8 +268,7 @@ private struct StreamingAnswerView: View {
         }
       }
       .padding(10)
-      .background(Color.secondary.opacity(0.1))
-      .clipShape(RoundedRectangle(cornerRadius: 12))
+      .background(Flat.assistantBubble)
       Spacer(minLength: 40)
     }
     .padding(.horizontal)

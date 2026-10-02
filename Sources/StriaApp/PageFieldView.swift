@@ -17,7 +17,7 @@ struct PageFieldView: View {
       TextField("Page", text: $text)
         .frame(width: 48)
         .multilineTextAlignment(.trailing)
-        .textFieldStyle(.roundedBorder)
+        .textFieldStyle(FlatTextFieldStyle())
         .focused($isFocused)
         .onSubmit {
           reader.pageFieldText = text

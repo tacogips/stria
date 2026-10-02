@@ -6,7 +6,7 @@ import StriaCore
 /// text field is being edited, and never steal typing. Command-key
 /// equivalents stay on the menus (`StriaCommands`).
 enum ReaderShortcut: CaseIterable {
-  case toggleLeftPane, toggleAgentPane, focusAgentInput, pageDown, pageUp, lineDown, lineUp, help
+  case toggleLeftPane, toggleAgentPane, focusAgentInput, pageDown, pageUp, lineDown, lineUp, toggleTheme, help
 
   var keys: String {
     switch self {
@@ -17,6 +17,7 @@ enum ReaderShortcut: CaseIterable {
     case .pageUp: "Ctrl+U"
     case .lineDown: "j"
     case .lineUp: "k"
+    case .toggleTheme: "Shift+D"
     case .help: "?"
     }
   }
@@ -30,6 +31,7 @@ enum ReaderShortcut: CaseIterable {
     case .pageUp: "Page the PDF up"
     case .lineDown: "Scroll the PDF down"
     case .lineUp: "Scroll the PDF up"
+    case .toggleTheme: "Toggle light and dark mode"
     case .help: "Show this list"
     }
   }
@@ -49,6 +51,7 @@ enum ReaderShortcut: CaseIterable {
     switch (characters, flags.contains(.shift)) {
     case ("L", true), ("l", true): return .toggleLeftPane
     case ("R", true), ("r", true): return .toggleAgentPane
+    case ("D", true), ("d", true): return .toggleTheme
     case ("/", _): return .focusAgentInput
     case ("?", _): return .help
     case ("j", false): return .lineDown
@@ -104,6 +107,7 @@ struct ShortcutHelpSheet: View {
         GridRow { Text("Cmd-Return").font(.system(.body, design: .monospaced)); Text("Send the question") }
         GridRow { Text("Cmd-.").font(.system(.body, design: .monospaced)); Text("Cancel the question") }
         GridRow { Text("Cmd-Shift-L").font(.system(.body, design: .monospaced)); Text("Back to the library") }
+        GridRow { Text("Cmd-Shift-D").font(.system(.body, design: .monospaced)); Text("Toggle light / dark (View > Appearance)") }
       }
       Text("Single-key shortcuts pause while you type in a text field.").font(.caption).foregroundStyle(.secondary)
       HStack { Spacer(); Button("Close") { isPresented = false }.keyboardShortcut(.cancelAction) }

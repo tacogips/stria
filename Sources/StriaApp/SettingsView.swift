@@ -5,9 +5,17 @@ import StriaCore
 /// variable, and whether OCR runs automatically after import.
 struct SettingsView: View {
   @Bindable var settings: SettingsViewModel
+  @AppStorage(Appearance.storageKey) private var appearance = Appearance.default
 
   var body: some View {
     Form {
+      Section("Appearance") {
+        Picker("Theme", selection: $appearance) {
+          ForEach(Appearance.allCases, id: \.self) { Text($0.title).tag($0) }
+        }
+        .pickerStyle(.segmented)
+        Text("Light is the default. Shift+D in the reader toggles light and dark.").font(.caption).foregroundStyle(.secondary)
+      }
       Section("OCR") {
         Picker("Vendor", selection: $settings.ocrVendor) {
           ForEach(SettingsViewModel.ocrVendorOptions, id: \.self) { vendor in
@@ -50,6 +58,7 @@ struct SettingsView: View {
         TextEditor(text: $settings.agentSystemPrompt)
           .font(.system(.body, design: .monospaced))
           .frame(minHeight: 160)
+          .overlay(Rectangle().stroke(Flat.border, lineWidth: 1))
         HStack {
           Text(settings.systemPromptIsDefault ? "Using the default prompt." : "Custom prompt.")
             .font(.caption).foregroundStyle(.secondary)
@@ -77,7 +86,7 @@ struct SettingsView: View {
       }
     }
     .formStyle(.grouped)
-    .frame(width: 560, height: 720)
+    .frame(width: 560, height: 780)
     .padding(.bottom, 8)
     .onAppear { settings.load() }
   }

@@ -10,6 +10,7 @@ struct ReaderView: View {
   @State private var showShortcutHelp = false
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
   @State private var shortcuts = ReaderShortcutMonitor()
+  @AppStorage(Appearance.storageKey) private var appearance = Appearance.default
 
   var body: some View {
     NavigationSplitView(columnVisibility: $columnVisibility) {
@@ -72,6 +73,7 @@ struct ReaderView: View {
     case .pageUp: reader.requestScroll(.pageUp)
     case .lineDown: reader.requestScroll(.lineDown)
     case .lineUp: reader.requestScroll(.lineUp)
+    case .toggleTheme: appearance = appearance.toggled
     case .help: showShortcutHelp = true
     }
   }

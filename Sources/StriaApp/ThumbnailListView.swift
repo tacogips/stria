@@ -27,8 +27,8 @@ struct ThumbnailListView: View {
                 Text("Page \(pageNumber)").font(.caption)
               }
               .padding(6)
-              .background(reader.currentPage == pageNumber ? Color.accentColor.opacity(0.18) : .clear)
-              .clipShape(RoundedRectangle(cornerRadius: 6))
+              .background(reader.currentPage == pageNumber ? Flat.selected : .clear)
+              .foregroundStyle(reader.currentPage == pageNumber ? Color.white : Color.primary)
             }
             .buttonStyle(.plain)
             .id(pageNumber)

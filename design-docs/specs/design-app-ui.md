@@ -193,6 +193,22 @@ while a search is active.
   and jumps to its page. Selecting an entry opens its thread and jumps
   to its anchor page.
 
+## Visual Style and Appearance
+
+Flat and solid: no corner radius and no translucent fills anywhere in the
+app (`Flat` in `StriaApp`). Chat bubbles are square, the user's in the
+solid accent colour with white text and the assistant's in the control
+background colour; text fields are square with a 1-point separator-colour
+border (`FlatTextFieldStyle`); hover and selection use the system's solid
+selection colours; the setup banner is a solid control-background strip.
+Every fill is an opaque system colour, so both modes stay readable.
+
+Appearance is an app-wide choice (`Appearance`: light, dark, system) stored
+in `UserDefaults` under `appearance`. **Light is the default.** It is set
+from Settings > Appearance, View > Appearance, or toggled with
+`Cmd-Shift-D` (menu) and `Shift+D` (reader shortcut, as in chilla); the
+scenes apply it with `preferredColorScheme`.
+
 ## Settings Window
 
 `Settings` scene (`Cmd-,`), backed by `SettingsViewModel` in
@@ -233,6 +249,7 @@ while a text field or text view has focus, so typing is never interrupted:
 | `/` | Show the agent pane and focus its input |
 | `Ctrl+D` / `Ctrl+U` | Page the PDF down / up (`PDFView.scrollPageDown/Up`) |
 | `j` / `k` | Scroll the PDF one line down / up |
+| `Shift+D` | Toggle light and dark mode |
 | `?` | Show the shortcut list (also Help > Keyboard Shortcuts, `Cmd-/`) |
 
 Scroll requests travel like navigation and zoom: `ReaderViewModel.scroll`

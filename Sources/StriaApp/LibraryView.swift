@@ -71,7 +71,7 @@ struct LibraryView: View {
           .contentShape(Rectangle())
           .listRowBackground(
             hoveredID == row.id && selection != row.id
-              ? Color.primary.opacity(0.06)
+              ? Flat.hover
               : Color.clear
           )
           .onHover { hovering in hoveredID = hovering ? row.id : (hoveredID == row.id ? nil : hoveredID) }
@@ -224,7 +224,7 @@ private struct SetupBanner: View {
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 10)
-    .background(.yellow.opacity(0.12))
+    .background(Flat.banner)
     Divider()
   }
 }

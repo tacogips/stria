@@ -12,7 +12,7 @@ struct GoToPageSheet: View {
       Text("Go to Page").font(.headline)
       HStack {
         TextField("Page number", text: $text)
-          .textFieldStyle(.roundedBorder)
+          .textFieldStyle(FlatTextFieldStyle())
           .focused($isFocused)
           .onSubmit(commit)
         Text("of \(reader.pageCount)").foregroundStyle(.secondary)

@@ -11,6 +11,7 @@ struct StriaCommands: Commands {
   @FocusedValue(\.striaImport) private var importAction
   @FocusedValue(\.striaAgent) private var agent
   @FocusedValue(\.striaShortcutHelp) private var shortcutHelp
+  @AppStorage(Appearance.storageKey) private var appearance = Appearance.default
 
   var body: some Commands {
     CommandMenu("Go") {
@@ -38,6 +39,13 @@ struct StriaCommands: Commands {
       Button("Library") { libraryAction?() }
         .keyboardShortcut("l", modifiers: [.command, .shift])
         .disabled(reader == nil)
+
+      Divider()
+      Picker("Appearance", selection: $appearance) {
+        ForEach(Appearance.allCases, id: \.self) { Text($0.title).tag($0) }
+      }
+      Button("Toggle Light/Dark") { appearance = appearance.toggled }
+        .keyboardShortcut("d", modifiers: [.command, .shift])
 
       Divider()
       Button("Zoom In") { reader?.requestZoom(.zoomIn) }

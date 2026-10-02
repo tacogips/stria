@@ -7,6 +7,7 @@ struct StriaReaderApp: App {
   @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
   @State private var appModel: AppModel?
   @State private var startupError: String?
+  @AppStorage(Appearance.storageKey) private var appearance = Appearance.default
 
   init() {
     do {
@@ -38,17 +39,21 @@ struct StriaReaderApp: App {
         }
       }
       .frame(minWidth: 1100, minHeight: 700)
+      .preferredColorScheme(appearance.colorScheme)
     }
     .commands {
       SidebarCommands()
       StriaCommands()
     }
     Settings {
-      if let appModel {
-        SettingsView(settings: appModel.settings)
-      } else {
-        StartupErrorView(message: startupError ?? "Stria could not start.")
+      Group {
+        if let appModel {
+          SettingsView(settings: appModel.settings)
+        } else {
+          StartupErrorView(message: startupError ?? "Stria could not start.")
+        }
       }
+      .preferredColorScheme(appearance.colorScheme)
     }
   }
 }
@@ -68,6 +73,17 @@ private struct StartupErrorView: View {
       Label("Unable to Start Stria", systemImage: "exclamationmark.triangle")
     } description: {
       Text(message)
+    }
+  }
+}
+
+extension Appearance {
+  /// nil follows the system.
+  var colorScheme: ColorScheme? {
+    switch self {
+    case .light: .light
+    case .dark: .dark
+    case .system: nil
     }
   }
 }
