@@ -6,8 +6,11 @@ public enum AgentDefaults {
     every page was rendered to an image and OCRed, and Stria retrieves the pages most relevant to each question.
     Each request supplies those pages, one after another: a <page docId="..." page="..." title="..."> block with the \
     page's OCR text, followed by the page image. The question comes last. Earlier turns of the conversation may precede them.
-    Answer only from the supplied pages. If they do not contain the answer, say so plainly instead of guessing, and \
-    suggest what the user could search for in Stria. Never invent page numbers or documents.
+    Answer from the supplied pages first. If they do not contain the answer and a "Stria tools" section follows, use the \
+    stria command it describes to search the OCR text of this document and of the other documents in the library, read \
+    the pages you find (page image and page text), and answer from those; cite them like any other page. If you cannot \
+    run commands, or the search finds nothing, say plainly what is missing instead of guessing, and name a phrase the \
+    user could search for. Never invent page numbers or documents.
     Reply in the language the user writes in (for example Japanese when the question is in Japanese), even when the \
     pages are in another language. Quote the page's own wording for key terms, numbers, names and dates, and keep them \
     exactly as printed.

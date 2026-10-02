@@ -81,6 +81,38 @@ import Testing
 }
 }
 
+@Suite @MainActor struct SettingsModelCatalogTests {
+  @Test func modelOptionsFollowTheVendorAndFetchMerges() async throws {
+    try await withAppModelDataRoot { paths in
+      let (library, _) = try makeAppModelFixture(paths: paths, pageTexts: ["one"])
+      let settings = SettingsViewModel(library: library) { vendor, key in
+        guard vendor == "anthropic", key == "ANTHROPIC_API_KEY" else { throw ServiceError.unavailable("no key") }
+        return ["claude-sonnet-5-5", "claude-fetched-1"]
+      }
+      #expect(settings.modelOptions(for: "claude-code", current: "") == ModelCatalog.models(for: "claude-code").sorted())
+      #expect(settings.modelOptions(for: "claude-code", current: "my-custom") .contains("my-custom"))
+      #expect(ModelCatalog.models(for: "cursor").isEmpty)
+
+      settings.agentVendor = "claude-code"
+      settings.applySuggestions(ocr: false)
+      #expect(settings.agentModel == "claude-sonnet-5-5")
+      settings.agentVendor = "gemini"
+      settings.applySuggestions(ocr: false)
+      #expect(settings.agentModel == "gemini-2.5-pro")
+
+      settings.agentVendor = "anthropic"
+      settings.agentAPIKeyEnvironment = ""
+      await settings.fetchModels(ocr: false)
+      #expect(settings.modelFetchError == "no key")
+      settings.agentAPIKeyEnvironment = "ANTHROPIC_API_KEY"
+      await settings.fetchModels(ocr: false)
+      #expect(settings.modelFetchError == nil)
+      #expect(settings.modelOptions(for: "anthropic", current: "").contains("claude-fetched-1"))
+      #expect(settings.modelOptions(for: "anthropic", current: "").filter { $0 == "claude-sonnet-5-5" }.count == 1)
+    }
+  }
+}
+
 @Suite struct AppearanceTests {
   @Test func lightIsDefaultAndToggleAlwaysChangesScheme() {
     #expect(Appearance.default == .light)

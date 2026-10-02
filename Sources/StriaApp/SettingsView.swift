@@ -24,7 +24,7 @@ struct SettingsView: View {
         }
         .onChange(of: settings.ocrVendor) { _, _ in settings.applySuggestions(ocr: true) }
         if SettingsViewModel.needsModel(settings.ocrVendor) {
-          TextField("Model", text: $settings.ocrModel, prompt: Text(SettingsViewModel.suggestedModel(for: settings.ocrVendor) ?? "model id"))
+          ModelField(settings: settings, vendor: settings.ocrVendor, model: $settings.ocrModel, ocr: true)
         }
         if SettingsViewModel.requiresAPIKey(settings.ocrVendor) {
           TextField("API key environment variable", text: $settings.ocrAPIKeyEnvironment,
@@ -33,10 +33,6 @@ struct SettingsView: View {
             .font(.caption).foregroundStyle(.secondary)
         }
         Toggle("Run OCR automatically after import", isOn: $settings.ocrAutoRunOnImport)
-        Text(settings.ocrAutoRunOnImport
-             ? "Pages are OCRed as soon as a PDF is imported."
-             : "Pages wait until you choose Run OCR for a document in the library.")
-          .font(.caption).foregroundStyle(.secondary)
         Stepper("Concurrent pages: \(settings.ocrConcurrency)", value: $settings.ocrConcurrency, in: 1...8)
       }
       Section("Agent") {
@@ -47,7 +43,7 @@ struct SettingsView: View {
         }
         .onChange(of: settings.agentVendor) { _, _ in settings.applySuggestions(ocr: false) }
         if SettingsViewModel.needsModel(settings.agentVendor) {
-          TextField("Model", text: $settings.agentModel, prompt: Text(SettingsViewModel.suggestedModel(for: settings.agentVendor) ?? "model id"))
+          ModelField(settings: settings, vendor: settings.agentVendor, model: $settings.agentModel, ocr: false)
         }
         if SettingsViewModel.requiresAPIKey(settings.agentVendor) {
           TextField("API key environment variable", text: $settings.agentAPIKeyEnvironment,
@@ -89,5 +85,58 @@ struct SettingsView: View {
     .frame(width: 560, height: 780)
     .padding(.bottom, 8)
     .onAppear { settings.load() }
+  }
+}
+
+/// Model picker limited to the chosen vendor's models, with "Custom…" for
+/// any other id and, for API vendors, a live refresh from the vendor.
+private struct ModelField: View {
+  @Bindable var settings: SettingsViewModel
+  let vendor: String
+  @Binding var model: String
+  let ocr: Bool
+  @State private var custom = false
+
+  private var options: [String] { settings.modelOptions(for: vendor, current: custom ? "" : model) }
+
+  private var selection: Binding<String> {
+    Binding(
+      get: { custom || !options.contains(model) ? SettingsViewModel.customModel : model },
+      set: { value in
+        if value == SettingsViewModel.customModel {
+          custom = true
+          model = ""
+        } else {
+          custom = false
+          model = value
+        }
+      }
+    )
+  }
+
+  var body: some View {
+    Picker("Model", selection: selection) {
+      ForEach(options, id: \.self) { Text($0).tag($0) }
+      Divider()
+      Text("Custom…").tag(SettingsViewModel.customModel)
+    }
+    .onChange(of: vendor) { _, _ in custom = false }
+    if custom || (!model.isEmpty && !options.contains(model)) {
+      TextField("Model id", text: $model, prompt: Text("model id as the vendor names it"))
+        .textFieldStyle(FlatTextFieldStyle())
+    }
+    if settings.canFetchModels(for: vendor) {
+      HStack {
+        Button(settings.isFetchingModels ? "Fetching…" : "Fetch models from vendor") {
+          Task { await settings.fetchModels(ocr: ocr) }
+        }
+        .disabled(settings.isFetchingModels)
+        if let error = settings.modelFetchError {
+          Text(error).font(.caption).foregroundStyle(.red).lineLimit(2)
+        } else if let fetched = settings.fetchedModels[vendor] {
+          Text("\(fetched.count) models").font(.caption).foregroundStyle(.secondary)
+        }
+      }
+    }
   }
 }

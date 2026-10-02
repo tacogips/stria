@@ -226,11 +226,14 @@ scenes apply it with `preferredColorScheme`.
 with `StriaLibrary.saveConfig` on Save (nothing is written before). Sections:
 
 - OCR: vendor picker ("Not configured", "PDF text layer", then the gateway
-  vendors with display names), model field (shown for model vendors, with the
-  vendor's suggested model as placeholder), API key environment variable
+  vendors with display names), a model picker limited to that vendor's models
+  (`ModelCatalog`, plus models fetched live for API vendors through
+  `GatewayModelCatalogService` with a "Fetch models from vendor" button, plus
+  "Custom…" which reveals a free-text id field), API key environment variable
   field (API vendors only), "Run OCR automatically after import" toggle, and
   the concurrency stepper. Choosing a vendor fills empty model and variable
-  fields with suggestions.
+  fields with suggestions and clears a model the new vendor does not know, so
+  a model id is never sent to the wrong vendor.
 - Agent: vendor, model and API key variable in the same way.
 - System Prompt: a text editor showing the current prompt (the default when
   none is set) with "Reset to Default". A prompt equal to the default is

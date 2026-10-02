@@ -61,6 +61,36 @@ import Testing
     }
   }
 
+  @Test func toolsSectionIsSentOnlyToCLIVendorsWithTheDataRoot() async throws {
+    try await withTestDataRoot { paths in
+      _ = try await prepareAskDocument(paths: paths, id: "doc", texts: [1: "text"])
+      let fake = FakeAgentService()
+      let api = try StriaLibrary.open(environment: makeTestEnvironment(paths: paths, agent: fake))
+      _ = try await api.ask(AskRequest(question: "q", context: .page(docId: "doc", page: 1)))
+      var config = StriaConfig.testing
+      config.agent.vendor = "claude-code"
+      config.agent.apiKeyEnvironment = nil
+      let cli = try StriaLibrary.open(environment: makeTestEnvironment(paths: paths, agent: fake, config: config))
+      _ = try await cli.ask(AskRequest(question: "q", context: .page(docId: "doc", page: 1)))
+      let requests = await fake.requests
+      #expect(requests.count == 2)
+      #expect(!requests[0].systemPrompt.contains("You may run the stria command"))
+      if StriaToolsPrompt.locateExecutable() != nil {
+        #expect(requests[1].systemPrompt.contains("You may run the stria command"))
+        #expect(requests[1].systemPrompt.contains("--home"))
+        #expect(requests[1].systemPrompt.contains("docId doc"))
+        #expect(requests[1].systemPrompt.contains(paths.root.path.replacingOccurrences(of: "'", with: "'\\''")) == true)
+      }
+      let section = StriaToolsPrompt.section(executable: URL(fileURLWithPath: "/usr/local/bin/stria"),
+                                             dataRoot: URL(fileURLWithPath: "/tmp/my root"), currentDocumentId: nil)
+      #expect(section.contains("'/tmp/my root'"))
+      #expect(section.contains("whole library"))
+      #expect(!section.contains("remove"))
+      #expect(StriaToolsPrompt.locateExecutable(environment: ["PATH": "/nowhere"], fileExists: { _ in false }) == nil)
+      #expect(StriaToolsPrompt.locateExecutable(environment: ["PATH": "/x"], fileExists: { $0 == "/x/stria" })?.path == "/x/stria")
+    }
+  }
+
   @Test func threadFollowUpReusesPreviouslyCitedPages() async throws {
     try await withTestDataRoot { paths in
       _ = try await prepareAskDocument(paths: paths, id: "doc", texts: [1: "zebra quantum lattice", 2: "unrelated"])

@@ -25,12 +25,52 @@ public final class SettingsViewModel {
   public private(set) var error: String?
   public private(set) var savedAt: Date?
   public var onSaved: (() -> Void)?
+  /// Models fetched live from a vendor, keyed by vendor id.
+  public private(set) var fetchedModels: [String: [String]] = [:]
+  public private(set) var modelFetchError: String?
+  public private(set) var isFetchingModels = false
+  /// Value of the model picker that reveals the free-text field.
+  public static let customModel = "__custom__"
 
   private let library: StriaLibrary
+  private let modelLister: @Sendable (String, String?) async throws -> [String]
 
-  public init(library: StriaLibrary) {
+  public init(library: StriaLibrary,
+              modelLister: @escaping @Sendable (String, String?) async throws -> [String] = {
+                try await GatewayModelCatalogService.models(vendor: $0, apiKeyEnvironment: $1)
+              }) {
     self.library = library
+    self.modelLister = modelLister
     load()
+  }
+
+  /// Models the picker offers for a vendor: the known catalog plus anything
+  /// fetched live, de-duplicated and sorted, with the current value kept.
+  public func modelOptions(for vendor: String, current: String) -> [String] {
+    var options = ModelCatalog.models(for: vendor) + (fetchedModels[vendor] ?? [])
+    let trimmed = current.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !trimmed.isEmpty, !options.contains(trimmed) { options.append(trimmed) }
+    var seen = Set<String>()
+    return options.filter { seen.insert($0).inserted }.sorted()
+  }
+
+  public func canFetchModels(for vendor: String) -> Bool { ModelCatalog.supportsListing(vendor) }
+
+  public func fetchModels(ocr: Bool) async {
+    let vendor = ocr ? ocrVendor : agentVendor
+    let keyName = Self.trimmed(ocr ? ocrAPIKeyEnvironment : agentAPIKeyEnvironment)
+    isFetchingModels = true
+    modelFetchError = nil
+    defer { isFetchingModels = false }
+    do {
+      fetchedModels[vendor] = try await modelLister(vendor, keyName)
+    } catch let failure as ServiceError {
+      switch failure {
+      case .unavailable(let reason), .failed(let reason): modelFetchError = reason
+      }
+    } catch {
+      modelFetchError = error.localizedDescription
+    }
   }
 
   /// Reloads the draft from the current configuration, discarding edits.
@@ -98,15 +138,24 @@ public final class SettingsViewModel {
     }
   }
 
-  /// Fills empty model and credential fields with the vendor's suggestions.
+  /// Fills empty model and credential fields with the vendor's suggestions,
+  /// and drops a model that does not belong to the newly chosen vendor.
   public func applySuggestions(ocr: Bool) {
     if ocr {
+      if !ocrModel.isEmpty, !Self.modelMayBelong(ocrModel, to: ocrVendor) { ocrModel = "" }
       if ocrModel.isEmpty, let model = Self.suggestedModel(for: ocrVendor) { ocrModel = model }
       if ocrAPIKeyEnvironment.isEmpty, let name = Self.suggestedAPIKeyEnvironment(for: ocrVendor) { ocrAPIKeyEnvironment = name }
     } else {
+      if !agentModel.isEmpty, !Self.modelMayBelong(agentModel, to: agentVendor) { agentModel = "" }
       if agentModel.isEmpty, let model = Self.suggestedModel(for: agentVendor) { agentModel = model }
       if agentAPIKeyEnvironment.isEmpty, let name = Self.suggestedAPIKeyEnvironment(for: agentVendor) { agentAPIKeyEnvironment = name }
     }
+  }
+
+  /// A model kept across a vendor change only when the new vendor's catalog
+  /// knows it (custom ids are cleared, so no model from vendor A is sent to B).
+  static func modelMayBelong(_ model: String, to vendor: String) -> Bool {
+    ModelCatalog.models(for: vendor).contains(model)
   }
 
   /// The configuration the draft describes, or the reason it is invalid.

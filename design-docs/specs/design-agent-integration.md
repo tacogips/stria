@@ -232,7 +232,18 @@ The system prompt can be overridden with `agent.systemPrompt`. The default
   input);
 - trust the page image over the OCR text when they disagree, and keep
   numbers, names and dates as printed;
-- cite pages as `[<docId> p.<page>]`, using the header of each page block.
+- cite pages as `[<docId> p.<page>]`, using the header of each page block;
+- when the supplied pages are not enough and the vendor can run commands,
+  search further with the `stria` CLI.
+
+For the CLI vendors (`claude-code`, `codex`, `cursor`) `AskCoordinator`
+appends a **Stria tools** section (`StriaToolsPrompt`) when a `stria`
+executable is found (next to the running executable, `/opt/homebrew/bin`,
+`/usr/local/bin`, then `PATH`). It gives the exact read-only commands with
+`--home <data root>` and the current docId: `search` within the document and
+across the library, `page image` / `page text`, `show` and `list`. Import,
+remove and config are never mentioned. API vendors cannot run commands and
+receive no section.
 
 The user prompt is a sequence of content blocks:
 

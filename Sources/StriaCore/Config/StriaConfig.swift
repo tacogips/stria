@@ -4,6 +4,8 @@ public enum KnownVendors {
   public static let gateway = ["claude-code", "codex", "cursor", "cursor-api", "openai", "anthropic", "gemini", "openrouter"]
   public static let pdfTextLayer = "pdf-text-layer"
   public static let apiKeyVendors: Set<String> = ["openai", "anthropic", "gemini", "openrouter", "cursor-api"]
+  /// Vendors that run as local agents with tools (they can execute `stria`).
+  public static let cliVendors: Set<String> = ["claude-code", "codex", "cursor"]
 }
 
 private enum RenderConfigCodingKeys: String, CodingKey { case dpi, imageFormat, quality, maxPixelDimension }

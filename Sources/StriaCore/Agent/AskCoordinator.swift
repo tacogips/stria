@@ -29,7 +29,7 @@ struct AskCoordinator: Sendable {
     let settings = ServiceSettings(agent: environment.config.agent)
     let agentRequest = AgentRequest(
       question: request.question,
-      systemPrompt: environment.config.agent.systemPrompt ?? AgentDefaults.systemPrompt,
+      systemPrompt: systemPrompt(for: request.context),
       contextPages: contextPages,
       history: history,
       settings: settings
@@ -73,6 +73,20 @@ struct AskCoordinator: Sendable {
     let sent = contextPages.map { Citation(docId: $0.docId, title: $0.title, page: $0.page, imagePath: $0.pngPath.path) }
     return AskResponse(threadId: threadId, answer: answer.text, vendor: settings.vendor, model: settings.model,
                        runId: runId, citations: AskResponse.citedPages(in: answer.text, contextPages: sent), contextPages: sent)
+  }
+
+  /// The configured (or default) prompt, plus the Stria tools section when
+  /// the vendor can run commands and a `stria` executable exists.
+  func systemPrompt(for context: AskContext) -> String {
+    let base = environment.config.agent.systemPrompt ?? AgentDefaults.systemPrompt
+    guard let vendor = environment.config.agent.vendor, KnownVendors.cliVendors.contains(vendor),
+          let executable = StriaToolsPrompt.locateExecutable() else { return base }
+    let docId: String?
+    switch context {
+    case .page(let id, _), .nearby(let id, _), .document(let id, _): docId = id
+    case .library: docId = nil
+    }
+    return base + "\n\n" + StriaToolsPrompt.section(executable: executable, dataRoot: environment.paths.root, currentDocumentId: docId)
   }
 
   /// Fresh retrieval first; in an existing thread the pages the previous
