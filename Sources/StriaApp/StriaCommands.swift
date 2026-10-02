@@ -12,6 +12,7 @@ struct StriaCommands: Commands {
   @FocusedValue(\.striaAgent) private var agent
   @FocusedValue(\.striaShortcutHelp) private var shortcutHelp
   @AppStorage(Appearance.storageKey) private var appearance = Appearance.default
+  @Environment(\.openSettings) private var openSettings
 
   var body: some Commands {
     CommandMenu("Go") {
@@ -63,6 +64,9 @@ struct StriaCommands: Commands {
     }
 
     CommandMenu("Agent") {
+      Button("Settings…") { openSettings() }
+        .keyboardShortcut(",", modifiers: [.command, .shift])
+      Divider()
       Button("New Chat") { agent?.newChat() }
         .keyboardShortcut("n", modifiers: [.command, .shift])
         .disabled(agent == nil)

@@ -221,7 +221,7 @@ scenes apply it with `preferredColorScheme`.
 
 ## Settings Window
 
-`Settings` scene (`Cmd-,`), backed by `SettingsViewModel` in
+`Settings` scene (`Cmd-,`, also Agent > Settings…), backed by `SettingsViewModel` in
 `StriaCore/AppModel`, which holds a draft of the configuration and writes it
 with `StriaLibrary.saveConfig` on Save (nothing is written before). Sections:
 
@@ -284,6 +284,7 @@ Commands are disabled when no reader is focused.
 | Go | Go to Page... | `Cmd-Opt-G` |
 | Go | Next Page / Previous Page | `Cmd-Opt-Down` / `Cmd-Opt-Up` |
 | View | Zoom In / Zoom Out / Actual Size / Zoom to Fit | `Cmd-+` / `Cmd--` / `Cmd-0` / `Cmd-9` |
+| Agent | Settings… (opens the Settings window, OCR and agent vendors) | `Cmd-Shift-,` |
 | Agent | Send | `Cmd-Return` (in the input field) |
 | Agent | New Chat | `Cmd-Shift-N` |
 | Agent | Cancel Question | `Cmd-.` |
