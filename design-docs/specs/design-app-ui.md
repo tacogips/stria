@@ -35,7 +35,8 @@ or answers.
 The reader toolbar contains:
 
 - leading: the built-in sidebar toggle (no second one is added), and a
-  "Library" button that returns home (`Cmd-Shift-L` via the View menu);
+  "< Library" back button that returns home (also `Esc`, `Cmd-Shift-L` via
+  the View menu, and a "< Library" row at the top of the left pane);
 - principal: a page field showing `n of N` with previous and next buttons;
 - trailing: a `.searchable(placement: .toolbar)` search field and an
   inspector toggle button.
@@ -253,6 +254,7 @@ while a text field or text view has focus, so typing is never interrupted:
 
 | Keys | Action |
 | --- | --- |
+| `Esc` | Back to the library (unless a sheet is open) |
 | `Shift+L` | Collapse or expand the left pane |
 | `Shift+R` | Collapse or expand the agent pane |
 | `/` | Show the agent pane and focus its input |

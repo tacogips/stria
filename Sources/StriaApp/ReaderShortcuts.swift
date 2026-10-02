@@ -6,10 +6,11 @@ import StriaCore
 /// text field is being edited, and never steal typing. Command-key
 /// equivalents stay on the menus (`StriaCommands`).
 enum ReaderShortcut: CaseIterable {
-  case toggleLeftPane, toggleAgentPane, focusAgentInput, pageDown, pageUp, lineDown, lineUp, toggleTheme, help
+  case backToLibrary, toggleLeftPane, toggleAgentPane, focusAgentInput, pageDown, pageUp, lineDown, lineUp, toggleTheme, help
 
   var keys: String {
     switch self {
+    case .backToLibrary: "Esc"
     case .toggleLeftPane: "Shift+L"
     case .toggleAgentPane: "Shift+R"
     case .focusAgentInput: "/"
@@ -24,6 +25,7 @@ enum ReaderShortcut: CaseIterable {
 
   var title: String {
     switch self {
+    case .backToLibrary: "Back to the library"
     case .toggleLeftPane: "Collapse or expand the left pane"
     case .toggleAgentPane: "Collapse or expand the agent pane"
     case .focusAgentInput: "Focus the agent chat input"
@@ -48,6 +50,7 @@ enum ReaderShortcut: CaseIterable {
       default: return nil
       }
     }
+    if event.keyCode == 53 { return .backToLibrary }  // Esc
     switch (characters, flags.contains(.shift)) {
     case ("L", true), ("l", true): return .toggleLeftPane
     case ("R", true), ("r", true): return .toggleAgentPane
@@ -70,6 +73,8 @@ final class ReaderShortcutMonitor {
     remove()
     monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
       guard !Self.isEditingText(), let shortcut = ReaderShortcut.match(event) else { return event }
+      // Esc belongs to a sheet or popover while one is open.
+      if shortcut == .backToLibrary, Self.sheetIsOpen() { return event }
       handler(shortcut)
       return nil
     }
@@ -78,6 +83,12 @@ final class ReaderShortcutMonitor {
   func remove() {
     if let monitor { NSEvent.removeMonitor(monitor) }
     monitor = nil
+  }
+
+  /// True while a sheet (Go to Page, shortcut help, a confirmation) is up.
+  private static func sheetIsOpen() -> Bool {
+    guard let window = NSApp.keyWindow else { return false }
+    return window.attachedSheet != nil || window.sheetParent != nil
   }
 
   /// True while a text field or text view has keyboard focus.

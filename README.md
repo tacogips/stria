@@ -107,6 +107,7 @@ Alternatively, `stria ask "<question>"` performs retrieval and answering with th
 
 Single keys, in the style of chilla, that pause while a text field is being edited:
 
+- `Esc`: back to the library
 - `Shift+L` / `Shift+R`: collapse or expand the left pane / the agent pane
 - `/`: focus the agent chat input
 - `Ctrl+D` / `Ctrl+U`: page the PDF down / up; `j` / `k`: scroll one line

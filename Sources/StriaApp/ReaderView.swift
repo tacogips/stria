@@ -14,7 +14,7 @@ struct ReaderView: View {
 
   var body: some View {
     NavigationSplitView(columnVisibility: $columnVisibility) {
-      LeftPaneView(reader: reader)
+      LeftPaneView(reader: reader, onBack: { Task { await model.showLibrary() } })
         .navigationSplitViewColumnWidth(min: 180, ideal: 280, max: 640)
     } detail: {
       PDFKitView(reader: reader)
@@ -38,8 +38,11 @@ struct ReaderView: View {
     .focusedSceneValue(\.striaShortcutHelp, $showShortcutHelp)
     .toolbar {
       ToolbarItem(placement: .navigation) {
-        Button("Library") { Task { await model.showLibrary() } }
-          .help("Back to the library (Cmd-Shift-L)")
+        Button { Task { await model.showLibrary() } } label: {
+          Label("Library", systemImage: "chevron.left")
+            .labelStyle(.titleAndIcon)
+        }
+        .help("Back to the library (Esc or Cmd-Shift-L)")
       }
       ToolbarItem(placement: .principal) {
         PageFieldView(reader: reader)
@@ -64,6 +67,7 @@ struct ReaderView: View {
 
   private func handle(_ shortcut: ReaderShortcut) {
     switch shortcut {
+    case .backToLibrary: Task { await model.showLibrary() }
     case .toggleLeftPane: columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
     case .toggleAgentPane: showAgent.toggle()
     case .focusAgentInput:
