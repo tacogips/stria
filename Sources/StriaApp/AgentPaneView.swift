@@ -176,7 +176,7 @@ struct AgentPaneView: View {
                   Text("p. \(page)").font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Text(message.createdAt, style: .relative).font(.caption2).foregroundStyle(.tertiary)
+                Text(RelativeAge.string(from: message.createdAt)).font(.caption2).foregroundStyle(.tertiary)
               }
               Text(message.content)
                 .lineLimit(3)

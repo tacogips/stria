@@ -122,3 +122,15 @@ import Testing
     #expect(Appearance(rawValue: "light") == .light)
   }
 }
+
+@Suite struct RelativeAgeTests {
+  @Test func coarseGranularity() {
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    #expect(RelativeAge.string(from: now.addingTimeInterval(-30), now: now) == "just now")
+    #expect(RelativeAge.string(from: now.addingTimeInterval(-125), now: now) == "2 min ago")
+    #expect(RelativeAge.string(from: now.addingTimeInterval(-3_600), now: now) == "1 hour ago")
+    #expect(RelativeAge.string(from: now.addingTimeInterval(-5 * 3_600), now: now) == "5 hours ago")
+    #expect(RelativeAge.string(from: now.addingTimeInterval(-3 * 86_400), now: now) == "3 days ago")
+    #expect(RelativeAge.string(from: now.addingTimeInterval(-40 * 86_400), now: now).hasPrefix("20"))
+  }
+}

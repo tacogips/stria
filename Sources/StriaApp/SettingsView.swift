@@ -72,7 +72,7 @@ struct SettingsView: View {
           if let error = settings.error {
             Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.red).font(.callout)
           } else if let savedAt = settings.savedAt {
-            Text("Saved \(savedAt, style: .relative) ago").font(.callout).foregroundStyle(.secondary)
+            Text("Saved \(RelativeAge.string(from: savedAt))").font(.callout).foregroundStyle(.secondary)
           }
           Spacer()
           Button("Revert") { settings.load() }

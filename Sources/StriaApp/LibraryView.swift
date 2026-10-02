@@ -238,7 +238,7 @@ private struct LibraryRowView: View {
           Text(row.title).font(.headline)
           Spacer()
           if let opened = row.lastOpenedAt {
-            Text("Opened \(opened, style: .relative) ago").font(.caption).foregroundStyle(.tertiary)
+            Text("Opened \(RelativeAge.string(from: opened))").font(.caption).foregroundStyle(.tertiary)
           }
           Text("\(row.pageCount) pages").foregroundStyle(.secondary)
         }
