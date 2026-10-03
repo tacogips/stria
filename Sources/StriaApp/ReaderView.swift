@@ -16,6 +16,9 @@ struct ReaderView: View {
     NavigationSplitView(columnVisibility: $columnVisibility) {
       LeftPaneView(reader: reader, onBack: { Task { await model.showLibrary() } }, onHide: { toggleSidebar() })
         .navigationSplitViewColumnWidth(min: 180, ideal: 280, max: 640)
+        // Must sit on the sidebar column itself to take effect on macOS; the
+        // pane header has Stria's own hide icon.
+        .toolbar(removing: .sidebarToggle)
     } detail: {
       PDFKitView(reader: reader)
         .background(.background)
@@ -51,7 +54,6 @@ struct ReaderView: View {
     .focusedSceneValue(\.striaAgentVisibility, $showAgent)
     .focusedSceneValue(\.striaShortcutHelp, $showShortcutHelp)
     .focusedSceneValue(\.striaSidebar, $columnVisibility)
-    .toolbar(removing: .sidebarToggle)
     .toolbar {
       ToolbarItem(placement: .principal) {
         PageFieldView(reader: reader)
