@@ -58,21 +58,39 @@ import Testing
   #expect(ReaderViewModel.outlineNodeID(in: nodes, page: 5) == "1.0")
 }
 
-@Test func readerSearchEntersAndLeavesSearchModeAndExpandsCache() async throws {
+@Test func searchResultsShowContextAndOpenAtThePage() async throws {
   try await withAppModelDataRoot { paths in
     let ocr = FakeOCRService()
     let (library, source) = try makeAppModelFixture(paths: paths, pageTexts: ["alpha searchable", "beta"], ocr: ocr)
     let imported = try await library.importDocument(at: source, runOCR: false)
     await ocr.script(docId: imported.document.id, page: 1, .success("alpha searchable"))
     _ = try await library.runOCR(documentId: imported.document.id, selection: .pending)
-    let reader = ReaderViewModel(library: library, documentId: imported.document.id)
-    reader.sidebarMode = .thumbnails
-    try await reader.open()
-    await reader.submitSearch("searchable")
-    #expect(reader.sidebarMode == .search)
-    #expect(reader.searchResults.first?.page == 1)
-    reader.clearSearch()
-    #expect(reader.sidebarMode == .thumbnails)
+    let app = AppModel(library: library)
+    await app.open(documentId: imported.document.id)
+    let reader = try #require(app.reader)
+    let search = app.search
+    #expect(search.scope == .currentDocument)
+    search.present()
+    #expect(search.isPromptPresented)
+    search.query = "searchable"
+    await search.submit()
+    #expect(!search.isPromptPresented)
+    #expect(search.isShowingResults)
+    #expect(search.resultsQuery == "searchable")
+    let hit = try #require(search.results.first)
+    #expect(hit.page == 1)
+    #expect(hit.context.contains { $0.isHit && $0.text == "searchable" })
+    await search.loadThumbnail(docId: hit.docId, page: hit.page)
+    #expect(search.thumbnails[SearchViewModel.thumbnailKey(docId: hit.docId, page: 1)] != nil)
+    reader.goToPage(2)
+    await app.openSearchResult(hit)
+    #expect(!search.isShowingResults)
+    #expect(reader.requestedPage == 1)
+    search.scope = .allDocuments
+    await search.submit()
+    #expect(search.resultsScope == .allDocuments)
+    search.close()
+    #expect(!search.isShowingResults)
     await reader.waitForExpansion()
     #expect(FileManager.default.fileExists(atPath: library.paths.cachedPage(docId: imported.document.id, page: 1).path))
     await reader.close()

@@ -107,9 +107,10 @@ Alternatively, `stria ask "<question>"` performs retrieval and answering with th
 
 Single keys, in the style of chilla, that pause while a text field is being edited:
 
-- `Esc`: back to the library
+- `Esc`: close search results, or back to the library
 - `Shift+L` / `Shift+R`: collapse or expand the left pane / the agent pane
-- `/`: focus the agent chat input
+- `/` (or `Cmd-F`): search the OCR text in a popup; results open in the center pane with page thumbnails and highlighted hits, `Esc` returns
+- `i`: focus the agent chat input
 - `Ctrl+D` / `Ctrl+U`: page the PDF down / up; `j` / `k`: scroll one line
 - `Shift+D`: toggle light and dark mode (light is the default; Settings > Appearance also offers "System")
 - `?` (or Help > Keyboard Shortcuts, `Cmd-/`): show the full list, including the menu shortcuts (`Cmd-Opt-G` go to page, `Cmd-Opt-Up/Down` previous/next page, `Cmd-+`/`Cmd--` zoom, `Cmd-Return` send, `Cmd-.` cancel, `Cmd-Shift-L` library)

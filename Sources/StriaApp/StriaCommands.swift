@@ -12,6 +12,7 @@ struct StriaCommands: Commands {
   @FocusedValue(\.striaAgent) private var agent
   @FocusedValue(\.striaShortcutHelp) private var shortcutHelp
   @FocusedValue(\.striaSidebar) private var sidebar
+  @FocusedValue(\.striaSearch) private var search
   @FocusedValue(\.striaLibraryViewMode) private var libraryViewMode
   @FocusedValue(\.striaRunOCR) private var runOCR
   @AppStorage(Appearance.storageKey) private var appearance = Appearance.default
@@ -88,6 +89,12 @@ struct StriaCommands: Commands {
       Button("Cancel Question") { agent?.cancel() }
         .keyboardShortcut(".", modifiers: .command)
         .disabled(agent?.inFlight != true)
+    }
+
+    CommandGroup(after: .textEditing) {
+      Button("Search OCR Text…") { search?() }
+        .keyboardShortcut("f", modifiers: .command)
+        .disabled(search == nil)
     }
 
     CommandGroup(replacing: .help) {

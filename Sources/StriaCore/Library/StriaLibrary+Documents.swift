@@ -109,7 +109,12 @@ public extension StriaLibrary {
   /// The stored first page, decoded and downscaled for library rows and
   /// cards; nil while the page is not rendered yet.
   func firstPageThumbnail(documentId: String, maxPixel: Int) async throws -> CGImage? {
-    guard let image = try await store.pageImage(documentId: documentId, page: 1) else { return nil }
+    try await pageThumbnail(documentId: documentId, page: 1, maxPixel: maxPixel)
+  }
+
+  /// A stored page decoded and downscaled, without writing the PNG cache.
+  func pageThumbnail(documentId: String, page: Int, maxPixel: Int) async throws -> CGImage? {
+    guard let image = try await store.pageImage(documentId: documentId, page: page) else { return nil }
     return ImageCodec.thumbnail(of: try ImageCodec.decode(image.data), maxPixel: maxPixel)
   }
 

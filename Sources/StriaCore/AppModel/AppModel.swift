@@ -16,6 +16,7 @@ public final class AppModel {
   /// Bumped after Settings saves, so views that read config re-render.
   public private(set) var configRevision = 0
   public let settings: SettingsViewModel
+  public let search: SearchViewModel
 
   private let striaLibrary: StriaLibrary
   private let debounce: Duration
@@ -25,6 +26,7 @@ public final class AppModel {
     self.debounce = debounce
     self.library = LibraryViewModel(library: library)
     settings = SettingsViewModel(library: library)
+    search = SearchViewModel(library: library)
     settings.onSaved = { [weak self] in
       guard let self else { return }
       configRevision += 1
@@ -42,6 +44,7 @@ public final class AppModel {
       try await reader.open()
       try await striaLibrary.markOpened(documentId: documentId)
       if let page { reader.goToPage(page) }
+      search.setCurrentDocument(id: documentId, title: reader.title)
       self.reader = reader
       let agent = AgentPaneViewModel(library: striaLibrary, reader: reader)
       await agent.loadSelection()
@@ -56,7 +59,20 @@ public final class AppModel {
     await reader?.close()
     reader = nil
     agent = nil
+    search.setCurrentDocument(id: nil, title: nil)
     route = .library
     await library.refresh()
+  }
+
+  /// A search result was chosen: jump within the open document, or open the
+  /// other document at that page.
+  public func openSearchResult(_ hit: SearchResultItem) async {
+    search.close()
+    if let reader, reader.documentId == hit.docId {
+      reader.goToPage(hit.page)
+    } else {
+      await reader?.close()
+      await open(documentId: hit.docId, page: hit.page)
+    }
   }
 }

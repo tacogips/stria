@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import StriaCore
 import UniformTypeIdentifiers
@@ -20,6 +21,7 @@ struct LibraryView: View {
 
   @State private var hoveredID: String?
   @AppStorage(LibraryViewMode.storageKey) private var viewMode = LibraryViewMode.list
+  @State private var keys = LocalKeyMonitor()
 
   var body: some View {
     withDialogs
@@ -31,19 +33,20 @@ struct LibraryView: View {
         SetupBanner()
           .id(model.configRevision)
       }
-      if model.library.isSearching {
-        searchResults
+      if model.search.isShowingResults {
+        SearchResultsView(search: model.search) { hit in Task { await model.openSearchResult(hit) } }
       } else if viewMode == .card {
         documentCards
       } else {
         documentList
       }
     }
-    .searchable(text: searchQuery, placement: .toolbar, prompt: "Search OCR text in all PDFs")
-    .onSubmit(of: .search) { Task { await model.library.submitSearch() } }
-    .onChange(of: model.library.searchQuery) { _, query in
-      if query.isEmpty { model.library.clearSearch() }
+    .sheet(isPresented: Bindable(model.search).isPromptPresented) {
+      SearchPrompt(search: model.search)
     }
+    .focusedSceneValue(\.striaSearch, { model.search.present() })
+    .onAppear { keys.install(handleKey) }
+    .onDisappear { keys.remove() }
   }
 
   private var withNavigation: some View {
@@ -131,42 +134,15 @@ struct LibraryView: View {
     }
   }
 
-  private var searchQuery: Binding<String> {
-    Binding(get: { model.library.searchQuery }, set: { model.library.searchQuery = $0 })
+  /// `/` opens the search popup and Esc closes search results (single keys,
+  /// paused while typing, as in the reader).
+  private func handleKey(_ event: NSEvent) -> Bool {
+    guard event.modifierFlags.isDisjoint(with: [.command, .control, .option]) else { return false }
+    if event.charactersIgnoringModifiers == "/" { model.search.present(); return true }
+    if event.keyCode == 53, model.search.isShowingResults { model.search.close(); return true }
+    return false
   }
 
-  /// OCR hits across the library; a click opens the document at that page.
-  private var searchResults: some View {
-    Group {
-      if let error = model.library.searchError {
-        ContentUnavailableView("Search Failed", systemImage: "exclamationmark.triangle", description: Text(error))
-      } else if model.library.searchResults.isEmpty {
-        ContentUnavailableView.search(text: model.library.searchQuery)
-      } else {
-        List(model.library.searchResults.indices, id: \.self) { index in
-          let hit = model.library.searchResults[index]
-          Button {
-            Task { await model.open(documentId: hit.docId, page: hit.page) }
-          } label: {
-            VStack(alignment: .leading, spacing: 4) {
-              HStack {
-                Text(hit.title).font(.headline)
-                Text("p. \(hit.page)").foregroundStyle(.secondary)
-              }
-              Text(hit.snippet).lineLimit(2).foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-          }
-          .buttonStyle(.plain)
-          .padding(.vertical, 2)
-        }
-        .listStyle(.inset(alternatesRowBackgrounds: true))
-      }
-    }
-  }
-
-  /// A single click opens the document; the context menu holds the rest.
   private var documentList: some View {
     List(selection: $selection) {
       ForEach(model.library.rows) { row in

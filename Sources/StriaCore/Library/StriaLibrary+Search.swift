@@ -1,7 +1,10 @@
 import Foundation
 
 extension StriaLibrary {
-  public func search(query: String, documentId: String? = nil, limit: Int = 10) async throws -> SearchResponse {
+  /// OCR search. `withContext` adds the text around each hit with the terms
+  /// marked (the app's results view); the CLI leaves it off.
+  public func search(query: String, documentId: String? = nil, limit: Int = 10,
+                     withContext: Bool = false) async throws -> SearchResponse {
     if let documentId, try await store.document(id: documentId) == nil {
       throw StriaError.documentNotFound("Document not found: \(documentId)")
     }
@@ -12,8 +15,13 @@ extension StriaLibrary {
       let imageURL = paths.cachedPage(docId: hit.docId, page: hit.page)
       let info = try await store.pageInfo(documentId: hit.docId, page: hit.page)
       let cached = info.map { cache.validCachedURL(docId: hit.docId, page: hit.page, width: $0.width, height: $0.height) != nil } ?? false
+      var context: [TextSegment] = []
+      if withContext {
+        context = SearchContextBuilder.segments(text: info?.ocrText ?? "", query: query)
+        if context.isEmpty { context = SearchContextBuilder.segments(fromBracketedSnippet: hit.snippet) }
+      }
       results.append(SearchResultItem(docId: hit.docId, title: hit.title, page: hit.page, snippet: hit.snippet,
-                                      score: hit.score, imagePath: imageURL.path, imageCached: cached))
+                                      score: hit.score, imagePath: imageURL.path, imageCached: cached, context: context))
     }
     return SearchResponse(query: query, matchMode: outcome.matchMode, results: results)
   }

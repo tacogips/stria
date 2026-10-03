@@ -5,7 +5,6 @@ import PDFKit
 public enum SidebarMode: Equatable, Sendable {
   case contents
   case thumbnails
-  case search
 }
 
 /// A zoom command for the PDF view, consumed once per id like `PageNavigation`.
@@ -66,18 +65,13 @@ public final class ReaderViewModel {
   public private(set) var scroll: ScrollRequest?
   public private(set) var outline: [OutlineNode] = []
   public private(set) var outlineRows: [OutlineRow] = []
-  public private(set) var searchError: String?
   public private(set) var currentOutlineNodeID: String?
   public private(set) var pdfDocument: PDFDocument?
   public var sidebarMode: SidebarMode = .contents
-  public var searchQuery = ""
-  public private(set) var searchResults: [SearchResultItem] = []
-  public private(set) var pagesWithoutOCR = 0
   public var pageFieldText = "1"
 
   private let library: StriaLibrary
   private let debounce: Duration
-  private var previousSidebarMode: SidebarMode = .contents
   private var expansionTask: Task<Void, Never>?
   private var readingSaveTask: Task<Void, Never>?
 
@@ -171,35 +165,6 @@ public final class ReaderViewModel {
   public func previousPage() {
     guard currentPage > 1 else { return }
     goToPage(currentPage - 1)
-  }
-
-  public func submitSearch(_ query: String) async {
-    searchQuery = query
-    guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-      clearSearch()
-      return
-    }
-    do {
-      let response = try await library.search(query: query, documentId: documentId, limit: 100)
-      let counts = try await library.store.ocrCounts(documentId: documentId)
-      searchResults = response.results
-      pagesWithoutOCR = counts.pending + counts.failed
-      searchError = nil
-    } catch {
-      searchResults = []
-      pagesWithoutOCR = 0
-      searchError = (error as? StriaError)?.message ?? error.localizedDescription
-    }
-    if sidebarMode != .search { previousSidebarMode = sidebarMode }
-    sidebarMode = .search
-  }
-
-  public func clearSearch() {
-    searchQuery = ""
-    searchResults = []
-    pagesWithoutOCR = 0
-    searchError = nil
-    if sidebarMode == .search { sidebarMode = previousSidebarMode }
   }
 
   public func flushReadingPosition() async {

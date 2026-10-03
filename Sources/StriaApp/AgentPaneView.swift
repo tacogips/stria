@@ -229,7 +229,7 @@ struct AgentPaneView: View {
             .foregroundStyle(sendDisabled ? Color.secondary : Flat.userBubble)
             .disabled(sendDisabled)
             .keyboardShortcut(.return, modifiers: .command)
-            .help("Send the question (Cmd-Return); / focuses this box")
+            .help("Send the question (Cmd-Return); i focuses this box")
             .accessibilityLabel("Send")
           }
         }

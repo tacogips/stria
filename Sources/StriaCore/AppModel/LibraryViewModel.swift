@@ -65,11 +65,6 @@ public final class LibraryViewModel {
   public var alert: String?
   public private(set) var isImporting = false
   public var selectedID: String?
-  /// OCR search across every document, shown in place of the list.
-  public var searchQuery = ""
-  public private(set) var searchResults: [SearchResultItem] = []
-  public private(set) var searchError: String?
-  public private(set) var isSearching = false
   /// First-page thumbnails by document id, loaded on demand.
   public private(set) var thumbnails: [String: CGImage] = [:]
   public static let thumbnailMaxPixel = 320
@@ -157,26 +152,6 @@ public final class LibraryViewModel {
     if let image = try? await library.firstPageThumbnail(documentId: documentId, maxPixel: Self.thumbnailMaxPixel) {
       thumbnails[documentId] = image
     }
-  }
-
-  public func submitSearch() async {
-    let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !query.isEmpty else { clearSearch(); return }
-    do {
-      searchResults = try await library.search(query: query, documentId: nil, limit: 100).results
-      searchError = nil
-    } catch {
-      searchResults = []
-      searchError = (error as? StriaError)?.message ?? error.localizedDescription
-    }
-    isSearching = true
-  }
-
-  public func clearSearch() {
-    searchQuery = ""
-    searchResults = []
-    searchError = nil
-    isSearching = false
   }
 
   /// OCR every page again, whatever its state (done pages are replaced).

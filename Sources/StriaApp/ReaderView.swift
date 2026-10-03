@@ -23,6 +23,11 @@ struct ReaderView: View {
       PDFKitView(reader: reader)
         .background(.background)
         .navigationTitle(reader.title)
+        .overlay {
+          if model.search.isShowingResults {
+            SearchResultsView(search: model.search) { hit in Task { await model.openSearchResult(hit) } }
+          }
+        }
         .overlay(alignment: .leading) {
           if columnVisibility == .detailOnly {
             // chilla-style edge tab: the collapsed sidebar comes back with one click.
@@ -42,11 +47,10 @@ struct ReaderView: View {
       AgentPaneView(agent: agent, reader: reader, configRevision: model.configRevision)
         .inspectorColumnWidth(min: 300, ideal: 400, max: 720)
     }
-    .searchable(text: $reader.searchQuery, placement: .toolbar, prompt: "Search OCR text")
-    .onSubmit(of: .search) { Task { await reader.submitSearch(reader.searchQuery) } }
-    .onChange(of: reader.searchQuery) { _, query in
-      if query.isEmpty { reader.clearSearch() }
+    .sheet(isPresented: Bindable(model.search).isPromptPresented) {
+      SearchPrompt(search: model.search)
     }
+    .focusedSceneValue(\.striaSearch, { model.search.present() })
     .onChange(of: reader.currentPage) { _, _ in agent.scheduleHistoryReload() }
     .focusedSceneValue(\.striaReader, reader)
     .focusedSceneValue(\.striaAgent, agent)
@@ -88,7 +92,9 @@ struct ReaderView: View {
 
   private func handle(_ shortcut: ReaderShortcut) {
     switch shortcut {
-    case .backToLibrary: Task { await model.showLibrary() }
+    case .backToLibrary:
+      if model.search.isShowingResults { model.search.close() } else { Task { await model.showLibrary() } }
+    case .search: model.search.present()
     case .toggleLeftPane: toggleSidebar()
     case .toggleAgentPane: showAgent.toggle()
     case .focusAgentInput:

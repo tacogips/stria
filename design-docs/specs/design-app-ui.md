@@ -55,11 +55,8 @@ The reader toolbar contains:
   or the OCR `unavailable` reason, plus a small spinner while this app
   process is rendering or OCRing the document (`LibraryRow.isBusy`). Rows are ordered by `last_opened_at`
   descending, then `imported_at` descending.
-- The toolbar search field runs the shared OCR search across every document
-  (`LibraryViewModel.submitSearch`); the results replace the list, each row
-  showing the title, page and snippet, and a click opens that document at
-  that page (`AppModel.open(documentId:page:)`). Clearing the field returns
-  to the list.
+- OCR search across every document opens with `/` or `Cmd-F`
+  ([OCR Search](#ocr-search)); its results replace the list until Esc.
 - Import uses a toolbar "Import" button (`Cmd-O`) that opens `fileImporter`
   (`UTType.pdf`, multiple selection), or PDF file URLs dropped onto the list.
   - Each import runs in the background through `StriaLibrary.importDocument`
@@ -103,9 +100,9 @@ The reader toolbar contains:
 
 ## Reader: Left Pane (sidebar)
 
-A segmented picker at the top switches between **Contents** and
-**Thumbnails**. A third segment, **Search**, appears (and is selected) only
-while a search is active.
+An icon control at the top switches between **Contents** and
+**Thumbnails**. OCR search is not in the sidebar (see
+[OCR Search](#ocr-search)).
 
 - **Contents**: a tree from `outline_json`. While the document is still
   `rendering`, the tree comes from the `OutlineExtractor` running on the open
@@ -128,6 +125,26 @@ while a search is active.
   OCRed, a footer reads "N pages not yet OCRed". A failed search shows its
   error in the pane (`ReaderViewModel.searchError`). Clearing the search
   field returns to the previous mode.
+
+## OCR Search
+
+There is no always-visible search field. Edit > Search OCR Text…
+(`Cmd-F`) or the `/` key (library and reader, paused while typing) opens a
+popup (`SearchPrompt`) with the query field and, in the reader, a scope
+control: this PDF (default) or all PDFs. Return searches.
+
+Results replace the center pane (`SearchResultsView`; in the reader an
+overlay above the PDF, which keeps its scroll position): a header with a
+back icon, the query in quotes and "N pages in <title> / in all PDFs", then
+one row per page with the page thumbnail (`StriaLibrary.pageThumbnail`,
+downscaled stored image), the document title in all-PDF searches, the page
+number, and the text around the hit with every matched term in the find
+highlight colour (`SearchContextBuilder`, built from the page's normalized
+OCR text so wrapped Japanese terms are found; the index snippet is the
+fallback). Clicking a row opens that page (jumping within the open PDF or
+opening the other document). Esc or the back icon returns to the previous
+screen; in the reader Esc closes results before it would leave for the
+library. One `SearchViewModel` (on `AppModel`) serves both screens.
 
 ## Reader: Center Pane (PDF)
 
@@ -286,10 +303,11 @@ while a text field or text view has focus, so typing is never interrupted:
 
 | Keys | Action |
 | --- | --- |
-| `Esc` | Back to the library (unless a sheet is open) |
+| `Esc` | Close search results; otherwise back to the library (unless a sheet is open) |
 | `Shift+L` | Collapse or expand the left pane |
 | `Shift+R` | Collapse or expand the agent pane |
-| `/` | Show the agent pane and focus its input |
+| `/` | Open the OCR search popup |
+| `i` | Show the agent pane and focus its input |
 | `Ctrl+D` / `Ctrl+U` | Page the PDF down / up (`PDFView.scrollPageDown/Up`) |
 | `j` / `k` | Scroll the PDF one line down / up |
 | `Shift+D` | Toggle light and dark mode |

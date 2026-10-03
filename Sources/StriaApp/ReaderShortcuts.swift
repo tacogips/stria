@@ -6,14 +6,15 @@ import StriaCore
 /// text field is being edited, and never steal typing. Command-key
 /// equivalents stay on the menus (`StriaCommands`).
 enum ReaderShortcut: CaseIterable {
-  case backToLibrary, toggleLeftPane, toggleAgentPane, focusAgentInput, pageDown, pageUp, lineDown, lineUp, toggleTheme, help
+  case backToLibrary, search, toggleLeftPane, toggleAgentPane, focusAgentInput, pageDown, pageUp, lineDown, lineUp, toggleTheme, help
 
   var keys: String {
     switch self {
     case .backToLibrary: "Esc"
+    case .search: "/"
     case .toggleLeftPane: "Shift+L"
     case .toggleAgentPane: "Shift+R"
-    case .focusAgentInput: "/"
+    case .focusAgentInput: "i"
     case .pageDown: "Ctrl+D"
     case .pageUp: "Ctrl+U"
     case .lineDown: "j"
@@ -25,7 +26,8 @@ enum ReaderShortcut: CaseIterable {
 
   var title: String {
     switch self {
-    case .backToLibrary: "Back to the library"
+    case .backToLibrary: "Close search results, or back to the library"
+    case .search: "Search the OCR text"
     case .toggleLeftPane: "Collapse or expand the left pane"
     case .toggleAgentPane: "Collapse or expand the agent pane"
     case .focusAgentInput: "Focus the agent chat input"
@@ -55,7 +57,8 @@ enum ReaderShortcut: CaseIterable {
     case ("L", true), ("l", true): return .toggleLeftPane
     case ("R", true), ("r", true): return .toggleAgentPane
     case ("D", true), ("d", true): return .toggleTheme
-    case ("/", _): return .focusAgentInput
+    case ("/", _): return .search
+    case ("i", false): return .focusAgentInput
     case ("?", _): return .help
     case ("j", false): return .lineDown
     case ("k", false): return .lineUp
@@ -117,6 +120,7 @@ struct ShortcutHelpSheet: View {
         GridRow { Text("Cmd-Opt-G").font(.system(.body, design: .monospaced)); Text("Go to page") }
         GridRow { Text("Cmd-Opt-Up/Down").font(.system(.body, design: .monospaced)); Text("Previous / next page") }
         GridRow { Text("Cmd-+ / Cmd--").font(.system(.body, design: .monospaced)); Text("Zoom in / out") }
+        GridRow { Text("Cmd-F").font(.system(.body, design: .monospaced)); Text("Search the OCR text") }
         GridRow { Text("Cmd-Return").font(.system(.body, design: .monospaced)); Text("Send the question") }
         GridRow { Text("Cmd-.").font(.system(.body, design: .monospaced)); Text("Cancel the question") }
         GridRow { Text("Cmd-Shift-L").font(.system(.body, design: .monospaced)); Text("Back to the library") }
@@ -127,5 +131,26 @@ struct ShortcutHelpSheet: View {
     }
     .padding(20)
     .frame(width: 420)
+  }
+}
+
+/// A local key monitor for a screen: the handler returns true to consume the
+/// event. Inactive while a text field has focus or a sheet is open.
+@MainActor
+final class LocalKeyMonitor {
+  private var monitor: Any?
+
+  func install(_ handler: @escaping @MainActor (NSEvent) -> Bool) {
+    remove()
+    monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+      guard let window = NSApp.keyWindow, window.attachedSheet == nil, window.sheetParent == nil else { return event }
+      if let responder = window.firstResponder, responder is NSTextView || responder is NSTextField { return event }
+      return handler(event) ? nil : event
+    }
+  }
+
+  func remove() {
+    if let monitor { NSEvent.removeMonitor(monitor) }
+    monitor = nil
   }
 }

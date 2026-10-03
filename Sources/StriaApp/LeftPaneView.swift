@@ -32,24 +32,16 @@ struct LeftPaneView: View {
           contents
         case .thumbnails:
           ThumbnailListView(reader: reader)
-        case .search:
-          searchResults
         }
       }
     }
     .navigationTitle("Contents")
   }
 
-  private var sidebarSegments: [IconSegment<SidebarMode>] {
-    var segments = [
-      IconSegment(value: SidebarMode.contents, symbol: "list.bullet.indent", help: "Contents: the PDF's table of contents"),
-      IconSegment(value: SidebarMode.thumbnails, symbol: "square.grid.2x2", help: "Thumbnails: small images of every page")
-    ]
-    if reader.sidebarMode == .search {
-      segments.append(IconSegment(value: .search, symbol: "magnifyingglass", help: "Search results for the OCR text search"))
-    }
-    return segments
-  }
+  private let sidebarSegments = [
+    IconSegment(value: SidebarMode.contents, symbol: "list.bullet.indent", help: "Contents: the PDF's table of contents"),
+    IconSegment(value: SidebarMode.thumbnails, symbol: "square.grid.2x2", help: "Thumbnails: small images of every page")
+  ]
 
   @ViewBuilder private var contents: some View {
     if reader.outlineRows.isEmpty {
@@ -102,37 +94,6 @@ struct LeftPaneView: View {
       if let page = page(for: id, in: row.children) { return page }
     }
     return nil
-  }
-
-  private var searchResults: some View {
-    VStack(spacing: 0) {
-      if let error = reader.searchError {
-        ContentUnavailableView("Search Failed", systemImage: "exclamationmark.triangle", description: Text(error))
-      } else if reader.searchResults.isEmpty {
-        ContentUnavailableView.search(text: reader.searchQuery)
-      } else {
-        List(reader.searchResults.indices, id: \.self) { index in
-          let result = reader.searchResults[index]
-          Button {
-            reader.goToPage(result.page)
-          } label: {
-            VStack(alignment: .leading, spacing: 4) {
-              Text("p. \(result.page)").font(.headline)
-              Text(result.snippet).lineLimit(3).foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-          }
-          .buttonStyle(.plain)
-        }
-      }
-      if reader.pagesWithoutOCR > 0 {
-        Text("\(reader.pagesWithoutOCR) pages not yet OCRed")
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          .padding(8)
-      }
-    }
   }
 }
 

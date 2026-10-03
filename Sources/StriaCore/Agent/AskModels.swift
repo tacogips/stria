@@ -97,8 +97,11 @@ public struct SearchResultItem: Sendable, Equatable {
   public var score: Double
   public var imagePath: String
   public var imageCached: Bool
+  /// Text around the hit with the matched terms marked (app search only).
+  public var context: [TextSegment]
 
-  public init(docId: String, title: String, page: Int, snippet: String, score: Double, imagePath: String, imageCached: Bool) {
+  public init(docId: String, title: String, page: Int, snippet: String, score: Double, imagePath: String, imageCached: Bool,
+              context: [TextSegment] = []) {
     self.docId = docId
     self.title = title
     self.page = page
@@ -106,6 +109,7 @@ public struct SearchResultItem: Sendable, Equatable {
     self.score = score
     self.imagePath = imagePath
     self.imageCached = imageCached
+    self.context = context
   }
 }
 

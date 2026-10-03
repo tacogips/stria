@@ -31,3 +31,25 @@ import Testing
     #expect(japanese.trigrams.first == "機械学")
   }
 }
+
+@Suite("SearchContextTests") struct SearchContextTests {
+  @Test func contextMarksEveryHitAndTrimsWithEllipsis() {
+    let text = String(repeating: "x", count: 100) + " The Zebra met a zebra. " + String(repeating: "y", count: 200)
+    let segments = SearchContextBuilder.segments(text: text, query: "zebra", radius: 10)
+    #expect(segments.first?.text == "…")
+    #expect(segments.last?.text == "…")
+    #expect(segments.filter(\.isHit).map(\.text) == ["Zebra", "zebra"])
+  }
+
+  @Test func japaneseHitAcrossALineBreakIsFound() {
+    let segments = SearchContextBuilder.segments(text: "本書は機械\n学習の基礎", query: "機械学習")
+    #expect(segments.filter(\.isHit).map(\.text) == ["機械学習"])
+    #expect(segments.map(\.text).joined() == "本書は機械学習の基礎")
+  }
+
+  @Test func bracketedSnippetFallback() {
+    let segments = SearchContextBuilder.segments(fromBracketedSnippet: "...the [zebra] and [quantum] lat...")
+    #expect(segments.filter(\.isHit).map(\.text) == ["zebra", "quantum"])
+    #expect(SearchContextBuilder.segments(text: "nothing here", query: "zebra").isEmpty)
+  }
+}
