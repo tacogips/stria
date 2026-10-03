@@ -117,7 +117,24 @@ Single keys, in the style of chilla, that pause while a text field is being edit
 
 ## Packaging
 
-Homebrew formula and cask paths use the name `stria`. Release packaging currently ships the CLI binary only. Run the app with `swift run stria-app`; app-bundle distribution is not part of v0.1. See [Homebrew packaging](packaging/homebrew/README.md) and [app distribution](design-docs/user-qa/app-distribution.md).
+Install with Homebrew (macOS 14+, Apple Silicon or Intel):
+
+```bash
+brew install --cask tacogips/homebrew-tap/stria
+```
+
+The cask installs the signed and notarized `Stria.app` and links its `stria` command line tool (`Stria.app/Contents/MacOS/stria`) into the Homebrew prefix. When Stria is opened from Finder or the Dock, it reads your login shell's environment once at startup, so `claude` / `codex` and API key variables resolve as they do in a terminal.
+
+Release (maintainers; Apple credentials come from kinko):
+
+```bash
+git tag v<version> && git push origin v<version>
+kinko exec --env APPLE_SIGNING_IDENTITY,APPLE_ID,APPLE_PASSWORD,APPLE_TEAM_ID -- \
+  mise run release:homebrew-cask-local -- v<version>
+# then commit and push ../homebrew-tap/Casks/stria.rb
+```
+
+The build assembles `Stria.app` (icon from `scripts/make-app-icon.swift`), signs the CLI and the app with the hardened runtime, notarizes and staples the app, then packs it with an Applications link into a DMG that is signed, notarized and stapled too. See [Homebrew packaging](packaging/homebrew/README.md) and [app distribution](design-docs/user-qa/app-distribution.md).
 
 ## Design docs
 

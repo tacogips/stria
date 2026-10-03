@@ -72,8 +72,8 @@ cask "stria" do
 
   url "$release_base_url/$artifact_name-#{version}-#{arch}.dmg",
       verified: "github.com/tacogips/stria/releases/download/"
-  name "stria"
-  desc "PDF reader with OCR-indexed page search and an agent pane"
+  name "Stria"
+  desc "PDF reader with OCR-indexed page search and an AI agent pane"
   homepage "https://github.com/tacogips/stria"
 
   livecheck do
@@ -81,12 +81,20 @@ cask "stria" do
     strategy :github_latest
   end
 
-  binary "$product"
+  depends_on macos: ">= :sonoma"
+
+  app "Stria.app"
+  binary "#{appdir}/Stria.app/Contents/MacOS/stria"
+
+  zap trash: "~/.local/stria"
 
   caveats do
     <<~EOS
-      This cask installs the signed and notarized macOS command line tool.
-      Homebrew links $product into the native Homebrew prefix for this Mac.
+      This cask installs the signed and notarized Stria.app and links its
+      stria command line tool (an OCR search and page-image tool for AI
+      agents) into the Homebrew prefix. Library data lives in ~/.local/stria
+      (override with STRIA_HOME). Choose an OCR vendor in Settings
+      (Agent > Settings...) before the first OCR run.
     EOS
   end
 end

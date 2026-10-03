@@ -3,7 +3,7 @@
 This project ships two Homebrew release paths:
 
 - Formula: unsigned tarballs containing `bin/stria`.
-- Cask: signed, notarized, and stapled macOS DMGs containing the command line tool.
+- Cask: signed, notarized, and stapled macOS DMGs containing Stria.app with the stria command line tool inside it.
 
 Swift formula archives are macOS-only by default. Add Linux archives only after
 the project has a reviewed Swift Linux build and runtime contract.

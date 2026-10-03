@@ -2,23 +2,24 @@
 
 ## Status
 
-Pending (default applied).
+Answered (2026-10-03): ship a signed `.app` through the Homebrew Cask, as
+chilla does.
 
 ## Question
 
 Should `stria-app` ship as a signed `.app` bundle (for example through the
 existing Homebrew Cask scripts), or only as a SwiftPM executable?
 
-## Default Applied
+## Decision
 
-v0.1 ships `stria-app` as a SwiftPM executable (`swift run stria-app`). The
-existing formula and cask scripts are renamed to `stria` and keep packaging
-only the CLI binary `stria`. Bundling the `.app` (Info.plist, icon, signing)
-is deferred until the user decides.
+The Homebrew Cask `stria` installs a signed, notarized and stapled
+`Stria.app` from a DMG and links the `stria` CLI that ships inside the app
+(`Stria.app/Contents/MacOS/stria`), following chilla's cask. The CLI-only
+formula is not published, because both would install `stria`.
 
 ## Consequence
 
-A GUI app started outside a shell does not inherit shell environment
-variables, so API-key env vars may be missing. In that case the app shows the
-name of the missing variable. Running from a terminal (`swift run stria-app`)
-inherits the variables.
+An app started from Finder or the Dock does not inherit shell environment
+variables. Stria imports the login shell's environment once at startup
+(`LoginEnvironment.importIfNeeded`), so PATH (for `claude`, `codex`) and
+API key variables are available; variables already set are kept.

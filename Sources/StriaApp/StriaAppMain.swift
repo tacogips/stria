@@ -10,6 +10,9 @@ struct StriaReaderApp: App {
   @AppStorage(Appearance.storageKey) private var appearance = Appearance.default
 
   init() {
+    // Before any service reads the environment (Finder launches get none of
+    // the shell's PATH or key variables).
+    LoginEnvironment.importIfNeeded()
     do {
       let currentDirectory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
       let paths = StriaPaths.resolve(

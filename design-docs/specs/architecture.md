@@ -233,7 +233,15 @@ the product cannot succeed. `gitleaks.yml` stays.
 
 ## Release Surfaces
 
-- Homebrew formula archives under `dist/homebrew/` (CLI `stria`).
-- Signed and notarized Cask DMGs under `dist/homebrew-cask/` (CLI `stria`).
-- `stria-app` runs with `swift run stria-app`. `.app` bundling is deferred
-  (`../user-qa/app-distribution.md`).
+- The Homebrew Cask `stria` (tap `tacogips/homebrew-tap`) is the release:
+  signed and notarized DMGs under `dist/homebrew-cask/` holding `Stria.app`
+  (executable `stria-app`, bundle id `me.tacogips.stria`, icon
+  `Resources/Stria.icns`) with the CLI at `Contents/MacOS/stria`; the cask
+  links that CLI as `stria` (`scripts/build-homebrew-cask-release.sh`,
+  `scripts/render-homebrew-cask.sh`, `scripts/release-homebrew-cask-local.sh`).
+- StriaCore has no SwiftPM resources (the model catalog is in code), so
+  neither the app nor the CLI needs a resource bundle beside it.
+- A Finder or Dock launch imports the login shell's environment at startup
+  (`LoginEnvironment`), so vendor CLIs on PATH and API key variables resolve.
+- The formula scripts (`dist/homebrew/`, CLI only) remain but are not
+  published, because a formula and the cask would both install `stria`.

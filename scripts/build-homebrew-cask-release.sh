@@ -4,6 +4,9 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
 product="stria"
+app_product="stria-app"
+app_name="Stria"
+bundle_id="me.tacogips.stria"
 artifact_name="stria"
 
 usage() {
@@ -35,7 +38,11 @@ Examples:
     scripts/build-homebrew-cask-release.sh darwin-arm64 darwin-x64
 
 This builder stages signed, notarized, and stapled macOS .dmg artifacts for a
-Homebrew Cask. It does not publish release assets, mutate a tap, or push commits.
+Homebrew Cask. Each DMG holds Stria.app (the SwiftUI reader, executable
+stria-app) with the stria CLI inside it at Contents/MacOS/stria, plus an
+Applications link. The app is notarized and stapled before it goes into the
+DMG, and the DMG is notarized and stapled as well. It does not publish
+release assets, mutate a tap, or push commits.
 EOF
 }
 
@@ -196,6 +203,8 @@ swift_release_bin_path() {
     DEVELOPER_DIR="$developer_dir" SDKROOT="$sdkroot" \
       "$swift_exe" build -c release --product "$product" --triple "$triple" >/dev/null
     DEVELOPER_DIR="$developer_dir" SDKROOT="$sdkroot" \
+      "$swift_exe" build -c release --product "$app_product" --triple "$triple" >/dev/null
+    DEVELOPER_DIR="$developer_dir" SDKROOT="$sdkroot" \
       "$swift_exe" build -c release --product "$product" --triple "$triple" --show-bin-path
   )
 }
@@ -207,13 +216,13 @@ assert_codesigning_identity() {
 }
 
 print_plan() {
-  local version target release_dir work_dir dmg_path staged_binary triple install_prefix
+  local version target release_dir work_dir dmg_path app_dir triple install_prefix
   version="$1"
   target="$2"
   release_dir="$3"
   work_dir="$release_dir/work/$artifact_name-$version-$target"
   dmg_path="$release_dir/$artifact_name-$version-$target.dmg"
-  staged_binary="$work_dir/$product"
+  app_dir="$work_dir/$app_name.app"
   triple="$(swift_triple_for_target "$target")"
   install_prefix="$(install_prefix_for_target "$target")"
 
@@ -221,61 +230,134 @@ print_plan() {
   assert_child_path "$release_dir" "$dmg_path"
 
   printf 'Swift Homebrew Cask DMG plan\n'
-  printf '  product: %s\n' "$product"
+  printf '  products: %s (CLI), %s (app)\n' "$product" "$app_product"
   printf '  target: %s\n' "$target"
   printf '  swift triple: %s\n' "$triple"
   printf '  cask install prefix: %s\n' "$install_prefix"
-  printf '  staged signed binary: %s\n' "$staged_binary"
+  printf '  app bundle: %s (%s %s)\n' "$app_dir" "$bundle_id" "$version"
+  printf '  CLI inside app: %s/Contents/MacOS/%s\n' "$app_dir" "$product"
   printf '  notarized DMG: %s\n' "$dmg_path"
   printf '  checksum: %s.sha256\n' "$dmg_path"
   printf '  required Apple env: APPLE_SIGNING_IDENTITY, APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID\n'
   printf '  publish side effects: false\n'
 }
 
+write_info_plist() {
+  local plist version
+  plist="$1"
+  version="$2"
+  cat > "$plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleDisplayName</key><string>$app_name</string>
+  <key>CFBundleExecutable</key><string>$app_product</string>
+  <key>CFBundleIconFile</key><string>$app_name</string>
+  <key>CFBundleIdentifier</key><string>$bundle_id</string>
+  <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+  <key>CFBundleName</key><string>$app_name</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>$version</string>
+  <key>CFBundleVersion</key><string>$version</string>
+  <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
+  <key>LSMinimumSystemVersion</key><string>14.0</string>
+  <key>NSHighResolutionCapable</key><true/>
+  <key>NSHumanReadableCopyright</key><string>Copyright tacogips. MIT License.</string>
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeName</key><string>PDF Document</string>
+      <key>CFBundleTypeRole</key><string>Viewer</string>
+      <key>LSHandlerRank</key><string>Alternate</string>
+      <key>LSItemContentTypes</key><array><string>com.adobe.pdf</string></array>
+    </dict>
+  </array>
+</dict>
+</plist>
+PLIST
+  plutil -lint "$plist" >/dev/null
+}
+
+# Submits a file for notarization and fails unless Apple accepts it.
+notarize() {
+  local file notarytool output status
+  file="$1"
+  notarytool="$2"
+  output="$("$notarytool" submit "$file" \
+    --apple-id "$APPLE_ID" \
+    --password "$APPLE_PASSWORD" \
+    --team-id "$APPLE_TEAM_ID" \
+    --wait --output-format json)"
+  status="$(printf '%s' "$output" | /usr/bin/python3 -c 'import json,sys; print(json.load(sys.stdin).get("status",""))')"
+  if [[ "$status" != "Accepted" ]]; then
+    printf 'notarization of %s ended with status %s\n' "$file" "${status:-unknown}" >&2
+    printf '%s\n' "$output" >&2
+    return 1
+  fi
+  printf 'notarized %s\n' "$(basename "$file")"
+}
+
 build_target() {
-  local version target release_dir work_dir dmg_path staged_binary bin_path notarytool stapler
+  local version target release_dir work_dir dmg_path app_dir bin_path notarytool stapler app_zip
   version="$1"
   target="$2"
   release_dir="$3"
   work_dir="$release_dir/work/$artifact_name-$version-$target"
   dmg_path="$release_dir/$artifact_name-$version-$target.dmg"
-  staged_binary="$work_dir/$product"
+  app_dir="$work_dir/$app_name.app"
+  app_zip="$release_dir/work/$artifact_name-$version-$target-app.zip"
   notarytool="${NOTARYTOOL:-/Applications/Xcode.app/Contents/Developer/usr/bin/notarytool}"
   stapler="${STAPLER:-/Applications/Xcode.app/Contents/Developer/usr/bin/stapler}"
 
   assert_child_path "$release_dir" "$work_dir"
   assert_child_path "$release_dir" "$dmg_path"
+  assert_child_path "$release_dir" "$app_zip"
 
   require_env APPLE_SIGNING_IDENTITY
   require_env APPLE_ID
   require_env APPLE_PASSWORD
   require_env APPLE_TEAM_ID
   require_command codesign
+  require_command ditto
   require_command hdiutil
+  require_command plutil
   require_command security
   require_command spctl
   test -x "$notarytool"
   test -x "$stapler"
+  test -f "$repo_root/Resources/$app_name.icns"
   assert_codesigning_identity "$APPLE_SIGNING_IDENTITY"
 
-  rm -rf "$work_dir" "$dmg_path" "$dmg_path.sha256"
-  mkdir -p "$work_dir"
+  rm -rf "$work_dir" "$dmg_path" "$dmg_path.sha256" "$app_zip"
+  mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources"
 
   bin_path="$(swift_release_bin_path "$target" | tail -n 1)"
-  cp "$bin_path/$product" "$staged_binary"
-  chmod 0755 "$staged_binary"
+  cp "$bin_path/$app_product" "$app_dir/Contents/MacOS/$app_product"
+  cp "$bin_path/$product" "$app_dir/Contents/MacOS/$product"
+  chmod 0755 "$app_dir/Contents/MacOS/$app_product" "$app_dir/Contents/MacOS/$product"
+  cp "$repo_root/Resources/$app_name.icns" "$app_dir/Contents/Resources/$app_name.icns"
+  printf 'APPL????' > "$app_dir/Contents/PkgInfo"
+  write_info_plist "$app_dir/Contents/Info.plist" "$version"
 
-  codesign --force --options runtime --timestamp --sign "$APPLE_SIGNING_IDENTITY" "$staged_binary"
-  codesign --verify --strict --verbose=2 "$staged_binary"
+  # Nested code first, then the bundle (no --deep).
+  codesign --force --options runtime --timestamp --sign "$APPLE_SIGNING_IDENTITY" "$app_dir/Contents/MacOS/$product"
+  codesign --force --options runtime --timestamp --sign "$APPLE_SIGNING_IDENTITY" "$app_dir"
+  codesign --verify --strict --deep --verbose=2 "$app_dir"
 
-  hdiutil create -quiet -fs HFS+ -format UDZO -volname "$product" -srcfolder "$work_dir" "$dmg_path"
+  ditto -c -k --keepParent "$app_dir" "$app_zip"
+  notarize "$app_zip" "$notarytool"
+  "$stapler" staple "$app_dir"
+  "$stapler" validate "$app_dir"
+  spctl --assess --type execute --verbose=4 "$app_dir"
+  rm -f "$app_zip"
+
+  ln -s /Applications "$work_dir/Applications"
+  hdiutil create -quiet -fs HFS+ -format UDZO -volname "$app_name" -srcfolder "$work_dir" "$dmg_path"
   codesign --force --timestamp --sign "$APPLE_SIGNING_IDENTITY" "$dmg_path"
   codesign --verify --strict --verbose=2 "$dmg_path"
-  "$notarytool" submit "$dmg_path" \
-    --apple-id "$APPLE_ID" \
-    --password "$APPLE_PASSWORD" \
-    --team-id "$APPLE_TEAM_ID" \
-    --wait
+  notarize "$dmg_path" "$notarytool"
   "$stapler" staple "$dmg_path"
   "$stapler" validate "$dmg_path"
   spctl --assess --type open --context context:primary-signature --verbose=4 "$dmg_path"

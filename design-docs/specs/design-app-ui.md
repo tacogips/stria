@@ -273,8 +273,8 @@ with `StriaLibrary.saveConfig` on Save (nothing is written before). Sections:
 
 - OCR: vendor picker ("Not configured", "PDF text layer", then the gateway
   vendors with display names), a model picker limited to that vendor's models
-  (`ModelCatalog`, loaded from `Sources/StriaCore/Resources/ProviderModels.json`,
-  a copy of konjac's catalog with the same vendors and `updatedAt`; the first
+  (`ModelCatalog`, a table in code that follows konjac's catalog for its
+  vendors; kept in code so the signed app needs no resource bundle; the first
   entry is the suggested default; plus models fetched live for API vendors through
   `GatewayModelCatalogService` with a "Fetch models from vendor" button, plus
   "Custom…" which reveals a free-text id field), API key environment variable
