@@ -34,11 +34,12 @@ or answers.
 
 The reader toolbar contains:
 
-- no navigation items: the built-in sidebar toggle is removed
-  (`.toolbar(removing: .sidebarToggle)`). The left pane's header carries
-  "< Library" (also `Esc`, `Cmd-Shift-L`) on the left and a hide-sidebar icon
-  (`Ctrl-Cmd-S`, `Shift+L`) on the right; when the sidebar is collapsed a
-  small tab at the PDF's left edge brings it back, as in chilla;
+- leading: one sidebar toggle, Stria's own (the built-in one is removed
+  with `.toolbar(removing: .sidebarToggle)` on the sidebar column), matching
+  the agent-pane toggle on the trailing side; its tooltip names
+  `Ctrl-Cmd-S` / `Shift+L`. The left pane's header carries "< Library" (also
+  `Esc`, `Cmd-Shift-L`); when the sidebar is collapsed a small tab at the
+  PDF's left edge also brings it back, as in chilla;
 - principal: a page field showing `n of N` with previous and next buttons;
 - trailing: a `.searchable(placement: .toolbar)` search field and an
   inspector toggle button.

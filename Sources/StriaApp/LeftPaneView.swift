@@ -4,7 +4,6 @@ import StriaCore
 struct LeftPaneView: View {
   @Bindable var reader: ReaderViewModel
   var onBack: (() -> Void)?
-  var onHide: (() -> Void)?
   @State private var expandedIDs: Set<String> = []
 
   var body: some View {
@@ -18,13 +17,6 @@ struct LeftPaneView: View {
           .help("Back to the library (Esc or Cmd-Shift-L)")
         }
         Spacer()
-        if let onHide {
-          Button(action: onHide) {
-            Image(systemName: "sidebar.left")
-          }
-          .buttonStyle(.plain)
-          .help("Hide the sidebar (Ctrl-Cmd-S or Shift+L)")
-        }
       }
       .padding(.horizontal, 12)
       .padding(.top, 10)
