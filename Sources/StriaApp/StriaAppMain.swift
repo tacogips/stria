@@ -62,6 +62,45 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
   func applicationDidFinishLaunching(_ notification: Notification) {
     NSApp.setActivationPolicy(.regular)
     NSApp.activate(ignoringOtherApps: true)
+    WindowSnapshotter.startIfRequested()
+  }
+}
+
+/// Development aid: with STRIA_SNAPSHOT_DIR set, every 2 seconds each window
+/// (title bar and toolbar included) is rendered to <dir>/window-<n>.png from
+/// the app's own view hierarchy, which needs no screen-recording permission.
+@MainActor
+enum WindowSnapshotter {
+  static func startIfRequested() {
+    guard let directory = ProcessInfo.processInfo.environment["STRIA_SNAPSHOT_DIR"], !directory.isEmpty else { return }
+    let url = URL(fileURLWithPath: directory, isDirectory: true)
+    try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+    Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in
+      MainActor.assumeIsolated { capture(into: url) }
+    }
+  }
+
+  private static func capture(into directory: URL) {
+    for (index, window) in NSApp.windows.enumerated() where window.isVisible {
+      guard let view = window.contentView?.superview ?? window.contentView else { continue }
+      // AppKit drawing (title bar, toolbar)...
+      if let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+        view.cacheDisplay(in: view.bounds, to: rep)
+        try? rep.representation(using: .png, properties: [:])?.write(to: directory.appendingPathComponent("window-\(index)-appkit.png"))
+      }
+      // ...and the layer tree, which is where SwiftUI content renders.
+      guard let layer = view.layer else { continue }
+      let scale = window.backingScaleFactor
+      let width = Int(view.bounds.width * scale), height = Int(view.bounds.height * scale)
+      guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+            let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                                    space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { continue }
+      context.scaleBy(x: scale, y: scale)
+      layer.render(in: context)
+      guard let image = context.makeImage() else { continue }
+      let rep = NSBitmapImageRep(cgImage: image)
+      try? rep.representation(using: .png, properties: [:])?.write(to: directory.appendingPathComponent("window-\(index).png"))
+    }
   }
 }
 

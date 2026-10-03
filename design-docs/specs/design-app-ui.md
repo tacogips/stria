@@ -57,7 +57,12 @@ The reader toolbar contains:
   descending, then `imported_at` descending.
 - OCR search across every document opens with `/` or `Cmd-F`
   ([OCR Search](#ocr-search)); its results replace the list until Esc.
-- Import uses a toolbar "Import" button (`Cmd-O`) that opens `fileImporter`
+- The library toolbar uses native controls only, so the system sizes their
+  capsules: a List / Cards segmented control at the leading edge, the title
+  "Library" with the document count as subtitle, and at the trailing edge
+  Search (opens the OCR search popup), Run OCR, and a labelled
+  "+ Import PDF" button. The empty-library message shows in both modes.
+- Import uses the toolbar "Import PDF" button (`Cmd-O`) that opens `fileImporter`
   (`UTType.pdf`, multiple selection), or PDF file URLs dropped onto the list.
   - Each import runs in the background through `StriaLibrary.importDocument`
     and streams `ImportEvent`s into its row.

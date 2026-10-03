@@ -35,6 +35,8 @@ struct LibraryView: View {
       }
       if model.search.isShowingResults {
         SearchResultsView(search: model.search) { hit in Task { await model.openSearchResult(hit) } }
+      } else if model.library.rows.isEmpty {
+        emptyLibrary
       } else if viewMode == .card {
         documentCards
       } else {
@@ -52,16 +54,14 @@ struct LibraryView: View {
   private var withNavigation: some View {
     content
     .navigationTitle("Library")
+    .navigationSubtitle(subtitle)
     .focusedSceneValue(\.striaLibraryViewMode, $viewMode)
     .focusedSceneValue(\.striaRunOCR, { runOCRForSelection() })
-    .toolbar {
-      ToolbarItem(placement: .principal) {
-        IconSegmentedControl(selection: $viewMode, segments: [
-          IconSegment(value: LibraryViewMode.list, symbol: "list.bullet", help: "List view (Cmd-1)"),
-          IconSegment(value: LibraryViewMode.card, symbol: "square.grid.2x2", help: "Card view (Cmd-2)")
-        ])
-      }
-    }
+  }
+
+  private var subtitle: String {
+    let count = model.library.rows.count
+    return count == 1 ? "1 PDF" : "\(count) PDFs"
   }
 
   private var withActions: some View {
@@ -80,18 +80,34 @@ struct LibraryView: View {
       return !urls.isEmpty
     }
     .toolbar {
-      ToolbarItem(placement: .primaryAction) {
-        Button { importAction?() } label: { Label("Import", systemImage: "square.and.arrow.down") }
-          .help("Import PDF files (Cmd-O)")
+      // Native controls only: the system sizes their toolbar capsules.
+      ToolbarItem(placement: .navigation) {
+        Picker("View", selection: $viewMode) {
+          Image(systemName: "list.bullet").tag(LibraryViewMode.list)
+            .accessibilityLabel("List")
+          Image(systemName: "square.grid.2x2").tag(LibraryViewMode.card)
+            .accessibilityLabel("Cards")
+        }
+        .pickerStyle(.segmented)
+        .help("List (Cmd-1) or cards (Cmd-2)")
       }
-      ToolbarItem(placement: .primaryAction) {
+      ToolbarItemGroup(placement: .primaryAction) {
+        Button { model.search.present() } label: {
+          Label("Search", systemImage: "magnifyingglass")
+        }
+        .help("Search the OCR text of all PDFs (/ or Cmd-F)")
         Button { runOCRForSelection() } label: {
           Label("Run OCR", systemImage: "text.viewfinder")
         }
         .disabled(selection == nil || !model.library.ocrConfigured)
         .help(model.library.ocrConfigured
-              ? "OCR the selected document (Cmd-Shift-O): remaining pages, or all pages again when it is complete. Asks first."
+              ? "OCR the selected PDF (Cmd-Shift-O): remaining pages, or all pages again when it is complete. Asks first."
               : "Choose an OCR vendor in Settings first (Agent > Settings…)")
+        Button { importAction?() } label: {
+          Label("Import PDF", systemImage: "plus")
+            .labelStyle(.titleAndIcon)
+        }
+        .help("Add PDF files to the library (Cmd-O); you can also drop them on the window")
       }
     }
   }
@@ -143,6 +159,17 @@ struct LibraryView: View {
     return false
   }
 
+  private var emptyLibrary: some View {
+    ContentUnavailableView {
+      Label("Your Library Is Empty", systemImage: "books.vertical")
+    } description: {
+      Text("Import a PDF to start reading. You can also drop PDF files here.")
+    } actions: {
+      Button("Import PDF…") { importAction?() }
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+  }
+
   private var documentList: some View {
     List(selection: $selection) {
       ForEach(model.library.rows) { row in
@@ -161,17 +188,6 @@ struct LibraryView: View {
       }
     }
     .listStyle(.inset(alternatesRowBackgrounds: true))
-    .overlay {
-      if model.library.rows.isEmpty {
-        ContentUnavailableView {
-          Label("Your Library Is Empty", systemImage: "books.vertical")
-        } description: {
-          Text("Import a PDF to start reading. You can also drop PDF files here.")
-        } actions: {
-          Button("Import PDF…") { importAction?() }
-        }
-      }
-    }
   }
 
   private var documentCards: some View {
