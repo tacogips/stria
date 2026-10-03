@@ -53,14 +53,10 @@ struct LibraryView: View {
     .focusedSceneValue(\.striaRunOCR, { runOCRForSelection() })
     .toolbar {
       ToolbarItem(placement: .principal) {
-        Picker("View", selection: $viewMode) {
-          ForEach(LibraryViewMode.allCases, id: \.self) { mode in
-            Label(mode.title, systemImage: mode == .list ? "list.bullet" : "square.grid.2x2").tag(mode)
-          }
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .help("List or card view (Cmd-1 / Cmd-2)")
+        IconSegmentedControl(selection: $viewMode, segments: [
+          IconSegment(value: LibraryViewMode.list, symbol: "list.bullet", help: "List view (Cmd-1)"),
+          IconSegment(value: LibraryViewMode.card, symbol: "square.grid.2x2", help: "Card view (Cmd-2)")
+        ])
       }
     }
   }

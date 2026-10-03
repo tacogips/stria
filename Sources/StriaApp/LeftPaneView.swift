@@ -11,26 +11,20 @@ struct LeftPaneView: View {
       HStack {
         if let onBack {
           Button(action: onBack) {
-            Label("Library", systemImage: "chevron.left")
+            Image(systemName: "chevron.backward")
           }
           .buttonStyle(.plain)
           .help("Back to the library (Esc or Cmd-Shift-L)")
+          .accessibilityLabel("Back to the library")
         }
         Spacer()
       }
       .padding(.horizontal, 12)
       .padding(.top, 10)
-      Picker("Sidebar", selection: $reader.sidebarMode) {
-        Text("Contents").tag(SidebarMode.contents)
-        Text("Thumbnails").tag(SidebarMode.thumbnails)
-        if reader.sidebarMode == .search {
-          Text("Search").tag(SidebarMode.search)
-        }
-      }
-      .pickerStyle(.segmented)
-      .labelsHidden()
-      .padding(.horizontal, 12)
-      .padding(.vertical, 8)
+      IconSegmentedControl(selection: $reader.sidebarMode, segments: sidebarSegments)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
 
       Group {
         switch reader.sidebarMode {
@@ -44,6 +38,17 @@ struct LeftPaneView: View {
       }
     }
     .navigationTitle("Contents")
+  }
+
+  private var sidebarSegments: [IconSegment<SidebarMode>] {
+    var segments = [
+      IconSegment(value: SidebarMode.contents, symbol: "list.bullet.indent", help: "Contents: the PDF's table of contents"),
+      IconSegment(value: SidebarMode.thumbnails, symbol: "square.grid.2x2", help: "Thumbnails: small images of every page")
+    ]
+    if reader.sidebarMode == .search {
+      segments.append(IconSegment(value: .search, symbol: "magnifyingglass", help: "Search results for the OCR text search"))
+    }
+    return segments
   }
 
   @ViewBuilder private var contents: some View {

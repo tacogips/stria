@@ -232,6 +232,13 @@ from Settings > Appearance, View > Appearance, or toggled with
 `Cmd-Shift-D` (menu) and `Shift+D` (reader shortcut, as in chilla); the
 scenes apply it with `preferredColorScheme`.
 
+Mode switches are icon-only (`IconSegmentedControl`): sidebar Contents /
+Thumbnails / Search, agent pane Chat / History, scope This page / Nearby
+pages / Whole PDF, history This page / This PDF, and library List / Cards.
+Each segment is its own button so it has its own hover description; the
+selected one is a solid accent square. Back to Library, New Chat, Send and
+Cancel are icons with tooltips as well.
+
 ## Settings Window
 
 `Settings` scene (`Cmd-,`, also Agent > Settings…), backed by `SettingsViewModel` in

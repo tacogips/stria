@@ -15,12 +15,11 @@ struct AgentPaneView: View {
 
   var body: some View {
     VStack(spacing: 0) {
-      Picker("Agent pane", selection: $tab) {
-        Text("Chat").tag(Tab.chat)
-        Text("History").tag(Tab.history)
-      }
-      .pickerStyle(.segmented)
-      .labelsHidden()
+      IconSegmentedControl(selection: $tab, segments: [
+        IconSegment(value: Tab.chat, symbol: "bubble.left.and.bubble.right", help: "Chat: ask about this PDF"),
+        IconSegment(value: Tab.history, symbol: "clock.arrow.circlepath", help: "History: earlier questions and answers")
+      ])
+      .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.horizontal)
       .padding(.vertical, 10)
       Divider()
@@ -34,7 +33,7 @@ struct AgentPaneView: View {
     .navigationTitle("Agent")
     .toolbar {
       ToolbarItem(placement: .primaryAction) {
-        Button("New Chat") { agent.newChat() }
+        Button { agent.newChat() } label: { Label("New Chat", systemImage: "square.and.pencil") }
           .disabled(agent.inFlight)
           .help("Start a new conversation (Cmd-Shift-N)")
       }
@@ -126,12 +125,14 @@ struct AgentPaneView: View {
 
   private var scopePicker: some View {
     VStack(alignment: .leading, spacing: 6) {
-      Picker("Scope", selection: $agent.scope) {
-        Text("This page").tag(AgentScope.page)
-        Text("Nearby pages").tag(AgentScope.nearby)
-        Text("Whole PDF").tag(AgentScope.document)
+      HStack(spacing: 8) {
+        IconSegmentedControl(selection: $agent.scope, segments: [
+          IconSegment(value: AgentScope.page, symbol: "doc", help: "This page: the agent sees the page you are on"),
+          IconSegment(value: AgentScope.nearby, symbol: "doc.on.doc", help: "Nearby pages: this page and its neighbours"),
+          IconSegment(value: AgentScope.document, symbol: "books.vertical", help: "Whole PDF: the most relevant pages of the document")
+        ])
+        Spacer()
       }
-      .pickerStyle(.segmented)
       Text(agent.scopeDescription)
         .font(.caption)
         .foregroundStyle(.secondary)
@@ -187,10 +188,12 @@ struct AgentPaneView: View {
         .focused($inputFocused)
         .onSubmit { agent.submit() }
       if agent.inFlight {
-        Button("Cancel") { agent.cancel() }
+        Button { agent.cancel() } label: { Image(systemName: "stop.circle") }
           .help("Stop waiting for this answer (Cmd-.)")
+          .accessibilityLabel("Cancel")
       } else {
-        Button("Send") { agent.submit() }
+        Button { agent.submit() } label: { Image(systemName: "paperplane") }
+          .accessibilityLabel("Send")
           .disabled(agent.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !agent.canSend)
           .keyboardShortcut(.return, modifiers: .command)
           .help("Send the question (Cmd-Return); / focuses this field")
@@ -201,11 +204,11 @@ struct AgentPaneView: View {
 
   private var history: some View {
     VStack(alignment: .leading, spacing: 4) {
-      Picker("History", selection: $agent.historyMode) {
-        Text("This page").tag(HistoryMode.page)
-        Text("This PDF").tag(HistoryMode.document)
-      }
-      .pickerStyle(.segmented)
+      IconSegmentedControl(selection: $agent.historyMode, segments: [
+        IconSegment(value: HistoryMode.page, symbol: "doc", help: "History for this page"),
+        IconSegment(value: HistoryMode.document, symbol: "books.vertical", help: "History for this whole PDF")
+      ])
+      .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.horizontal)
       .onChange(of: agent.historyMode) { _, _ in Task { await agent.reloadHistory() } }
 
