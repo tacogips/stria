@@ -64,10 +64,10 @@ main() {
   mkdir -p "$(dirname "$output")"
   cat > "$output" <<EOF
 cask "stria" do
-  version "$version"
   arch arm: "darwin-arm64", intel: "darwin-x64"
 
-  sha256 arm: "$darwin_arm64_sha",
+  version "$version"
+  sha256 arm:   "$darwin_arm64_sha",
          intel: "$darwin_x64_sha"
 
   url "$release_base_url/$artifact_name-#{version}-#{arch}.dmg",
@@ -81,7 +81,7 @@ cask "stria" do
     strategy :github_latest
   end
 
-  depends_on macos: ">= :sonoma"
+  depends_on macos: :sonoma
 
   app "Stria.app"
   binary "#{appdir}/Stria.app/Contents/MacOS/stria"
