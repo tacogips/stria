@@ -45,8 +45,6 @@ struct AgentPaneView: View {
       switch tab {
       case .chat:
         scopePicker
-        vendorBar
-          .id(configRevision)
         if let notice = agent.notice {
           Label(notice, systemImage: "exclamationmark.circle")
             .font(.callout)
@@ -63,56 +61,63 @@ struct AgentPaneView: View {
     }
   }
 
-  /// Vendor and model for the next question. API vendors without a usable
-  /// key cannot be chosen (disabled, with the reason) and a warning with a
-  /// Settings link appears if the current selection loses its key.
-  private var vendorBar: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      HStack(spacing: 8) {
-        Menu {
-          ForEach(AgentPaneViewModel.vendorOptions, id: \.self) { vendor in
-            let availability = agent.availability(of: vendor)
-            Button {
-              Task { await agent.select(vendor: vendor) }
-            } label: {
-              switch availability {
-              case .ready: Text(SettingsViewModel.displayName(for: vendor))
-              case .needsCredentialName: Text("\(SettingsViewModel.displayName(for: vendor)) (no API key variable in Settings)")
-              case .missingKey(let name): Text("\(SettingsViewModel.displayName(for: vendor)) (\(name) not set)")
-              }
+  /// Vendor menu and model picker, shown at the composer's bottom right.
+  /// API vendors without a usable key are disabled with the reason.
+  private var modelSelector: some View {
+    HStack(spacing: 6) {
+      Menu {
+        ForEach(AgentPaneViewModel.vendorOptions, id: \.self) { vendor in
+          let availability = agent.availability(of: vendor)
+          Button {
+            Task { await agent.select(vendor: vendor) }
+          } label: {
+            switch availability {
+            case .ready: Text(SettingsViewModel.displayName(for: vendor))
+            case .needsCredentialName: Text("\(SettingsViewModel.displayName(for: vendor)) (no API key variable in Settings)")
+            case .missingKey(let name): Text("\(SettingsViewModel.displayName(for: vendor)) (\(name) not set)")
             }
-            .disabled(!availability.isReady)
           }
-        } label: {
-          Label(agent.selectedVendor.map { SettingsViewModel.displayName(for: $0) } ?? "Choose vendor…", systemImage: "cpu")
+          .disabled(!availability.isReady)
         }
-        .fixedSize()
-        if let vendor = agent.selectedVendor {
-          Picker("Model", selection: Binding(
-            get: { agent.selectedModel ?? "" },
-            set: { model in Task { await agent.select(model: model) } }
-          )) {
-            ForEach(agent.modelOptions(for: vendor), id: \.self) { Text($0).tag($0) }
-          }
-          .pickerStyle(.menu)
-          .labelsHidden()
-          .fixedSize()
-        }
-        Spacer()
+      } label: {
+        Text(agent.selectedVendor.map { SettingsViewModel.displayName(for: $0) } ?? "Choose vendor…")
       }
-      if let vendor = agent.selectedVendor, !agent.availability(of: vendor).isReady {
-        HStack(spacing: 8) {
-          Label(warningText(for: agent.availability(of: vendor)), systemImage: "exclamationmark.triangle")
-            .foregroundStyle(.orange)
-          SettingsLink { Text("Open Settings…") }
+      .menuStyle(.borderlessButton)
+      .fixedSize()
+      .help("Vendor that answers the question")
+      if let vendor = agent.selectedVendor {
+        Picker("Model", selection: Binding(
+          get: { agent.selectedModel ?? "" },
+          set: { model in Task { await agent.select(model: model) } }
+        )) {
+          ForEach(agent.modelOptions(for: vendor), id: \.self) { Text($0).tag($0) }
         }
-        .font(.callout)
-      } else if agent.selectedVendor == nil {
-        Text("Choose the vendor and model that answer your questions.").font(.caption).foregroundStyle(.secondary)
+        .pickerStyle(.menu)
+        .labelsHidden()
+        .fixedSize()
+        .help("Model for this vendor")
       }
     }
-    .padding(.horizontal)
-    .padding(.top, 10)
+    .font(.caption)
+  }
+
+  /// Shown above the composer when the selection cannot be used.
+  @ViewBuilder private var selectionWarning: some View {
+    if let vendor = agent.selectedVendor, !agent.availability(of: vendor).isReady {
+      HStack(spacing: 8) {
+        Label(warningText(for: agent.availability(of: vendor)), systemImage: "exclamationmark.triangle")
+          .foregroundStyle(.orange)
+        SettingsLink { Text("Open Settings…") }
+      }
+      .font(.callout)
+      .padding(.horizontal)
+      .padding(.top, 6)
+    } else if agent.selectedVendor == nil {
+      Text("Choose a vendor and model at the bottom right of the box below.")
+        .font(.caption).foregroundStyle(.secondary)
+        .padding(.horizontal)
+        .padding(.top, 6)
+    }
   }
 
   private func warningText(for availability: VendorAvailability) -> String {
@@ -180,26 +185,67 @@ struct AgentPaneView: View {
     }
   }
 
+  /// A wide, tall input box: the text on top, and along its bottom edge the
+  /// vendor / model selector and the send (arrow) or cancel button at the
+  /// right. Return inserts a new line; Cmd-Return sends.
   private var composer: some View {
-    HStack(alignment: .bottom, spacing: 8) {
-      TextField("Ask about this PDF…", text: $agent.input, axis: .vertical)
-        .lineLimit(2...6)
-        .textFieldStyle(FlatTextFieldStyle())
-        .focused($inputFocused)
-        .onSubmit { agent.submit() }
-      if agent.inFlight {
-        Button { agent.cancel() } label: { Image(systemName: "stop.circle") }
-          .help("Stop waiting for this answer (Cmd-.)")
-          .accessibilityLabel("Cancel")
-      } else {
-        Button { agent.submit() } label: { Image(systemName: "paperplane") }
-          .accessibilityLabel("Send")
-          .disabled(agent.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !agent.canSend)
-          .keyboardShortcut(.return, modifiers: .command)
-          .help("Send the question (Cmd-Return); / focuses this field")
+    VStack(spacing: 0) {
+      selectionWarning
+        .id(configRevision)
+      VStack(spacing: 0) {
+        ZStack(alignment: .topLeading) {
+          TextEditor(text: $agent.input)
+            .font(.body)
+            .scrollContentBackground(.hidden)
+            .focused($inputFocused)
+            .frame(minHeight: 96, maxHeight: 240)
+            .fixedSize(horizontal: false, vertical: true)
+          if agent.input.isEmpty {
+            Text("Ask about this PDF…")
+              .foregroundStyle(.tertiary)
+              .padding(.top, 1)
+              .padding(.leading, 5)
+              .allowsHitTesting(false)
+          }
+        }
+        .padding(.horizontal, 8)
+        .padding(.top, 8)
+        HStack(spacing: 8) {
+          Spacer()
+          modelSelector
+            .id(configRevision)
+          if agent.inFlight {
+            Button { agent.cancel() } label: {
+              Image(systemName: "stop.circle.fill").font(.title2)
+            }
+            .buttonStyle(.plain)
+            .help("Stop waiting for this answer (Cmd-.)")
+            .accessibilityLabel("Cancel")
+          } else {
+            Button { agent.submit() } label: {
+              Image(systemName: "arrow.up.circle.fill").font(.title2)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(sendDisabled ? Color.secondary : Flat.userBubble)
+            .disabled(sendDisabled)
+            .keyboardShortcut(.return, modifiers: .command)
+            .help("Send the question (Cmd-Return); / focuses this box")
+            .accessibilityLabel("Send")
+          }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
       }
+      .background(Flat.assistantBubble, in: RoundedRectangle(cornerRadius: Flat.bubbleRadius))
+      .overlay(RoundedRectangle(cornerRadius: Flat.bubbleRadius)
+        .stroke(inputFocused ? Flat.userBubble : Flat.border, lineWidth: inputFocused ? 1.5 : 1))
+      .padding(.horizontal, 10)
+      .padding(.vertical, 10)
     }
-    .padding()
+  }
+
+  private var sendDisabled: Bool {
+    agent.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !agent.canSend
   }
 
   private var history: some View {

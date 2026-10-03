@@ -192,8 +192,12 @@ while a search is active.
 - Suggested questions: an empty thread shows three fixed prompts: "Summarize
   this page", "Explain the key terms on this page" and "What should I read
   next to understand this?". Clicking one sends it.
-- Input: a multi-line text field. Send with the Send button or
-  `Cmd-Return`. During the request an assistant bubble with a small
+- Input: a wide, tall rounded box spanning the pane (a text editor, 96 to
+  240 points high; Return inserts a new line). Along its bottom edge, at the
+  right, sit the vendor menu and model picker for the question and the
+  send button (an up-arrow; `Cmd-Return`), which becomes a stop button
+  while an answer is in flight. A warning with an Open Settings link
+  appears above the box when the selected vendor lacks its key. During the request an assistant bubble with a small
   progress indicator shows the answer as it streams
   (`AgentPaneViewModel.streamingAnswer`); when the answer completes, the
   bubble is replaced by the persisted transcript message. The Send button
