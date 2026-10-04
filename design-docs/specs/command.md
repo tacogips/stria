@@ -179,7 +179,7 @@ With `--threads` it lists conversations (same filters, newest first):
 
 ```json
 {"threads": [{"threadId": "...", "docId": null, "page": null,
-  "firstQuestion": "...", "summary": null, "summaryCurrent": false,
+  "title": null, "firstQuestion": "...", "summary": null, "summaryCurrent": false,
   "messageCount": 2, "updatedAt": "..."}]}
 ```
 

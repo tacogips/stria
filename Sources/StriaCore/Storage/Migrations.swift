@@ -5,7 +5,7 @@ struct MigrationResult {
 }
 
 enum Migrations {
-  static let version = 2
+  static let version = 3
 
   static func run(_ database: SQLiteConnection, forceLikeSearch: Bool) throws -> MigrationResult {
     // busy_timeout comes first: even reading user_version can hit the lock of
@@ -46,6 +46,13 @@ enum Migrations {
         try database.execute("PRAGMA user_version=2")
       }
     }
+    if try userVersion(database) < 3 {
+      try database.transaction {
+        guard try userVersion(database) < 3 else { return }
+        try addThreadTitleColumn(database)
+        try database.execute("PRAGMA user_version=3")
+      }
+    }
     return MigrationResult(backend: try storedBackend(database))
   }
 
@@ -63,6 +70,12 @@ enum Migrations {
       ALTER TABLE chat_threads ADD COLUMN summary_through_message_id INTEGER;
       ALTER TABLE chat_threads ADD COLUMN summary_updated_at TEXT;
       """)
+  }
+
+  /// Migration 3: a short title per chat thread, shown in the agent pane
+  /// header and the history list.
+  static func addThreadTitleColumn(_ db: SQLiteConnection) throws {
+    try db.execute("ALTER TABLE chat_threads ADD COLUMN title TEXT;")
   }
 
   /// Schema version 1, kept as the first step of every fresh database.

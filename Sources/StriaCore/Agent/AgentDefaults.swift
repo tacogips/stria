@@ -7,6 +7,14 @@ public enum AgentDefaults {
     when they matter. Output only the summary text, with no heading, quotation marks or preamble.
     """
 
+  /// Asks for a short title for the conversation (agent pane header and history).
+  public static let titlePrompt = """
+    You write the title of a conversation between a user and Stria's PDF reading assistant.
+    Name what the conversation is about, starting from the user's first question, in at most eight words \
+    (or about twenty characters in Chinese or Japanese), in the language the user wrote in.
+    Output only the title on one line, with no quotation marks, heading, trailing period or preamble.
+    """
+
   /// The default system prompt. Users can edit it in Settings (or
   /// `agent.systemPrompt`) and reset to this text.
   public static let systemPrompt = """

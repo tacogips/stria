@@ -45,7 +45,7 @@ import Testing
       #expect(threads.exitCode == 0)
       let threadList = try #require(try json(threads.stdout)["threads"]?.arrayValue)
       #expect(threadList.count == 1)
-      #expect(threadList.first?.objectValue?.keySet == Set(["threadId", "docId", "page", "firstQuestion", "summary", "summaryCurrent", "messageCount", "updatedAt"]))
+      #expect(threadList.first?.objectValue?.keySet == Set(["threadId", "docId", "page", "title", "firstQuestion", "summary", "summaryCurrent", "messageCount", "updatedAt"]))
       #expect(threadList.first?.objectValue?["summary"] == .null)
       let homePaths = StriaPaths(root: home)
       #expect(FileManager.default.fileExists(atPath: homePaths.original(docId: idB).path))

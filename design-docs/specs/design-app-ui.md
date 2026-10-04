@@ -238,19 +238,25 @@ library. One `SearchViewModel` (on `AppModel`) serves both screens.
   inline notice naming the reason and are not persisted.
 - The pane has two tabs, **Chat** and **History**, as a segmented control
   pinned at the top (the content below is top-aligned, so switching tabs
-  never moves the control). Chat holds the scope picker, transcript and
-  composer (no suggested questions). History lists conversations, not
+  never moves the control). Chat holds a title bar, the scope picker,
+  transcript and composer (no suggested questions). The title bar shows the
+  open chat's title (`AgentPaneViewModel.chatTitle`: the AI title, else the
+  first question's first line, else "New Chat" in secondary colour), a
+  "wand.and.stars" button that asks the AI for a new title (a spinner while
+  it runs; disabled for a new chat or without a vendor), and the `p.N` flag
+  button for the chat's start page. History lists conversations, not
   messages; its own segmented control switches between "This page" and
   "This PDF" (`design-storage.md#thread-overviews`). Each row shows the page,
-  message count, relative time, the conversation summary (up to four lines;
+  message count, relative time, the title, the conversation summary (up to four lines;
   "Summarizing..." while one is written; a stale icon when newer messages
   exist) and the first question in two secondary lines. The context menu
-  offers Summarize / Summarize Again. The list refreshes when the tab is
+  offers Summarize / Summarize Again and Write Title / Write New Title. The list refreshes when the tab is
   shown, after each answer, and on page change debounced by 300 ms (only in
   "This page" mode). Selecting a row reopens its thread in the Chat tab and
   jumps to its anchor page.
 - Summaries: with `agent.autoSummarize` (default true; Settings toggle
-  "Summarize conversations after each answer") each successful answer starts
+  "Title and summarize conversations after each answer") the first successful
+  answer of a conversation also writes its title, then each answer starts
   a background `ThreadSummarizer` call with the composer's vendor and model
   (`design-agent-integration.md#conversation-summaries`). A failure shows a
   notice and keeps the previous summary.
@@ -302,6 +308,10 @@ with `StriaLibrary.saveConfig` on Save (nothing is written before). Sections:
   the concurrency stepper. Choosing a vendor fills empty model and variable
   fields with suggestions and clears a model the new vendor does not know, so
   a model id is never sent to the wrong vendor.
+- OCR Prompt: a text editor showing the prompt sent with each page image
+  (`OCRDefaults.prompt` when `ocr.prompt` is null), "Using the default
+  prompt." / "Custom prompt.", and Reset to Default. Saving text equal to the
+  default stores null. Changes apply to the next OCR run.
 - Agent: vendor, model and API key variable in the same way.
 - System Prompt: a text editor showing the current prompt (the default when
   none is set) with "Reset to Default". A prompt equal to the default is

@@ -125,7 +125,8 @@ Migrations are versioned with `PRAGMA user_version`. Each migration runs in
 one transaction and bumps `user_version`. Opening a DB whose version is newer
 than the binary knows fails with `databaseTooNew` and leaves the DB
 unmodified. Re-opening an up-to-date DB runs nothing. Migration 1 creates
-the schema; migration 2 adds the `chat_threads` summary columns. Later schema
+the schema; migration 2 adds the `chat_threads` summary columns; migration 3
+adds `chat_threads.title`. Later schema
 changes add new numbered migrations and never edit earlier ones.
 
 ### Search Backend
@@ -204,7 +205,8 @@ chat_threads(
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
   summary TEXT,                      -- migration 2: conversation summary
   summary_through_message_id INTEGER, -- last message the summary covers
-  summary_updated_at TEXT)
+  summary_updated_at TEXT,
+  title TEXT)                        -- migration 3: short AI-written title
 
 chat_messages(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -314,7 +316,10 @@ thread whose messages match the chat-history filter below: the first user
 message, message count, last message id, `updated_at` and the summary.
 Ordered by `updated_at DESC`. A summary is current when
 `summary_through_message_id >= MAX(chat_messages.id)` of the thread.
-`setThreadSummary(threadId:summary:throughMessageId:)` writes it.
+`setThreadSummary(threadId:summary:throughMessageId:)` writes it. Overviews
+also carry `title` (`setThreadTitle(threadId:title:)`; `displayTitle` falls
+back to the first question's first line, 60 characters), and
+`threadOverview(threadId:)` returns one thread for the agent pane header.
 
 ## Chat History Queries
 

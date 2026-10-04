@@ -39,17 +39,6 @@ struct AgentPaneView: View {
         .disabled(agent.inFlight)
         .help("Resume the previous chat about this PDF; repeat for older ones (r or Cmd-Shift-R)")
         .accessibilityLabel("Resume Previous Chat")
-        Spacer(minLength: 0)
-        if let page = agent.conversationStartPage {
-          Button { agent.goToConversationStart() } label: {
-            Label("p.\(page)", systemImage: "flag")
-              .labelStyle(.titleAndIcon)
-              .font(.caption)
-          }
-          .buttonStyle(.plain)
-          .help("Go to page \(page), where this chat started (s or Cmd-Shift-J)")
-          .accessibilityLabel("Go to Chat Start Page")
-        }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.horizontal)
@@ -73,6 +62,8 @@ struct AgentPaneView: View {
     VStack(spacing: 0) {
       switch tab {
       case .chat:
+        chatTitleBar
+        Divider()
         scopePicker
         if let notice = agent.notice {
           Label(notice, systemImage: "exclamationmark.circle")
@@ -88,6 +79,43 @@ struct AgentPaneView: View {
         history
       }
     }
+  }
+
+  /// The open conversation's title, a button that asks the AI for a new
+  /// one, and a jump to the page where the chat started.
+  private var chatTitleBar: some View {
+    HStack(alignment: .firstTextBaseline, spacing: 8) {
+      Text(agent.chatTitle)
+        .font(.headline)
+        .foregroundStyle(agent.threadId == nil ? .secondary : .primary)
+        .lineLimit(2)
+        .help(agent.chatTitle)
+        .frame(maxWidth: .infinity, alignment: .leading)
+      if agent.isTitlingCurrentChat {
+        ProgressView().controlSize(.small)
+          .help("Writing a title…")
+      } else {
+        Button { Task { await agent.retitle() } } label: {
+          Image(systemName: "wand.and.stars")
+        }
+        .buttonStyle(.plain)
+        .disabled(agent.threadId == nil || agent.inFlight || agent.selection == nil)
+        .help(agent.currentThread?.title == nil ? "Ask the AI to title this chat" : "Ask the AI for a new title")
+        .accessibilityLabel("Regenerate Title")
+      }
+      if let page = agent.conversationStartPage {
+        Button { agent.goToConversationStart() } label: {
+          Label("p.\(page)", systemImage: "flag")
+            .labelStyle(.titleAndIcon)
+            .font(.caption)
+        }
+        .buttonStyle(.plain)
+        .help("Go to page \(page), where this chat started (s or Cmd-Shift-J)")
+        .accessibilityLabel("Go to Chat Start Page")
+      }
+    }
+    .padding(.horizontal)
+    .padding(.vertical, 8)
   }
 
   /// Vendor and model controls stacked along the composer's bottom edge.
@@ -294,6 +322,10 @@ struct AgentPaneView: View {
               Task { await agent.summarize(threadId: thread.threadId) }
             }
             .disabled(agent.summarizingThreadIDs.contains(thread.threadId) || agent.selection == nil)
+            Button(thread.title == nil ? "Write Title" : "Write New Title") {
+              Task { await agent.retitle(threadId: thread.threadId) }
+            }
+            .disabled(agent.titlingThreadIDs.contains(thread.threadId) || agent.selection == nil)
           }
         }
         .listStyle(.plain)
@@ -390,7 +422,7 @@ private struct StreamingAnswerView: View {
   }
 }
 
-/// A conversation in the History tab: its summary, then the question that
+/// A conversation in the History tab: its title and summary, then the question that
 /// started it, the page, the number of messages and when it last changed.
 private struct ThreadRow: View {
   let thread: ThreadOverview
@@ -406,6 +438,9 @@ private struct ThreadRow: View {
         Spacer()
         Text(RelativeAge.string(from: thread.updatedAt)).font(.caption2).foregroundStyle(.tertiary)
       }
+      Text(thread.displayTitle)
+        .font(.headline)
+        .lineLimit(2)
       summary
       Text(thread.firstQuestion)
         .font(.callout)

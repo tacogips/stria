@@ -234,19 +234,21 @@ public struct ThreadOutput: Encodable {
   public let threadId: String
   public let docId: String?
   public let page: Int?
+  public let title: String?
   public let firstQuestion: String
   public let summary: String?
   public let summaryCurrent: Bool
   public let messageCount: Int
   public let updatedAt: Date
 
-  enum CodingKeys: String, CodingKey { case threadId, docId, page, firstQuestion, summary, summaryCurrent, messageCount, updatedAt }
+  enum CodingKeys: String, CodingKey { case threadId, docId, page, title, firstQuestion, summary, summaryCurrent, messageCount, updatedAt }
 
   public func encode(to encoder: Encoder) throws {
     var container = encoder.container(keyedBy: CodingKeys.self)
     try container.encode(threadId, forKey: .threadId)
     try container.encode(docId, forKey: .docId)
     try container.encode(page, forKey: .page)
+    try container.encode(title, forKey: .title)
     try container.encode(firstQuestion, forKey: .firstQuestion)
     try container.encode(summary, forKey: .summary)
     try container.encode(summaryCurrent, forKey: .summaryCurrent)

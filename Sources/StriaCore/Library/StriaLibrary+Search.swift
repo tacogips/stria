@@ -48,6 +48,16 @@ extension StriaLibrary {
     try await ThreadSummarizer(environment: environment, store: store).summarize(threadId: threadId, selection: selection)
   }
 
+  /// Asks the agent for a short title for a conversation and stores it.
+  @discardableResult
+  public func titleThread(threadId: String, selection: AgentSelection? = nil) async throws -> String {
+    try await ThreadSummarizer(environment: environment, store: store).title(threadId: threadId, selection: selection)
+  }
+
+  public func threadOverview(threadId: String) async throws -> ThreadOverview? {
+    try await store.threadOverview(threadId: threadId)
+  }
+
   public func threadMessages(threadId: String) async throws -> [ChatMessageRecord] {
     try await store.threadMessages(threadId: threadId)
   }

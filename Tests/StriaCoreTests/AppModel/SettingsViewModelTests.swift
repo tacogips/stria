@@ -16,6 +16,8 @@ import Testing
     #expect(settings.credentials["anthropic"] == "ANTHROPIC_API_KEY")
     #expect(settings.ocrVendor == SettingsViewModel.notConfigured)
     #expect(settings.systemPromptIsDefault)
+    #expect(settings.ocrPromptIsDefault)
+    #expect(settings.ocrPrompt == OCRDefaults.prompt)
 
     settings.ocrVendor = "claude-code"
     #expect(!settings.save())
@@ -27,6 +29,8 @@ import Testing
     settings.credentials["openai"] = "MY_OPENAI_KEY"
     settings.credentials["gemini"] = ""
     settings.agentSystemPrompt = "custom prompt"
+    settings.ocrPrompt = "  Transcribe this page.\n"
+    #expect(!settings.ocrPromptIsDefault)
     #expect(settings.save())
     #expect(settings.error == nil)
     #expect(model.configRevision == 1)
@@ -35,6 +39,8 @@ import Testing
     let saved = try ConfigStore.loadOrCreate(paths: paths)
     #expect(saved.ocr.vendor == "claude-code")
     #expect(saved.agent.systemPrompt == "custom prompt")
+    #expect(saved.ocr.prompt == "Transcribe this page.")
+    #expect(library.environment.config.ocr.prompt == "Transcribe this page.")
     #expect(saved.agent.credentials["openai"] == "MY_OPENAI_KEY")
     #expect(saved.agent.credentials["gemini"] == nil)
     #expect(library.environment.config.agent.credential(for: "openai") == "MY_OPENAI_KEY")
@@ -43,8 +49,11 @@ import Testing
 
     settings.resetSystemPrompt()
     #expect(settings.systemPromptIsDefault)
+    settings.resetOCRPrompt()
+    #expect(settings.ocrPromptIsDefault)
     #expect(settings.save())
     #expect(try ConfigStore.loadOrCreate(paths: paths).agent.systemPrompt == nil)
+    #expect(try ConfigStore.loadOrCreate(paths: paths).ocr.prompt == nil)
   }
 }
 

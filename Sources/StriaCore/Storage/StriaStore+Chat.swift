@@ -71,18 +71,41 @@ extension StriaStore {
     guard page == nil || documentId != nil else { throw StriaError.usage("A page filter requires a document id") }
     guard limit > 0 else { throw StriaError.usage("History limit must be positive") }
     let filter = historyFilter(documentId: documentId, page: page)
-    let statement = try database.prepare("""
-      SELECT t.id, t.document_id, t.page_number, t.summary, t.summary_through_message_id, t.updated_at,
-        (SELECT content FROM chat_messages m WHERE m.thread_id=t.id AND m.role='user' ORDER BY m.id LIMIT 1),
-        (SELECT MAX(id) FROM chat_messages m WHERE m.thread_id=t.id),
-        (SELECT COUNT(*) FROM chat_messages m WHERE m.thread_id=t.id)
-      FROM chat_threads t
+    let statement = try database.prepare(Self.threadOverviewSelect + """
       WHERE t.id IN (SELECT DISTINCT thread_id FROM chat_messages \(filter.sql))
       ORDER BY t.updated_at DESC, t.rowid DESC LIMIT ?
       """)
-    var index = try bind(filter, to: statement)
+    let index = try bind(filter, to: statement)
     try statement.bind(limit, at: index)
-    index += 1
+    return try readThreadOverviews(statement)
+  }
+
+  /// One conversation's overview (title, summary, first question), or nil
+  /// when the thread has no messages.
+  public func threadOverview(threadId: String) throws -> ThreadOverview? {
+    let statement = try database.prepare(Self.threadOverviewSelect + "WHERE t.id=? AND EXISTS (SELECT 1 FROM chat_messages m WHERE m.thread_id=t.id)")
+    try statement.bind(threadId, at: 1)
+    return try readThreadOverviews(statement).first
+  }
+
+  public func setThreadTitle(threadId: String, title: String) throws {
+    let statement = try database.prepare("UPDATE chat_threads SET title=? WHERE id=?")
+    try statement.bind(title, at: 1).bind(threadId, at: 2)
+    _ = try statement.step()
+    guard database.changes > 0 else { throw StriaError.database("Chat thread not found: \(threadId)") }
+  }
+
+  private static let threadOverviewSelect = """
+    SELECT t.id, t.document_id, t.page_number, t.summary, t.summary_through_message_id, t.updated_at,
+      (SELECT content FROM chat_messages m WHERE m.thread_id=t.id AND m.role='user' ORDER BY m.id LIMIT 1),
+      (SELECT MAX(id) FROM chat_messages m WHERE m.thread_id=t.id),
+      (SELECT COUNT(*) FROM chat_messages m WHERE m.thread_id=t.id),
+      t.title
+    FROM chat_threads t
+
+    """
+
+  private func readThreadOverviews(_ statement: Statement) throws -> [ThreadOverview] {
     var threads: [ThreadOverview] = []
     while try statement.step() {
       guard let id = statement.string(0),
@@ -92,7 +115,7 @@ extension StriaStore {
       let summary = statement.string(3)
       threads.append(ThreadOverview(
         threadId: id, documentId: statement.string(1), pageNumber: statement.isNull(2) ? nil : statement.int(2),
-        firstQuestion: statement.string(6) ?? "", summary: summary,
+        title: statement.string(9), firstQuestion: statement.string(6) ?? "", summary: summary,
         isSummaryCurrent: summary != nil && through.map { $0 >= lastMessageId } == true,
         messageCount: statement.int(8), lastMessageId: lastMessageId, updatedAt: updated))
     }

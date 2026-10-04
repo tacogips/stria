@@ -46,6 +46,10 @@ public final class AgentPaneViewModel {
   public private(set) var threads: [ThreadOverview] = []
   /// Threads whose summary is being written right now.
   public private(set) var summarizingThreadIDs: Set<String> = []
+  /// Threads whose title is being written right now.
+  public private(set) var titlingThreadIDs: Set<String> = []
+  /// The open conversation's overview (title, summary); nil for a new chat.
+  public private(set) var currentThread: ThreadOverview?
   private let library: StriaLibrary
   private let reader: ReaderViewModel
   private let processEnvironment: [String: String]
@@ -199,9 +203,13 @@ public final class AgentPaneViewModel {
       await reloadTranscript()
       await reloadHistory()
       if library.environment.config.agent.autoSummarize {
-        // Refresh the conversation's summary in the background.
+        // Title a new conversation once, then refresh its summary, in the background.
         let selection = self.selection
-        Task { [weak self] in await self?.summarize(threadId: requestThreadId, selection: selection) }
+        let needsTitle = currentThread?.title == nil
+        Task { [weak self] in
+          if needsTitle { await self?.retitle(threadId: requestThreadId, selection: selection) }
+          await self?.summarize(threadId: requestThreadId, selection: selection)
+        }
       }
     } catch let error as StriaError where error.code == .serviceFailed {
       await reloadTranscript()
@@ -237,7 +245,32 @@ public final class AgentPaneViewModel {
     guard !inFlight else { return }
     threadId = nil
     transcript = []
+    currentThread = nil
     notice = nil
+  }
+
+  /// The header title: the AI title, else the first question, else "New Chat".
+  public var chatTitle: String {
+    if let currentThread { return currentThread.displayTitle }
+    if let question = transcript.first(where: { $0.role == .user }) { return ThreadOverview.fallbackTitle(question.content) }
+    return "New Chat"
+  }
+
+  public var isTitlingCurrentChat: Bool { threadId.map(titlingThreadIDs.contains) ?? false }
+
+  /// Asks the agent for a new title for a conversation (the open one by
+  /// default). Failures keep the previous title and show a notice.
+  public func retitle(threadId: String? = nil, selection: AgentSelection? = nil) async {
+    guard let target = threadId ?? self.threadId, !titlingThreadIDs.contains(target) else { return }
+    titlingThreadIDs.insert(target)
+    defer { titlingThreadIDs.remove(target) }
+    do {
+      _ = try await library.titleThread(threadId: target, selection: selection ?? self.selection)
+    } catch {
+      notice = "Could not title the conversation: " + ((error as? StriaError)?.message ?? error.localizedDescription)
+    }
+    if target == self.threadId { currentThread = try? await library.threadOverview(threadId: target) }
+    await reloadHistory()
   }
 
   public func reloadHistory() async {
@@ -319,7 +352,8 @@ public final class AgentPaneViewModel {
   }
 
   private func reloadTranscript() async {
-    guard let threadId else { transcript = []; return }
+    guard let threadId else { transcript = []; currentThread = nil; return }
     do { transcript = try await library.threadMessages(threadId: threadId) } catch { transcript = [] }
+    currentThread = try? await library.threadOverview(threadId: threadId)
   }
 }

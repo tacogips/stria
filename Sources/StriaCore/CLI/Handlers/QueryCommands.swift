@@ -36,7 +36,8 @@ enum QueryCommands {
     case .history(let docId, let page, let limit, let threads) where threads:
       let overviews = try await library.threadOverviews(documentId: docId, page: page, limit: limit ?? 50)
       return ThreadsOutput(threads: overviews.map {
-        ThreadOutput(threadId: $0.threadId, docId: $0.documentId, page: $0.pageNumber, firstQuestion: $0.firstQuestion,
+        ThreadOutput(threadId: $0.threadId, docId: $0.documentId, page: $0.pageNumber, title: $0.title,
+                     firstQuestion: $0.firstQuestion,
                              summary: $0.summary, summaryCurrent: $0.isSummaryCurrent, messageCount: $0.messageCount,
                              updatedAt: $0.updatedAt)
       })

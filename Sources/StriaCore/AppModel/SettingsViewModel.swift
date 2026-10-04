@@ -18,6 +18,8 @@ public final class SettingsViewModel {
   public var ocrAPIKeyEnvironment = ""
   public var ocrAutoRunOnImport = true
   public var ocrConcurrency = 2
+  /// The OCR prompt as shown for editing; the default text when none is set.
+  public var ocrPrompt = OCRDefaults.prompt
   /// Credential variable name per API vendor ("" = none).
   public var credentials: [String: String] = [:]
   /// The prompt as shown for editing; the default text when none is set.
@@ -93,6 +95,7 @@ public final class SettingsViewModel {
     ocrAPIKeyEnvironment = config.ocr.apiKeyEnvironment ?? ""
     ocrAutoRunOnImport = config.ocr.autoRunOnImport
     ocrConcurrency = config.ocr.concurrency
+    ocrPrompt = config.ocr.prompt ?? OCRDefaults.prompt
     credentials = config.agent.credentials
     for vendor in Self.credentialVendors where credentials[vendor] == nil { credentials[vendor] = "" }
     agentSystemPrompt = config.agent.systemPrompt ?? AgentDefaults.systemPrompt
@@ -105,6 +108,12 @@ public final class SettingsViewModel {
   }
 
   public func resetSystemPrompt() { agentSystemPrompt = AgentDefaults.systemPrompt }
+
+  public var ocrPromptIsDefault: Bool {
+    ocrPrompt.trimmingCharacters(in: .whitespacesAndNewlines) == OCRDefaults.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  public func resetOCRPrompt() { ocrPrompt = OCRDefaults.prompt }
 
   public static func displayName(for vendor: String) -> String {
     switch vendor {
@@ -169,6 +178,8 @@ public final class SettingsViewModel {
     config.ocr.apiKeyEnvironment = Self.trimmed(ocrAPIKeyEnvironment)
     config.ocr.autoRunOnImport = ocrAutoRunOnImport
     config.ocr.concurrency = ocrConcurrency
+    // Stored as null while it matches the default, so a later default reaches users who never edited it.
+    config.ocr.prompt = ocrPromptIsDefault ? nil : Self.trimmed(ocrPrompt)
     config.agent.credentials = credentials.reduce(into: [:]) { result, entry in
       if let name = Self.trimmed(entry.value) { result[entry.key] = name }
     }

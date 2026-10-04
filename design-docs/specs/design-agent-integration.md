@@ -293,6 +293,15 @@ reply is stored with the id of the last message it covers, so a later answer
 marks it stale. The app runs it after each answer when `agent.autoSummarize`
 is true, and on demand from the History context menu.
 
+Titles use the same transcript with `AgentDefaults.titlePrompt` (at most
+eight words, or about twenty CJK characters, in the user's language).
+`ThreadSummarizer.cleanTitle` keeps the first non-empty line, drops a
+"Title:" label, quotes, Markdown emphasis and a trailing period, and caps it
+at 80 characters. With `agent.autoSummarize` the app titles a conversation
+once, after its first answer and before the summary; the agent pane's wand
+button and the History context menu rewrite it on demand. A failure keeps
+the previous title and shows a notice.
+
 ## agent-gateway Integration
 
 Dependency: `.package(url: "https://github.com/tacogips/agent-gateway.git",

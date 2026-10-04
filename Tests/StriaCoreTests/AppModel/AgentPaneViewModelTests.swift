@@ -125,11 +125,18 @@ import Testing
     try await reader.open()
     let pane = AgentPaneViewModel(library: library, reader: reader)
     await fakeAgent.enqueue(.success("first answer"))
+    await fakeAgent.enqueue(.success("Title: \"Page one contents\"."))
     await fakeAgent.enqueue(.success("```\nThe user asked about page one.\n```"))
     pane.input = "What is on page one?"
     await pane.send()
+    #expect(pane.chatTitle == "What is on page one?")
     let thread = try #require(pane.threadId)
     for _ in 0..<100 where pane.threads.first?.summary == nil { try await Task.sleep(for: .milliseconds(20)) }
+    #expect(pane.currentThread?.title == "Page one contents")
+    #expect(pane.chatTitle == "Page one contents")
+    #expect(pane.threads.first?.title == "Page one contents")
+    let requests = await fakeAgent.requests
+    #expect(requests.map(\.systemPrompt).suffix(2) == [AgentDefaults.titlePrompt, AgentDefaults.summaryPrompt])
     let overview = try #require(pane.threads.first)
     #expect(overview.summary == "The user asked about page one.")
     #expect(overview.isSummaryCurrent)
@@ -145,6 +152,26 @@ import Testing
     await pane.summarize(threadId: thread)
     #expect(pane.threads.first?.summary == "The user asked about page one.")
     #expect(pane.notice?.contains("down") == true)
+
+    // Regenerating the title replaces it; a failure keeps the old one.
+    await fakeAgent.enqueue(.success("Page one, revisited"))
+    await pane.retitle()
+    #expect(pane.chatTitle == "Page one, revisited")
+    await fakeAgent.enqueue(.failure(.failed("offline")))
+    await pane.retitle()
+    #expect(pane.chatTitle == "Page one, revisited")
+    #expect(pane.notice == "Could not title the conversation: offline")
+    // A follow-up keeps the title and only refreshes the summary.
+    let before = await fakeAgent.requests.count
+    await fakeAgent.enqueue(.success("second answer"))
+    await fakeAgent.enqueue(.success("Updated summary."))
+    pane.input = "And page two?"
+    await pane.send()
+    for _ in 0..<100 where pane.threads.first?.summary != "Updated summary." { try await Task.sleep(for: .milliseconds(20)) }
+    #expect(await fakeAgent.requests.count == before + 2)
+    #expect(pane.chatTitle == "Page one, revisited")
+    pane.newChat()
+    #expect(pane.chatTitle == "New Chat")
     await reader.close()
   }
 }

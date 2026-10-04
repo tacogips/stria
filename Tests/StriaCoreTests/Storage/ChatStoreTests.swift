@@ -78,7 +78,24 @@ import Testing
       #expect(!overview.isSummaryCurrent)
       #expect(try await store.threadOverviews(documentId: "doc", page: 3, limit: 10).isEmpty)
       await #expect(throws: StriaError.self) { try await store.setThreadSummary(threadId: "missing", summary: "x", throughMessageId: 1) }
+
+      #expect(overview.title == nil)
+      #expect(overview.displayTitle == "first question")
+      try await store.setThreadTitle(threadId: "t1", title: "First question basics")
+      #expect(try await store.threadOverview(threadId: "t1")?.title == "First question basics")
+      #expect(try await store.threadOverviews(documentId: "doc", page: nil, limit: 10).first?.displayTitle == "First question basics")
+      #expect(try await store.threadOverview(threadId: "missing") == nil)
+      await #expect(throws: StriaError.self) { try await store.setThreadTitle(threadId: "missing", title: "x") }
     }
+  }
+
+  @Test func titlesAreCleanedToOneShortLine() {
+    #expect(ThreadSummarizer.cleanTitle("Title: \"Page one overview\".\nextra") == "Page one overview")
+    #expect(ThreadSummarizer.cleanTitle("```\n**契約書の確認**。\n```") == "契約書の確認")
+    #expect(ThreadSummarizer.cleanTitle("タイトル：「見積の内訳」") == "見積の内訳")
+    #expect(ThreadSummarizer.cleanTitle(String(repeating: "a", count: 120)).count == 80)
+    #expect(ThreadOverview.fallbackTitle("  line one\nline two") == "line one")
+    #expect(ThreadOverview.fallbackTitle(String(repeating: "b", count: 70)).count == 60)
   }
 
   @Test func summaryTranscriptKeepsFirstExchangeAndElidesTheMiddle() {

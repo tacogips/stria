@@ -1,7 +1,7 @@
 import Foundation
 
-/// Writes the summary of one chat thread with the selected agent vendor and
-/// model, from the first question through the newest message.
+/// Writes the summary or the title of one chat thread with the selected
+/// agent vendor and model, from the first question through the newest message.
 struct ThreadSummarizer: Sendable {
   let environment: StriaEnvironment
   let store: StriaStore
@@ -13,10 +13,47 @@ struct ThreadSummarizer: Sendable {
   func summarize(threadId: String, selection: AgentSelection?) async throws -> String {
     let messages = try await store.threadMessages(threadId: threadId)
     guard let last = messages.last else { throw StriaError.usage("Chat thread not found: \(threadId)") }
+    let summary = OCRTextPostProcessor.clean(try await ask(AgentDefaults.summaryPrompt, about: messages, selection: selection))
+    guard !summary.isEmpty else { throw StriaError.serviceFailed("The summary came back empty") }
+    try await store.setThreadSummary(threadId: threadId, summary: summary, throughMessageId: last.id)
+    return summary
+  }
+
+  /// Writes (or rewrites) the conversation's short title.
+  func title(threadId: String, selection: AgentSelection?) async throws -> String {
+    let messages = try await store.threadMessages(threadId: threadId)
+    guard !messages.isEmpty else { throw StriaError.usage("Chat thread not found: \(threadId)") }
+    let title = Self.cleanTitle(try await ask(AgentDefaults.titlePrompt, about: messages, selection: selection))
+    guard !title.isEmpty else { throw StriaError.serviceFailed("The title came back empty") }
+    try await store.setThreadTitle(threadId: threadId, title: title)
+    return title
+  }
+
+  /// The first non-empty line without a "Title:" label, quotes, Markdown
+  /// emphasis or a trailing period, capped at 80 characters.
+  static func cleanTitle(_ text: String) -> String {
+    let cleaned = OCRTextPostProcessor.clean(text)
+    var line = cleaned.split(whereSeparator: \.isNewline)
+      .map { $0.trimmingCharacters(in: .whitespaces) }
+      .first { !$0.isEmpty } ?? ""
+    line = line.replacingOccurrences(of: #"^(#+\s*)?(title|タイトル)\s*[:：]\s*"#, with: "",
+                                     options: [.regularExpression, .caseInsensitive])
+    // Quotes, emphasis and a trailing period can wrap each other ("x". or **x**。).
+    let wrapping = CharacterSet(charactersIn: "\"'`*_「」『』“”‘’ ")
+    var previous = ""
+    while previous != line {
+      previous = line
+      line = line.trimmingCharacters(in: wrapping)
+      while let last = line.last, ".。".contains(last) { line.removeLast() }
+    }
+    return String(line.prefix(80))
+  }
+
+  private func ask(_ systemPrompt: String, about messages: [ChatMessageRecord], selection: AgentSelection?) async throws -> String {
     let resolved = try await AskCoordinator(environment: environment, store: store).resolveSelection(selection)
     let request = AgentRequest(
       question: Self.transcript(messages),
-      systemPrompt: AgentDefaults.summaryPrompt,
+      systemPrompt: systemPrompt,
       contextPages: [],
       history: [],
       settings: ServiceSettings(agent: environment.config.agent, vendor: resolved.vendor, model: resolved.model)
@@ -30,10 +67,7 @@ struct ThreadSummarizer: Sendable {
       case .failed(let reason): throw StriaError.serviceFailed(SecretRedactor.truncate(reason))
       }
     }
-    let summary = OCRTextPostProcessor.clean(answer.text)
-    guard !summary.isEmpty else { throw StriaError.serviceFailed("The summary came back empty") }
-    try await store.setThreadSummary(threadId: threadId, summary: summary, throughMessageId: last.id)
-    return summary
+    return answer.text
   }
 
   /// "User: ... / Assistant: ..." lines, oldest first, failed answers left
@@ -42,7 +76,7 @@ struct ThreadSummarizer: Sendable {
     let lines = messages.filter { $0.status == .ok }.map { message in
       "\(message.role == .user ? "User" : "Assistant"): \(message.content)"
     }
-    let header = "Conversation to summarize:\n\n"
+    let header = "Conversation:\n\n"
     let full = lines.joined(separator: "\n\n")
     guard full.count > limit, lines.count > 2 else { return header + String(full.prefix(limit)) }
     let head = lines.prefix(2).joined(separator: "\n\n")

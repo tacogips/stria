@@ -66,6 +66,26 @@ struct SettingsView: View {
         Stepper("Concurrent pages: \(settings.ocrConcurrency)", value: $settings.ocrConcurrency, in: 1...8)
       }
       Section {
+        TextEditor(text: $settings.ocrPrompt)
+          .font(.system(.body, design: .monospaced))
+          .frame(minHeight: 120, maxHeight: 240)
+          .overlay(Rectangle().stroke(Flat.border, lineWidth: 1))
+        HStack {
+          Text(settings.ocrPromptIsDefault ? "Using the default prompt." : "Custom prompt.")
+            .font(.caption).foregroundStyle(.secondary)
+          Spacer()
+          Button("Reset to Default") { settings.resetOCRPrompt() }
+            .disabled(settings.ocrPromptIsDefault)
+        }
+      } header: {
+        Text("OCR Prompt")
+      } footer: {
+        Text("""
+          Sent with each page image. A reply of exactly \(OCRDefaults.noTextSentinel) is stored as a page without text. \
+          Changes apply to the next OCR run; use Run OCR to redo pages already OCRed.
+          """)
+      }
+      Section {
         ForEach(SettingsViewModel.credentialVendors, id: \.self) { vendor in
           HStack {
             TextField(SettingsViewModel.displayName(for: vendor), text: Binding(
@@ -104,7 +124,7 @@ struct SettingsView: View {
           Button("Reset to Default") { settings.resetSystemPrompt() }
             .disabled(settings.systemPromptIsDefault)
         }
-        Toggle("Summarize conversations after each answer", isOn: $settings.agentAutoSummarize)
+        Toggle("Title and summarize conversations after each answer", isOn: $settings.agentAutoSummarize)
       } header: {
         Text("System Prompt")
       } footer: {
