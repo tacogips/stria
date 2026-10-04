@@ -42,13 +42,10 @@ public final class AgentPaneViewModel {
   public func requestInputFocus() { focusInputRequest += 1 }
   public var notice: String?
   public var historyMode: HistoryMode = .page
-  public private(set) var history: [ChatMessageRecord] = []
-  public let suggestedQuestions = [
-    "Summarize this page",
-    "Explain the key terms on this page",
-    "What should I read next to understand this?"
-  ]
-
+  /// Conversations for the History tab (summary + first question).
+  public private(set) var threads: [ThreadOverview] = []
+  /// Threads whose summary is being written right now.
+  public private(set) var summarizingThreadIDs: Set<String> = []
   private let library: StriaLibrary
   private let reader: ReaderViewModel
   private let processEnvironment: [String: String]
@@ -201,6 +198,11 @@ public final class AgentPaneViewModel {
       input = ""
       await reloadTranscript()
       await reloadHistory()
+      if library.environment.config.agent.autoSummarize {
+        // Refresh the conversation's summary in the background.
+        let selection = self.selection
+        Task { [weak self] in await self?.summarize(threadId: requestThreadId, selection: selection) }
+      }
     } catch let error as StriaError where error.code == .serviceFailed {
       await reloadTranscript()
       await reloadHistory()
@@ -240,19 +242,72 @@ public final class AgentPaneViewModel {
 
   public func reloadHistory() async {
     do {
-      history = try await library.history(
+      threads = try await library.threadOverviews(
         documentId: reader.documentId,
         page: historyMode == .page ? reader.currentPage : nil
       )
     } catch {
-      history = []
+      threads = []
     }
   }
 
-  public func selectHistory(_ message: ChatMessageRecord) async {
-    threadId = message.threadId
+  /// Opens a conversation from the History tab and jumps to its page.
+  public func selectThread(_ thread: ThreadOverview) async {
+    threadId = thread.threadId
     await reloadTranscript()
-    if let page = message.pageNumber { reader.goToPage(page) }
+    if thread.documentId == reader.documentId, let page = thread.pageNumber { reader.goToPage(page) }
+  }
+
+  /// The page of this PDF where the open conversation's first question was asked.
+  public var conversationStartPage: Int? {
+    guard let first = transcript.first(where: { $0.role == .user }), first.documentId == reader.documentId else { return nil }
+    return first.pageNumber
+  }
+
+  /// Jumps the reader to the page where the open conversation started.
+  public func goToConversationStart() {
+    if let page = conversationStartPage { reader.goToPage(page) }
+  }
+
+  /// Reopens an earlier conversation about this PDF to continue it: the most
+  /// recent one from a new chat, then each older one on repeated use.
+  @discardableResult
+  public func resumePreviousChat() async -> Bool {
+    guard !inFlight else { return false }
+    let candidates: [ThreadOverview]
+    do {
+      candidates = try await library.threadOverviews(documentId: reader.documentId, page: nil)
+    } catch {
+      notice = (error as? StriaError)?.message ?? error.localizedDescription
+      return false
+    }
+    let previous: ThreadOverview?
+    if let threadId, let index = candidates.firstIndex(where: { $0.threadId == threadId }) {
+      previous = candidates.indices.contains(index + 1) ? candidates[index + 1] : nil
+    } else {
+      previous = candidates.first
+    }
+    guard let previous else {
+      notice = candidates.isEmpty ? "No earlier conversation about this PDF." : "No older conversation about this PDF."
+      return false
+    }
+    notice = nil
+    await selectThread(previous)
+    return true
+  }
+
+  /// Writes (or rewrites) a conversation's summary with the chat's current
+  /// vendor and model. Failures leave the previous summary in place.
+  public func summarize(threadId: String, selection: AgentSelection? = nil) async {
+    guard !summarizingThreadIDs.contains(threadId) else { return }
+    summarizingThreadIDs.insert(threadId)
+    defer { summarizingThreadIDs.remove(threadId) }
+    do {
+      _ = try await library.summarizeThread(threadId: threadId, selection: selection ?? self.selection)
+    } catch {
+      notice = "Could not summarize the conversation: " + ((error as? StriaError)?.message ?? error.localizedDescription)
+    }
+    await reloadHistory()
   }
 
   public func citationPages(in message: ChatMessageRecord) -> [Int] {

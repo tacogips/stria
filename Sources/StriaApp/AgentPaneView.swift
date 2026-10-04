@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import StriaCore
 
@@ -10,6 +11,7 @@ struct AgentPaneView: View {
   var configRevision = 0
   @State private var tab: Tab = .chat
   @FocusState private var inputFocused: Bool
+  @State private var sendKey = ControlMSendMonitor()
 
   enum Tab: Hashable { case chat, history }
 
@@ -21,13 +23,33 @@ struct AgentPaneView: View {
           IconSegment(value: Tab.history, symbol: "clock.arrow.circlepath", help: "History: earlier questions and answers")
         ])
         Divider().frame(height: 22)
-        Button { agent.newChat(); tab = .chat } label: {
+        Button { agent.newChat(); agent.requestInputFocus() } label: {
           Image(systemName: "square.and.pencil")
         }
         .buttonStyle(.plain)
         .disabled(agent.inFlight)
-        .help("Start a new conversation (Cmd-Shift-N)")
+        .help("Start a new conversation (n or Cmd-Shift-N)")
         .accessibilityLabel("New Chat")
+        Button {
+          Task { if await agent.resumePreviousChat() { agent.requestInputFocus() } }
+        } label: {
+          Image(systemName: "arrow.uturn.backward.circle")
+        }
+        .buttonStyle(.plain)
+        .disabled(agent.inFlight)
+        .help("Resume the previous chat about this PDF; repeat for older ones (r or Cmd-Shift-R)")
+        .accessibilityLabel("Resume Previous Chat")
+        Spacer(minLength: 0)
+        if let page = agent.conversationStartPage {
+          Button { agent.goToConversationStart() } label: {
+            Label("p.\(page)", systemImage: "flag")
+              .labelStyle(.titleAndIcon)
+              .font(.caption)
+          }
+          .buttonStyle(.plain)
+          .help("Go to page \(page), where this chat started (s or Cmd-Shift-J)")
+          .accessibilityLabel("Go to Chat Start Page")
+        }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.horizontal)
@@ -39,6 +61,8 @@ struct AgentPaneView: View {
     .onAppear {
       if agent.focusInputRequest > 0 { tab = .chat; inputFocused = true }
     }
+    .onAppear { sendKey.install { inputFocused && !sendDisabled ? (agent.submit(), true).1 : false } }
+    .onDisappear { sendKey.remove() }
     .onChange(of: agent.focusInputRequest) { _, _ in
       tab = .chat
       inputFocused = true
@@ -157,24 +181,6 @@ struct AgentPaneView: View {
       ScrollView {
         // Eager layout avoids a macOS sheet sizing loop when reopening long answers.
         VStack(spacing: 12) {
-          if agent.transcript.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-              Text("Try asking").font(.headline)
-              ForEach(agent.suggestedQuestions, id: \.self) { question in
-                Button(question) {
-                  agent.input = question
-                  agent.submit()
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(Color.accentColor)
-                .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
-                .disabled(agent.inFlight || !agent.canSend)
-              }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding()
-          }
           ForEach(agent.transcript, id: \.id) { message in
             MessageView(message: message, documentId: reader.documentId) {
               reader.goToPage($0)
@@ -242,7 +248,7 @@ struct AgentPaneView: View {
             .foregroundStyle(sendDisabled ? Color.secondary : Flat.userBubble)
             .disabled(sendDisabled)
             .keyboardShortcut(.return, modifiers: .command)
-            .help("Send the question (Cmd-Return); i focuses this box")
+            .help("Send the question (Cmd-Return or Ctrl-M); i or Cmd-L focuses this box")
             .accessibilityLabel("Send")
           }
         }
@@ -271,35 +277,26 @@ struct AgentPaneView: View {
       .padding(.horizontal)
       .onChange(of: agent.historyMode) { _, _ in Task { await agent.reloadHistory() } }
 
-      if agent.history.isEmpty {
-        ContentUnavailableView("No Questions Yet", systemImage: "clock",
+      if agent.threads.isEmpty {
+        ContentUnavailableView("No Conversations Yet", systemImage: "clock",
                                description: Text(agent.historyMode == .page ? "Nothing has been asked about this page." : "Nothing has been asked about this PDF."))
       } else {
-        List(agent.history, id: \.id) { message in
+        List(agent.threads) { thread in
           Button {
-            Task { await agent.selectHistory(message) }
+            Task { await agent.selectThread(thread) }
             tab = .chat
           } label: {
-            VStack(alignment: .leading, spacing: 3) {
-              HStack(spacing: 6) {
-                Text(message.role == .user ? "You" : "Assistant")
-                  .font(.caption.bold())
-                  .foregroundStyle(.secondary)
-                if let page = message.pageNumber {
-                  Text("p. \(page)").font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer()
-                Text(RelativeAge.string(from: message.createdAt)).font(.caption2).foregroundStyle(.tertiary)
-              }
-              Text(message.content)
-                .lineLimit(3)
-                .foregroundStyle(message.status == .error ? Color.red : Color.primary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
+            ThreadRow(thread: thread, isSummarizing: agent.summarizingThreadIDs.contains(thread.threadId))
           }
           .buttonStyle(.plain)
+          .contextMenu {
+            Button(thread.summary == nil ? "Summarize" : "Summarize Again") {
+              Task { await agent.summarize(threadId: thread.threadId) }
+            }
+            .disabled(agent.summarizingThreadIDs.contains(thread.threadId) || agent.selection == nil)
+          }
         }
+        .listStyle(.plain)
       }
     }
     .padding(.top, 8)
@@ -390,5 +387,76 @@ private struct StreamingAnswerView: View {
       Spacer(minLength: 40)
     }
     .padding(.horizontal)
+  }
+}
+
+/// A conversation in the History tab: its summary, then the question that
+/// started it, the page, the number of messages and when it last changed.
+private struct ThreadRow: View {
+  let thread: ThreadOverview
+  let isSummarizing: Bool
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      HStack(spacing: 6) {
+        if let page = thread.pageNumber {
+          Text("p. \(page)").font(.caption.bold()).foregroundStyle(.secondary)
+        }
+        Text("\(thread.messageCount) messages").font(.caption).foregroundStyle(.secondary)
+        Spacer()
+        Text(RelativeAge.string(from: thread.updatedAt)).font(.caption2).foregroundStyle(.tertiary)
+      }
+      summary
+      Text(thread.firstQuestion)
+        .font(.callout)
+        .foregroundStyle(.secondary)
+        .lineLimit(2)
+        .help("First question: \(thread.firstQuestion)")
+    }
+    .padding(.vertical, 4)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .contentShape(Rectangle())
+  }
+
+  @ViewBuilder private var summary: some View {
+    if let text = thread.summary {
+      HStack(alignment: .firstTextBaseline, spacing: 4) {
+        Text(text).lineLimit(4)
+        if isSummarizing {
+          ProgressView().controlSize(.mini)
+        } else if !thread.isSummaryCurrent {
+          Image(systemName: "clock.badge.exclamationmark").font(.caption).foregroundStyle(.secondary)
+            .help("Newer messages are not in this summary yet; right-click > Summarize Again")
+        }
+      }
+    } else if isSummarizing {
+      HStack(spacing: 6) {
+        ProgressView().controlSize(.mini)
+        Text("Summarizing…").foregroundStyle(.secondary)
+      }
+    } else {
+      Text("No summary yet (right-click > Summarize)").font(.callout).foregroundStyle(.tertiary)
+    }
+  }
+}
+
+/// Ctrl-M sends the chat message (terminal habit: Ctrl-M is Return). The
+/// handler decides, so it only fires while the chat input has focus.
+@MainActor
+final class ControlMSendMonitor {
+  private var monitor: Any?
+
+  func install(_ handler: @escaping @MainActor () -> Bool) {
+    remove()
+    monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+      let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+      guard flags == .control, event.charactersIgnoringModifiers?.lowercased() == "m" else { return event }
+      return handler() ? nil : event
+    }
+  }
+
+  func remove() {
+    if let monitor { NSEvent.removeMonitor(monitor) }
+    monitor = nil
   }
 }

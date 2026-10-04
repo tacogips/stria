@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import StriaCore
 
@@ -14,6 +15,9 @@ struct ReaderView: View {
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
   @State private var shortcuts = ReaderShortcutMonitor()
   @AppStorage(Appearance.storageKey) private var appearance = Appearance.default
+  /// The side panes' last widths, restored the next time a reader opens.
+  @AppStorage("readerLeftPaneWidth") private var leftPaneWidth = 240.0
+  @AppStorage("readerAgentPaneWidth") private var agentPaneWidth = 360.0
 
   var body: some View {
     GeometryReader { geometry in
@@ -76,12 +80,15 @@ struct ReaderView: View {
     HSplitView {
       if sidebarVisible {
         LeftPaneView(reader: reader)
-          .frame(minWidth: 180, idealWidth: 240, maxWidth: 400)
+          .frame(minWidth: 180, idealWidth: leftPaneWidth, maxWidth: 400)
           .background(Flat.panel)
+
       }
       PDFKitView(reader: reader)
         .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity)
         .background(Flat.panel)
+        .background(SplitWidthKeeper(leftVisible: sidebarVisible, agentVisible: agentVisible,
+                                     leftWidth: $leftPaneWidth, agentWidth: $agentPaneWidth))
         .overlay {
           if model.search.isShowingResults {
             SearchResultsView(search: model.search) { hit in Task { await model.openSearchResult(hit) } }
@@ -89,8 +96,9 @@ struct ReaderView: View {
         }
       if agentVisible {
         AgentPaneView(agent: agent, reader: reader, configRevision: model.configRevision)
-          .frame(minWidth: 300, idealWidth: 360, maxWidth: 600)
+          .frame(minWidth: 300, idealWidth: agentPaneWidth, maxWidth: 600)
           .background(Flat.panel)
+
       }
     }
     .navigationTitle(reader.title)
@@ -110,6 +118,7 @@ struct ReaderView: View {
     .onChange(of: reader.currentPage) { _, _ in agent.scheduleHistoryReload() }
     .focusedSceneValue(\.striaReader, reader)
     .focusedSceneValue(\.striaAgent, agent)
+    .focusedSceneValue(\.striaReaderShortcut, { handle($0) })
     .focusedSceneValue(\.striaPageSheet, $showPageSheet)
     .focusedSceneValue(\.striaAgentVisibility, agentControl)
     .focusedSceneValue(\.striaShortcutHelp, $showShortcutHelp)
@@ -185,6 +194,10 @@ struct ReaderView: View {
     showAgent.toggle()
   }
 
+  private func revealAgent() {
+    if availableWidth < 1000 { compactAgent = true } else { showAgent = true }
+  }
+
   private func handle(_ shortcut: ReaderShortcut) {
     switch shortcut {
     case .backToLibrary:
@@ -193,14 +206,128 @@ struct ReaderView: View {
     case .toggleLeftPane: toggleSidebar()
     case .toggleAgentPane: toggleAgent()
     case .focusAgentInput:
-      if availableWidth < 1000 { compactAgent = true } else { showAgent = true }
+      revealAgent()
       agent.requestInputFocus()
+    case .newChat:
+      guard !agent.inFlight else { return }
+      revealAgent()
+      agent.newChat()
+      agent.requestInputFocus()
+    case .resumePreviousChat:
+      revealAgent()
+      Task { if await agent.resumePreviousChat() { agent.requestInputFocus() } }
+    case .conversationStart: agent.goToConversationStart()
     case .pageDown: reader.requestScroll(.pageDown)
     case .pageUp: reader.requestScroll(.pageUp)
     case .lineDown: reader.requestScroll(.lineDown)
     case .lineUp: reader.requestScroll(.lineUp)
     case .toggleTheme: appearance = appearance.toggled
     case .help: showShortcutHelp = true
+    }
+  }
+}
+
+/// Keeps the side panes' widths across launches. It finds the split view
+/// that hosts the reader's panes, moves its dividers to the saved widths when
+/// the layout appears (or a pane is shown again), and saves a width only when
+/// the user drags a divider, so window resizes and tiling never overwrite it.
+private struct SplitWidthKeeper: NSViewRepresentable {
+  let leftVisible: Bool
+  let agentVisible: Bool
+  @Binding var leftWidth: Double
+  @Binding var agentWidth: Double
+
+  func makeCoordinator() -> Coordinator { Coordinator() }
+
+  func makeNSView(context: Context) -> NSView {
+    let view = ProbeView()
+    view.onAttach = { [weak coordinator = context.coordinator] probe in coordinator?.attach(from: probe) }
+    return view
+  }
+
+  func updateNSView(_ nsView: NSView, context: Context) {
+    let coordinator = context.coordinator
+    coordinator.leftVisible = leftVisible
+    coordinator.agentVisible = agentVisible
+    coordinator.saveLeft = { leftWidth = $0 }
+    coordinator.saveAgent = { agentWidth = $0 }
+    coordinator.savedLeft = leftWidth
+    coordinator.savedAgent = agentWidth
+    coordinator.applySavedWidths()
+  }
+
+  static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+    coordinator.detach()
+  }
+
+  final class ProbeView: NSView {
+    var onAttach: ((NSView) -> Void)?
+    override func viewDidMoveToWindow() {
+      super.viewDidMoveToWindow()
+      if window != nil { DispatchQueue.main.async { [weak self] in if let self { self.onAttach?(self) } } }
+    }
+  }
+
+  @MainActor
+  final class Coordinator {
+    var leftVisible = false
+    var agentVisible = false
+    var saveLeft: (Double) -> Void = { _ in }
+    var saveAgent: (Double) -> Void = { _ in }
+    var savedLeft = 0.0
+    var savedAgent = 0.0
+    private weak var splitView: NSSplitView?
+    private var observer: NSObjectProtocol?
+    private var isRestoring = false
+
+    func attach(from probe: NSView) {
+      var view: NSView? = probe
+      while let current = view, !(current is NSSplitView) { view = current.superview }
+      guard let split = view as? NSSplitView, split !== splitView else { return }
+      detach()
+      splitView = split
+      observer = NotificationCenter.default.addObserver(
+        forName: NSSplitView.didResizeSubviewsNotification, object: split, queue: .main
+      ) { [weak self] note in
+        // User drags carry the divider index and are saved; any other
+        // resize (window, tiling, a pane shown) puts the saved widths back.
+        let dragged = note.userInfo?["NSSplitViewDividerIndex"] != nil
+        MainActor.assumeIsolated { dragged ? self?.saveWidths() : self?.applySavedWidths() }
+      }
+      applySavedWidths()
+    }
+
+    func detach() {
+      if let observer { NotificationCenter.default.removeObserver(observer) }
+      observer = nil
+      splitView = nil
+    }
+
+    /// Moves the dividers so the side panes have their saved widths and the
+    /// PDF takes the rest.
+    func applySavedWidths() {
+      guard !isRestoring, let split = splitView, split.bounds.width > 0 else { return }
+      isRestoring = true
+      defer { isRestoring = false }
+      let panes = split.arrangedSubviews.isEmpty ? split.subviews : split.arrangedSubviews
+      let expected = 1 + (leftVisible ? 1 : 0) + (agentVisible ? 1 : 0)
+      guard panes.count == expected else { return }
+      if leftVisible, abs(Double(panes[0].frame.width) - savedLeft) > 1 {
+        split.setPosition(CGFloat(savedLeft), ofDividerAt: 0)
+      }
+      if agentVisible, let last = panes.last, abs(Double(last.frame.width) - savedAgent) > 1 {
+        split.setPosition(split.bounds.width - CGFloat(savedAgent) - split.dividerThickness,
+                          ofDividerAt: panes.count - 2)
+      }
+    }
+
+    private func saveWidths() {
+      // SwiftUI moves dividers too; only a mouse drag is the user's choice.
+      guard !isRestoring, let split = splitView, let event = NSApp.currentEvent,
+            event.type == .leftMouseDragged || event.type == .leftMouseUp, event.window === split.window else { return }
+      let panes = split.arrangedSubviews.isEmpty ? split.subviews : split.arrangedSubviews
+      if leftVisible, let first = panes.first { saveLeft(Double(first.frame.width.rounded())) }
+      if agentVisible, let last = panes.last, panes.count > 1 { saveAgent(Double(last.frame.width.rounded())) }
     }
   }
 }

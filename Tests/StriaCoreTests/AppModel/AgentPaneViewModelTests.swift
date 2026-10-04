@@ -25,7 +25,9 @@ import Testing
     await pane.send()
     #expect(pane.threadId != nil)
     #expect(pane.transcript.count == 2)
-    #expect(pane.history.count == 2)
+    #expect(pane.threads.count == 1)
+    #expect(pane.threads.first?.firstQuestion == "What is here?")
+    #expect(pane.threads.first?.messageCount == 2)
     #expect(pane.input.isEmpty)
     await reader.close()
   }
@@ -73,7 +75,9 @@ import Testing
       documentId: imported.document.id, pageNumber: 4, createdAt: Date()
     )
     #expect(pane.citationPages(in: message) == [3])
-    await pane.selectHistory(message)
+    let thread = ThreadOverview(threadId: "thread", documentId: imported.document.id, pageNumber: 4, firstQuestion: "q",
+                                summary: nil, isSummaryCurrent: false, messageCount: 1, lastMessageId: 1, updatedAt: Date())
+    await pane.selectThread(thread)
     #expect(reader.requestedPage == 4)
     #expect(pane.threadId == "thread")
     await reader.close()
@@ -105,7 +109,82 @@ import Testing
     pane.scheduleHistoryReload()
     pane.scheduleHistoryReload()
     try await Task.sleep(for: .milliseconds(100))
-    #expect(pane.history.count == 2)
+    #expect(pane.threads.count == 1)
+    await reader.close()
+  }
+}
+
+@Test func conversationsAreSummarizedFromTheFirstQuestion() async throws {
+  try await withAppModelDataRoot { paths in
+    let fakeAgent = FakeAgentService()
+    var config = StriaConfig.testing
+    config.agent.autoSummarize = true
+    let (library, source) = try makeAppModelFixture(paths: paths, pageTexts: ["one", "two"], agent: fakeAgent, config: config)
+    let imported = try await library.importDocument(at: source, runOCR: false)
+    let reader = ReaderViewModel(library: library, documentId: imported.document.id)
+    try await reader.open()
+    let pane = AgentPaneViewModel(library: library, reader: reader)
+    await fakeAgent.enqueue(.success("first answer"))
+    await fakeAgent.enqueue(.success("```\nThe user asked about page one.\n```"))
+    pane.input = "What is on page one?"
+    await pane.send()
+    let thread = try #require(pane.threadId)
+    for _ in 0..<100 where pane.threads.first?.summary == nil { try await Task.sleep(for: .milliseconds(20)) }
+    let overview = try #require(pane.threads.first)
+    #expect(overview.summary == "The user asked about page one.")
+    #expect(overview.isSummaryCurrent)
+    #expect(overview.firstQuestion == "What is on page one?")
+    let summaryRequest = try #require(await fakeAgent.requests.last)
+    #expect(summaryRequest.systemPrompt == AgentDefaults.summaryPrompt)
+    #expect(summaryRequest.contextPages.isEmpty)
+    #expect(summaryRequest.question.contains("User: What is on page one?"))
+    #expect(summaryRequest.question.contains("Assistant: first answer"))
+
+    // A manual re-summary with a failing vendor keeps the old summary.
+    await fakeAgent.enqueue(.failure(.failed("down")))
+    await pane.summarize(threadId: thread)
+    #expect(pane.threads.first?.summary == "The user asked about page one.")
+    #expect(pane.notice?.contains("down") == true)
+    await reader.close()
+  }
+}
+
+@Test func previousChatsResumeNewestFirstAndKnowTheirStartPage() async throws {
+  try await withAppModelDataRoot { paths in
+    let (library, source) = try makeAppModelFixture(paths: paths, pageTexts: ["1", "2", "3"])
+    let imported = try await library.importDocument(at: source, runOCR: false)
+    let reader = ReaderViewModel(library: library, documentId: imported.document.id)
+    try await reader.open()
+    let pane = AgentPaneViewModel(library: library, reader: reader)
+    #expect(await pane.resumePreviousChat() == false)
+    #expect(pane.notice == "No earlier conversation about this PDF.")
+
+    reader.pageDidChange(to: 1)
+    pane.input = "older"
+    await pane.send()
+    let older = try #require(pane.threadId)
+    pane.newChat()
+    reader.pageDidChange(to: 3)
+    pane.input = "newer"
+    await pane.send()
+    let newer = try #require(pane.threadId)
+    reader.pageDidChange(to: 2)
+    pane.input = "follow-up on another page"
+    await pane.send()
+    #expect(pane.conversationStartPage == 3)
+    pane.goToConversationStart()
+    #expect(reader.requestedPage == 3)
+
+    pane.newChat()
+    #expect(pane.conversationStartPage == nil)
+    #expect(await pane.resumePreviousChat())
+    #expect(pane.threadId == newer)
+    #expect(await pane.resumePreviousChat())
+    #expect(pane.threadId == older)
+    #expect(pane.conversationStartPage == 1)
+    #expect(await pane.resumePreviousChat() == false)
+    #expect(pane.notice == "No older conversation about this PDF.")
+    #expect(pane.threadId == older)
     await reader.close()
   }
 }

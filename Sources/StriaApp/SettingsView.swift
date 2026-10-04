@@ -104,6 +104,7 @@ struct SettingsView: View {
           Button("Reset to Default") { settings.resetSystemPrompt() }
             .disabled(settings.systemPromptIsDefault)
         }
+        Toggle("Summarize conversations after each answer", isOn: $settings.agentAutoSummarize)
       } header: {
         Text("System Prompt")
       } footer: {

@@ -33,7 +33,14 @@ enum QueryCommands {
       }
       return AskOutput(threadId: response.threadId, answer: response.answer, vendor: response.vendor,
                        model: response.model, runId: response.runId, citations: citations, contextPages: contextPages)
-    case .history(let docId, let page, let limit):
+    case .history(let docId, let page, let limit, let threads) where threads:
+      let overviews = try await library.threadOverviews(documentId: docId, page: page, limit: limit ?? 50)
+      return ThreadsOutput(threads: overviews.map {
+        ThreadOutput(threadId: $0.threadId, docId: $0.documentId, page: $0.pageNumber, firstQuestion: $0.firstQuestion,
+                             summary: $0.summary, summaryCurrent: $0.isSummaryCurrent, messageCount: $0.messageCount,
+                             updatedAt: $0.updatedAt)
+      })
+    case .history(let docId, let page, let limit, _):
       let messages = try await library.history(documentId: docId, page: page, limit: limit ?? 50).map { item in
         HistoryMessageOutput(
           id: item.id, threadId: item.threadId, role: item.role, status: item.status, content: item.content,

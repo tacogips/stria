@@ -19,6 +19,8 @@ public extension StriaConfig {
     // A CLI vendor needs no key, so app-model tests can send without one.
     config.agent.vendor = "claude-code"
     config.agent.model = "test-agent-model"
+    // Background summaries would add agent calls to tests that count them.
+    config.agent.autoSummarize = false
     return config
   }
 }

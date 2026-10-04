@@ -14,7 +14,7 @@ public enum Usage {
     page text <docId> <page>
     search <query> [--doc <docId>] [--limit <n>]
     ask <question> [--doc <docId>] [--page <n>] [--query <terms>] [--limit <n>] [--thread <id>] [--vendor <v> [--model <m>]]
-    history [--doc <docId>] [--page <n>] [--limit <n>]
+    history [--doc <docId>] [--page <n>] [--limit <n>] [--threads]
     config get [<key>]
     config set <key> <value>
     paths

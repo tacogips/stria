@@ -3,7 +3,7 @@ import Foundation
 public enum ConfigKeyPath {
   public static let credentialKeys = KnownVendors.apiKeyVendors.sorted().map { "agent.credentials.\($0)" }
   public static let keys = credentialKeys + [
-    "agent.apiKeyEnvironment", "agent.maxContextCharacters", "agent.maxImages", "agent.model",
+    "agent.apiKeyEnvironment", "agent.autoSummarize", "agent.maxContextCharacters", "agent.maxImages", "agent.model",
     "agent.neighborPages", "agent.systemPrompt", "agent.timeoutSeconds", "agent.vendor", "ocr.apiKeyEnvironment",
     "ocr.autoRunOnImport", "ocr.concurrency", "ocr.model", "ocr.prompt", "ocr.timeoutSeconds", "ocr.vendor", "render.dpi",
     "render.imageFormat", "render.maxPixelDimension", "render.quality"
@@ -24,6 +24,7 @@ public enum ConfigKeyPath {
     case "ocr.prompt": return config.ocr.prompt.map(JSONValue.string) ?? .null
     case "ocr.timeoutSeconds": return .int(config.ocr.timeoutSeconds)
     case "agent.timeoutSeconds": return .int(config.agent.timeoutSeconds)
+    case "agent.autoSummarize": return .bool(config.agent.autoSummarize)
     case "agent.vendor": return config.agent.vendor.map(JSONValue.string) ?? .null
     case "agent.model": return config.agent.model.map(JSONValue.string) ?? .null
     case "agent.apiKeyEnvironment": return config.agent.apiKeyEnvironment.map(JSONValue.string) ?? .null
@@ -113,6 +114,7 @@ public enum ConfigKeyPath {
     case "agent.maxContextCharacters": updated.agent.maxContextCharacters = try integer(raw, key: key)
     case "agent.systemPrompt": updated.agent.systemPrompt = raw
     case "agent.timeoutSeconds": updated.agent.timeoutSeconds = try integer(raw, key: key)
+    case "agent.autoSummarize": updated.agent.autoSummarize = try boolean(raw, key: key)
     default:
       if let vendor = credentialVendor(key) { updated.agent.credentials[vendor] = raw } else { throw .usage("Unknown config key '\(key)'") }
     }

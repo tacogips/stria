@@ -103,7 +103,8 @@ import Testing
       settings.ocrVendor = "gemini"
       settings.applySuggestions(ocr: true)
       #expect(settings.ocrModel == "gemini-3.5-flash-lite")
-      #expect(ModelCatalog.models(for: "openai") == ["gpt-6-luna", "gpt-6-sol", "gpt-6-astra"])
+      #expect(ModelCatalog.models(for: "openai") == ["gpt-6-luna", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-astra"])
+      #expect(ModelCatalog.models(for: "codex").contains("gpt-6.1-sol"))
       #expect(ModelCatalog.models(for: "openrouter").contains("anthropic/claude-opus-5-5"))
       #expect(!ModelCatalog.updatedAt.isEmpty)
 
@@ -145,8 +146,10 @@ import Testing
 @Suite @MainActor struct ChatVendorSelectionTests {
   @Test func selectionIsPerQuestionPersistedAndKeyGated() async throws {
     try await withAppModelDataRoot { paths in
+      var noAutoSummary = StriaConfig.defaults
+      noAutoSummary.agent.autoSummarize = false
       let fakeAgent = FakeAgentService()
-      let (library, source) = try makeAppModelFixture(paths: paths, pageTexts: ["one"], agent: fakeAgent, config: .defaults)
+      let (library, source) = try makeAppModelFixture(paths: paths, pageTexts: ["one"], agent: fakeAgent, config: noAutoSummary)
       let imported = try await library.importDocument(at: source, runOCR: false)
       let reader = ReaderViewModel(library: library, documentId: imported.document.id)
       try await reader.open()

@@ -8,7 +8,7 @@ import Testing
     #expect(try CommandLineParser.parse(["import", "a.pdf", "--no-ocr", "--json"]).command == .importPDF(path: "a.pdf", noOCR: true, forceOCR: false))
     #expect(try CommandLineParser.parse(["page", "image", "abc", "3", "--output", "/tmp/o.png"]).command == .pageImage(docId: "abc", page: 3, output: "/tmp/o.png"))
     #expect(try CommandLineParser.parse(["search", "foo", "--doc", "d", "--limit", "5"]).command == .search(query: "foo", docId: "d", limit: 5))
-    #expect(try CommandLineParser.parse(["history", "--doc", "d", "--page", "2"]).command == .history(docId: "d", page: 2, limit: nil))
+    #expect(try CommandLineParser.parse(["history", "--doc", "d", "--page", "2"]).command == .history(docId: "d", page: 2, limit: nil, threads: false))
     #expect(try CommandLineParser.parse(["remove", "d"]).command == .remove(docId: "d"))
     #expect(try CommandLineParser.parse(["ask", "q", "--thread", "t1"]).command == .ask(question: "q", docId: nil, page: nil, query: nil, limit: nil, thread: "t1", vendor: nil, model: nil))
     #expect(try CommandLineParser.parse(["config"]).command == .configGet(key: nil))

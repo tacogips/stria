@@ -41,6 +41,12 @@ import Testing
       let history = await execute(["history", "--doc", idB, "--page", "2"], home: home, paths: paths, ocr: ocr, agent: agent)
       #expect(try json(history.stdout)["messages"]?.arrayValue?.count == 2)
 
+      let threads = await execute(["history", "--doc", idB, "--threads"], home: home, paths: paths, ocr: ocr, agent: agent)
+      #expect(threads.exitCode == 0)
+      let threadList = try #require(try json(threads.stdout)["threads"]?.arrayValue)
+      #expect(threadList.count == 1)
+      #expect(threadList.first?.objectValue?.keySet == Set(["threadId", "docId", "page", "firstQuestion", "summary", "summaryCurrent", "messageCount", "updatedAt"]))
+      #expect(threadList.first?.objectValue?["summary"] == .null)
       let homePaths = StriaPaths(root: home)
       #expect(FileManager.default.fileExists(atPath: homePaths.original(docId: idB).path))
       #expect(FileManager.default.fileExists(atPath: homePaths.cacheDirectory(docId: idB).path))

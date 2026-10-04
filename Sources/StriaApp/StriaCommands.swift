@@ -15,6 +15,7 @@ struct StriaCommands: Commands {
   @FocusedValue(\.striaSearch) private var search
   @FocusedValue(\.striaLibraryViewMode) private var libraryViewMode
   @FocusedValue(\.striaRunOCR) private var runOCR
+  @FocusedValue(\.striaReaderShortcut) private var readerShortcut
   @AppStorage(Appearance.storageKey) private var appearance = Appearance.default
   @Environment(\.openSettings) private var openSettings
 
@@ -83,9 +84,18 @@ struct StriaCommands: Commands {
       Button("Settings…") { openSettings() }
         .keyboardShortcut(",", modifiers: [.command, .shift])
       Divider()
-      Button("New Chat") { agent?.newChat() }
+      Button("Focus Chat Input") { readerShortcut?(.focusAgentInput) }
+        .keyboardShortcut("l", modifiers: .command)
+        .disabled(readerShortcut == nil)
+      Button("New Chat") { readerShortcut?(.newChat) }
         .keyboardShortcut("n", modifiers: [.command, .shift])
-        .disabled(agent == nil || agent?.inFlight == true)
+        .disabled(readerShortcut == nil || agent?.inFlight == true)
+      Button("Resume Previous Chat") { readerShortcut?(.resumePreviousChat) }
+        .keyboardShortcut("r", modifiers: [.command, .shift])
+        .disabled(readerShortcut == nil || agent?.inFlight == true)
+      Button("Go to Chat Start Page") { readerShortcut?(.conversationStart) }
+        .keyboardShortcut("j", modifiers: [.command, .shift])
+        .disabled(readerShortcut == nil || agent?.conversationStartPage == nil)
       Button("Cancel Question") { agent?.cancel() }
         .keyboardShortcut(".", modifiers: .command)
         .disabled(agent?.inFlight != true)

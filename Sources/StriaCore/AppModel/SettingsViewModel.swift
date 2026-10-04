@@ -22,6 +22,7 @@ public final class SettingsViewModel {
   public var credentials: [String: String] = [:]
   /// The prompt as shown for editing; the default text when none is set.
   public var agentSystemPrompt = AgentDefaults.systemPrompt
+  public var agentAutoSummarize = true
   public private(set) var error: String?
   public private(set) var savedAt: Date?
   public var onSaved: (() -> Void)?
@@ -95,6 +96,7 @@ public final class SettingsViewModel {
     credentials = config.agent.credentials
     for vendor in Self.credentialVendors where credentials[vendor] == nil { credentials[vendor] = "" }
     agentSystemPrompt = config.agent.systemPrompt ?? AgentDefaults.systemPrompt
+    agentAutoSummarize = config.agent.autoSummarize
     error = nil
   }
 
@@ -172,6 +174,7 @@ public final class SettingsViewModel {
     }
     // The default is stored as nil, so a future default change reaches users who never edited it.
     config.agent.systemPrompt = systemPromptIsDefault ? nil : Self.trimmed(agentSystemPrompt)
+    config.agent.autoSummarize = agentAutoSummarize
     if Self.needsModel(ocrVendor), config.ocr.model == nil { throw .config("OCR: a model is required for \(Self.displayName(for: ocrVendor))") }
     if Self.requiresAPIKey(ocrVendor), config.ocr.apiKeyEnvironment == nil {
       throw .config("OCR: an API key environment variable name is required for \(Self.displayName(for: ocrVendor))")

@@ -282,6 +282,17 @@ A `failed` call is still persisted, so history reflects every question that
 was sent to a model. An `unavailable` error (no call attempted) and
 `noRelevantPages` persist nothing.
 
+### Conversation summaries
+
+`ThreadSummarizer` summarizes a thread from its first question: the
+transcript of `ok` messages ("User:" / "Assistant:" lines, capped at 24,000
+characters by keeping the first exchange and eliding the middle) is sent with
+`AgentDefaults.summaryPrompt` (2-4 sentences in the user's language, keeping
+`[docId p.N]` markers only where relevant) and no context pages. The cleaned
+reply is stored with the id of the last message it covers, so a later answer
+marks it stale. The app runs it after each answer when `agent.autoSummarize`
+is true, and on demand from the History context menu.
+
 ## agent-gateway Integration
 
 Dependency: `.package(url: "https://github.com/tacogips/agent-gateway.git",
@@ -472,7 +483,7 @@ applies to the next call in the running process (`ConfigBox` inside
   "agent": {
     "vendor": null, "model": null, "apiKeyEnvironment": null, "neighborPages": 1,
     "maxImages": 4, "maxContextCharacters": 60000, "systemPrompt": null,
-    "timeoutSeconds": 600
+    "timeoutSeconds": 600, "autoSummarize": true
   }
 }
 ```
@@ -491,7 +502,7 @@ Validation for `stria config set <key> <value>` (dotted keys above):
 | `agent.maxContextCharacters` | 1000...500000 |
 | `ocr.timeoutSeconds`, `agent.timeoutSeconds` | 10...3600 |
 | `ocr.vendor`, `agent.vendor` | `null` (not configured) or a `GatewayVendor` raw value (`claude-code`, `codex`, `cursor`, `cursor-api`, `openai`, `anthropic`, `gemini`, `openrouter`); `ocr.vendor` also accepts `pdf-text-layer` |
-| `ocr.autoRunOnImport` | `true` or `false` |
+| `ocr.autoRunOnImport`, `agent.autoSummarize` | `true` or `false` |
 | `ocr.apiKeyEnvironment`, `agent.apiKeyEnvironment` | must match `^[A-Z_][A-Z0-9_]*$`, or `null` |
 
 The value `null` clears the optional keys `vendor`, `model`,

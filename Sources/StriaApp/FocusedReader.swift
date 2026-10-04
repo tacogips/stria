@@ -11,6 +11,7 @@ private struct ShortcutHelpFocusedKey: FocusedValueKey { typealias Value = Bindi
 private struct LibraryViewModeFocusedKey: FocusedValueKey { typealias Value = Binding<LibraryViewMode> }
 private struct RunOCRFocusedKey: FocusedValueKey { typealias Value = () -> Void }
 private struct SearchFocusedKey: FocusedValueKey { typealias Value = () -> Void }
+private struct ReaderShortcutFocusedKey: FocusedValueKey { typealias Value = (ReaderShortcut) -> Void }
 private struct SidebarFocusedKey: FocusedValueKey { typealias Value = Binding<NavigationSplitViewVisibility> }
 
 extension FocusedValues {
@@ -67,5 +68,11 @@ extension FocusedValues {
   var striaSidebar: Binding<NavigationSplitViewVisibility>? {
     get { self[SidebarFocusedKey.self] }
     set { self[SidebarFocusedKey.self] = newValue }
+  }
+
+  /// Runs a reader shortcut, so menu items share the single-key actions.
+  var striaReaderShortcut: ((ReaderShortcut) -> Void)? {
+    get { self[ReaderShortcutFocusedKey.self] }
+    set { self[ReaderShortcutFocusedKey.self] = newValue }
   }
 }

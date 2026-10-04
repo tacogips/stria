@@ -124,9 +124,9 @@ read one page at a time. No query loads all the images of a document.
 Migrations are versioned with `PRAGMA user_version`. Each migration runs in
 one transaction and bumps `user_version`. Opening a DB whose version is newer
 than the binary knows fails with `databaseTooNew` and leaves the DB
-unmodified. Re-opening an up-to-date DB runs nothing. v0.1 ships migration 1
-only. Later schema changes add new numbered migrations and never edit
-migration 1.
+unmodified. Re-opening an up-to-date DB runs nothing. Migration 1 creates
+the schema; migration 2 adds the `chat_threads` summary columns. Later schema
+changes add new numbered migrations and never edit earlier ones.
 
 ### Search Backend
 
@@ -201,7 +201,10 @@ chat_threads(
   document_id TEXT REFERENCES documents(id) ON DELETE CASCADE, -- null: library-wide ask
   page_number INTEGER,               -- anchor page at the first question
   scope TEXT NOT NULL CHECK (scope IN ('page','nearby','document','library')),
-  created_at TEXT NOT NULL, updated_at TEXT NOT NULL)
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+  summary TEXT,                      -- migration 2: conversation summary
+  summary_through_message_id INTEGER, -- last message the summary covers
+  summary_updated_at TEXT)
 
 chat_messages(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -303,6 +306,15 @@ becomes null. `StriaLibrary.removeDocument(id:)` then deletes
 `originals/<docId>.pdf` and `cache/<docId>/`. The CLI exposes it as
 `stria remove`, and the library screen as a context-menu action (and the
 Delete key) behind a confirmation dialog.
+
+## Thread Overviews
+
+`StriaStore.threadOverviews(documentId:page:limit:)` returns one row per
+thread whose messages match the chat-history filter below: the first user
+message, message count, last message id, `updated_at` and the summary.
+Ordered by `updated_at DESC`. A summary is current when
+`summary_through_message_id >= MAX(chat_messages.id)` of the thread.
+`setThreadSummary(threadId:summary:throughMessageId:)` writes it.
 
 ## Chat History Queries
 

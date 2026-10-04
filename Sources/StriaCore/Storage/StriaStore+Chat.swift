@@ -1,5 +1,12 @@
 import Foundation
 
+/// The WHERE clause of a history query and the values it binds.
+private struct HistoryFilter {
+  let sql: String
+  let documentId: String?
+  let page: Int?
+}
+
 private struct ChatMessageInsert {
   let threadId: String
   let role: ChatRole
@@ -45,40 +52,96 @@ extension StriaStore {
   public func history(documentId: String?, page: Int?, limit: Int) throws -> [ChatMessageRecord] {
     guard page == nil || documentId != nil else { throw StriaError.usage("A page filter requires a document id") }
     guard limit > 0 else { throw StriaError.usage("History limit must be positive") }
-    // A library-wide ask has no anchor document, but it still belongs to the
-    // history of every document (and page) it cited; both messages of such an
-    // exchange share the thread, so the user question is matched through the
-    // assistant message's citations.
-    let filter: String
+    let filter = historyFilter(documentId: documentId, page: page)
+    let statement = try database.prepare("""
+      SELECT id,thread_id,role,status,content,document_id,page_number,vendor,model,agent_run_id,citations_json,created_at
+      FROM chat_messages \(filter.sql) ORDER BY created_at DESC,id DESC LIMIT ?
+      """)
+    var index = try bind(filter, to: statement)
+    try statement.bind(limit, at: index)
+    index += 1
+    var messages: [ChatMessageRecord] = []
+    while try statement.step() { messages.append(try chatMessage(statement)) }
+    return Array(messages.reversed())
+  }
+
+  /// Conversations for the history list, newest first: every thread with a
+  /// message in the per-page / per-PDF history (same rules as `history`).
+  public func threadOverviews(documentId: String?, page: Int?, limit: Int) throws -> [ThreadOverview] {
+    guard page == nil || documentId != nil else { throw StriaError.usage("A page filter requires a document id") }
+    guard limit > 0 else { throw StriaError.usage("History limit must be positive") }
+    let filter = historyFilter(documentId: documentId, page: page)
+    let statement = try database.prepare("""
+      SELECT t.id, t.document_id, t.page_number, t.summary, t.summary_through_message_id, t.updated_at,
+        (SELECT content FROM chat_messages m WHERE m.thread_id=t.id AND m.role='user' ORDER BY m.id LIMIT 1),
+        (SELECT MAX(id) FROM chat_messages m WHERE m.thread_id=t.id),
+        (SELECT COUNT(*) FROM chat_messages m WHERE m.thread_id=t.id)
+      FROM chat_threads t
+      WHERE t.id IN (SELECT DISTINCT thread_id FROM chat_messages \(filter.sql))
+      ORDER BY t.updated_at DESC, t.rowid DESC LIMIT ?
+      """)
+    var index = try bind(filter, to: statement)
+    try statement.bind(limit, at: index)
+    index += 1
+    var threads: [ThreadOverview] = []
+    while try statement.step() {
+      guard let id = statement.string(0),
+            let updated = statement.string(5).flatMap(StriaDateFormat.date(from:)) else { throw StriaError.database("Invalid chat thread row") }
+      let lastMessageId = statement.int64(7)
+      let through: Int64? = statement.isNull(4) ? nil : statement.int64(4)
+      let summary = statement.string(3)
+      threads.append(ThreadOverview(
+        threadId: id, documentId: statement.string(1), pageNumber: statement.isNull(2) ? nil : statement.int(2),
+        firstQuestion: statement.string(6) ?? "", summary: summary,
+        isSummaryCurrent: summary != nil && through.map { $0 >= lastMessageId } == true,
+        messageCount: statement.int(8), lastMessageId: lastMessageId, updatedAt: updated))
+    }
+    return threads
+  }
+
+  public func setThreadSummary(threadId: String, summary: String, throughMessageId: Int64) throws {
+    let statement = try database.prepare("""
+      UPDATE chat_threads SET summary=?,summary_through_message_id=?,summary_updated_at=? WHERE id=?
+      """)
+    try statement.bind(summary, at: 1).bind(throughMessageId, at: 2).bind(nowString(), at: 3).bind(threadId, at: 4)
+    _ = try statement.step()
+    guard database.changes > 0 else { throw StriaError.database("Chat thread not found: \(threadId)") }
+  }
+
+  /// The WHERE clause shared by message and thread history. A library-wide
+  /// ask has no anchor document, but it still belongs to the history of every
+  /// document (and page) it cited; both messages of such an exchange share
+  /// the thread, so the user question is matched through the assistant
+  /// message's citations.
+  private func historyFilter(documentId: String?, page: Int?) -> HistoryFilter {
+    let sql: String
     if documentId != nil, page != nil {
-      filter = """
+      sql = """
         WHERE (document_id=? AND page_number=?) OR (document_id IS NULL AND thread_id IN
           (SELECT thread_id FROM chat_messages WHERE document_id IS NULL AND citations_json LIKE ? ESCAPE '\\'))
         """
     } else if documentId != nil {
-      filter = """
+      sql = """
         WHERE document_id=? OR (document_id IS NULL AND thread_id IN
           (SELECT thread_id FROM chat_messages WHERE document_id IS NULL AND citations_json LIKE ? ESCAPE '\\'))
         """
     } else {
-      filter = ""
+      sql = ""
     }
-    let statement = try database.prepare("""
-      SELECT id,thread_id,role,status,content,document_id,page_number,vendor,model,agent_run_id,citations_json,created_at
-      FROM chat_messages \(filter) ORDER BY created_at DESC,id DESC LIMIT ?
-      """)
+    return HistoryFilter(sql: sql, documentId: documentId, page: page)
+  }
+
+  /// Binds the filter's parameters from index 1 and returns the next index.
+  private func bind(_ filter: HistoryFilter, to statement: Statement) throws -> Int32 {
     var index: Int32 = 1
-    if let documentId { try statement.bind(documentId, at: index); index += 1 }
-    if let page { try statement.bind(page, at: index); index += 1 }
-    if let documentId {
-      let citation = page.map { "{\"docId\":\"\(documentId)\",\"page\":\($0)}" } ?? "{\"docId\":\"\(documentId)\","
+    if let documentId = filter.documentId { try statement.bind(documentId, at: index); index += 1 }
+    if let page = filter.page { try statement.bind(page, at: index); index += 1 }
+    if let documentId = filter.documentId {
+      let citation = filter.page.map { "{\"docId\":\"\(documentId)\",\"page\":\($0)}" } ?? "{\"docId\":\"\(documentId)\","
       try statement.bind(SearchQueryBuilder.likePattern(term: citation), at: index)
       index += 1
     }
-    try statement.bind(limit, at: index)
-    var messages: [ChatMessageRecord] = []
-    while try statement.step() { messages.append(try chatMessage(statement)) }
-    return Array(messages.reversed())
+    return index
   }
 
   public func threadMessages(threadId: String) throws -> [ChatMessageRecord] {

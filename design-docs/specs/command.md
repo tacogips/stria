@@ -167,13 +167,23 @@ first mention, or all context pages when the answer cites none.
 If the agent call fails, the exchange is still persisted and the command
 exits 5.
 
-### `stria history [--doc <docId>] [--page <n>] [--limit <n>]`
+### `stria history [--doc <docId>] [--page <n>] [--limit <n>] [--threads]`
 
 ```json
 {"messages": [{"id": 1, "threadId": "...", "role": "user|assistant",
   "status": "ok|error", "content": "...", "docId": null, "page": null,
   "vendor": null, "model": null, "runId": null, "citations": [], "createdAt": "..."}]}
 ```
+
+With `--threads` it lists conversations (same filters, newest first):
+
+```json
+{"threads": [{"threadId": "...", "docId": null, "page": null,
+  "firstQuestion": "...", "summary": null, "summaryCurrent": false,
+  "messageCount": 2, "updatedAt": "..."}]}
+```
+
+`summaryCurrent` is false when messages were added after the summary.
 
 ### `stria config get [<key>]` / `stria config set <key> <value>`
 

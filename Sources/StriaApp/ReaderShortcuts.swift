@@ -6,7 +6,8 @@ import StriaCore
 /// text field is being edited, and never steal typing. Command-key
 /// equivalents stay on the menus (`StriaCommands`).
 enum ReaderShortcut: CaseIterable {
-  case backToLibrary, search, toggleLeftPane, toggleAgentPane, focusAgentInput, pageDown, pageUp, lineDown, lineUp, toggleTheme, help
+  case backToLibrary, search, toggleLeftPane, toggleAgentPane, focusAgentInput, newChat, resumePreviousChat
+  case conversationStart, pageDown, pageUp, lineDown, lineUp, toggleTheme, help
 
   var keys: String {
     switch self {
@@ -15,6 +16,9 @@ enum ReaderShortcut: CaseIterable {
     case .toggleLeftPane: "Shift+L"
     case .toggleAgentPane: "Shift+R"
     case .focusAgentInput: "i"
+    case .newChat: "n"
+    case .resumePreviousChat: "r"
+    case .conversationStart: "s"
     case .pageDown: "Ctrl+D"
     case .pageUp: "Ctrl+U"
     case .lineDown: "j"
@@ -31,6 +35,9 @@ enum ReaderShortcut: CaseIterable {
     case .toggleLeftPane: "Collapse or expand the left pane"
     case .toggleAgentPane: "Collapse or expand the agent pane"
     case .focusAgentInput: "Focus the agent chat input"
+    case .newChat: "Start a new chat"
+    case .resumePreviousChat: "Resume the previous chat about this PDF (repeat for older ones)"
+    case .conversationStart: "Go to the page where the open chat started"
     case .pageDown: "Page the PDF down"
     case .pageUp: "Page the PDF up"
     case .lineDown: "Scroll the PDF down"
@@ -59,6 +66,9 @@ enum ReaderShortcut: CaseIterable {
     case ("D", true), ("d", true): return .toggleTheme
     case ("/", _): return .search
     case ("i", false): return .focusAgentInput
+    case ("n", false): return .newChat
+    case ("r", false): return .resumePreviousChat
+    case ("s", false): return .conversationStart
     case ("?", _): return .help
     case ("j", false): return .lineDown
     case ("k", false): return .lineUp

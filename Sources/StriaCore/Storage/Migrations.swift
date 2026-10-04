@@ -5,7 +5,7 @@ struct MigrationResult {
 }
 
 enum Migrations {
-  static let version = 1
+  static let version = 2
 
   static func run(_ database: SQLiteConnection, forceLikeSearch: Bool) throws -> MigrationResult {
     // busy_timeout comes first: even reading user_version can hit the lock of
@@ -38,6 +38,14 @@ enum Migrations {
         try database.execute("PRAGMA user_version=1")
       }
     }
+    if try userVersion(database) < 2 {
+      try database.transaction {
+        // Re-check inside the write lock: another process may have upgraded.
+        guard try userVersion(database) < 2 else { return }
+        try addThreadSummaryColumns(database)
+        try database.execute("PRAGMA user_version=2")
+      }
+    }
     return MigrationResult(backend: try storedBackend(database))
   }
 
@@ -47,7 +55,18 @@ enum Migrations {
     return statement.int(0)
   }
 
-  private static func createSchema(_ db: SQLiteConnection) throws {
+  /// Migration 2: a stored summary per chat thread, and the newest message it
+  /// covers (a newer message makes the summary stale).
+  static func addThreadSummaryColumns(_ db: SQLiteConnection) throws {
+    try db.execute("""
+      ALTER TABLE chat_threads ADD COLUMN summary TEXT;
+      ALTER TABLE chat_threads ADD COLUMN summary_through_message_id INTEGER;
+      ALTER TABLE chat_threads ADD COLUMN summary_updated_at TEXT;
+      """)
+  }
+
+  /// Schema version 1, kept as the first step of every fresh database.
+  static func createSchema(_ db: SQLiteConnection) throws {
     try db.execute("""
       CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE documents(

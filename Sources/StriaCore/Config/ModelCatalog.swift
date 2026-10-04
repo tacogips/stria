@@ -8,13 +8,13 @@ import Foundation
 /// vendor's models; API vendors can also be refreshed live
 /// (`GatewayModelCatalogService`), and any id can still be typed as custom.
 public enum ModelCatalog {
-  public static let updatedAt = "2026-10-02"
+  public static let updatedAt = "2026-10-04"
 
   private static let vendors: [String: [String]] = [
     "anthropic": ["claude-opus-5-5", "claude-sonnet-5-5", "claude-fable-5-1", "claude-haiku-4-5-20251001"],
     "claude-code": ["claude-opus-5-5", "claude-sonnet-5-5", "claude-fable-5-1", "claude-haiku-4-5-20251001"],
-    "openai": ["gpt-6-luna", "gpt-6-sol", "gpt-6-astra"],
-    "codex": ["gpt-6-luna", "gpt-6-sol", "gpt-6-astra"],
+    "openai": ["gpt-6-luna", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-astra"],
+    "codex": ["gpt-6-luna", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-astra"],
     "gemini": ["gemini-3.5-flash-lite", "gemini-3.8-flash"],
     "openrouter": [
       "anthropic/claude-opus-5-5",
@@ -22,6 +22,7 @@ public enum ModelCatalog {
       "anthropic/claude-fable-5-1",
       "anthropic/claude-haiku-4-5-20251001",
       "openai/gpt-6-luna",
+      "openai/gpt-6.1-sol",
       "openai/gpt-6-sol",
       "openai/gpt-6-astra",
       "google/gemini-3.5-flash-lite",

@@ -13,7 +13,8 @@ private enum OCRConfigCodingKeys: String, CodingKey {
   case vendor, model, apiKeyEnvironment, concurrency, prompt, timeoutSeconds, autoRunOnImport
 }
 private enum AgentConfigCodingKeys: String, CodingKey {
-  case vendor, model, apiKeyEnvironment, neighborPages, maxImages, maxContextCharacters, systemPrompt, timeoutSeconds, credentials
+  case vendor, model, apiKeyEnvironment, neighborPages, maxImages, maxContextCharacters, systemPrompt, timeoutSeconds, credentials,
+    autoSummarize
 }
 private enum StriaConfigCodingKeys: String, CodingKey { case version, render, ocr, agent }
 
@@ -90,6 +91,8 @@ public struct StriaConfig: Codable, Equatable, Sendable {
     /// API key environment variable name per API vendor. The chat picks the
     /// vendor and model per question; this is the only per-vendor setting.
     public var credentials: [String: String]
+    /// Refresh a conversation's summary after each answer (one extra call).
+    public var autoSummarize: Bool
 
     public static let defaultCredentials = [
       "anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY", "gemini": "GEMINI_API_KEY",
@@ -107,10 +110,11 @@ public struct StriaConfig: Codable, Equatable, Sendable {
 
     public init(vendor: String?, model: String?, apiKeyEnvironment: String?, neighborPages: Int, maxImages: Int,
                 maxContextCharacters: Int, systemPrompt: String?, timeoutSeconds: Int = 600,
-                credentials: [String: String] = AgentConfig.defaultCredentials) {
+                credentials: [String: String] = AgentConfig.defaultCredentials, autoSummarize: Bool = true) {
       self.vendor = vendor; self.model = model; self.apiKeyEnvironment = apiKeyEnvironment
       self.neighborPages = neighborPages; self.maxImages = maxImages; self.maxContextCharacters = maxContextCharacters
       self.systemPrompt = systemPrompt; self.timeoutSeconds = timeoutSeconds; self.credentials = credentials
+      self.autoSummarize = autoSummarize
     }
     public init(from decoder: Decoder) throws {
       let c = try decoder.container(keyedBy: AgentConfigCodingKeys.self)
@@ -122,7 +126,8 @@ public struct StriaConfig: Codable, Equatable, Sendable {
                 maxContextCharacters: try c.decodeIfPresent(Int.self, forKey: .maxContextCharacters) ?? 60_000,
                 systemPrompt: try decodeOptional(String.self, key: .systemPrompt, in: c, defaultValue: nil),
                 timeoutSeconds: try c.decodeIfPresent(Int.self, forKey: .timeoutSeconds) ?? 600,
-                credentials: try c.decodeIfPresent([String: String].self, forKey: .credentials) ?? AgentConfig.defaultCredentials)
+                credentials: try c.decodeIfPresent([String: String].self, forKey: .credentials) ?? AgentConfig.defaultCredentials,
+                autoSummarize: try c.decodeIfPresent(Bool.self, forKey: .autoSummarize) ?? true)
     }
     public func encode(to encoder: Encoder) throws {
       var c = encoder.container(keyedBy: AgentConfigCodingKeys.self)
@@ -130,7 +135,7 @@ public struct StriaConfig: Codable, Equatable, Sendable {
       try c.encode(apiKeyEnvironment, forKey: .apiKeyEnvironment); try c.encode(neighborPages, forKey: .neighborPages)
       try c.encode(maxImages, forKey: .maxImages); try c.encode(maxContextCharacters, forKey: .maxContextCharacters)
       try c.encode(systemPrompt, forKey: .systemPrompt); try c.encode(timeoutSeconds, forKey: .timeoutSeconds)
-      try c.encode(credentials, forKey: .credentials)
+      try c.encode(credentials, forKey: .credentials); try c.encode(autoSummarize, forKey: .autoSummarize)
     }
   }
 

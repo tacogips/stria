@@ -228,3 +228,34 @@ public struct PathsOutput: Encodable {
   public let config: String
   public let logs: String
 }
+
+/// One conversation in `stria history --threads`.
+public struct ThreadOutput: Encodable {
+  public let threadId: String
+  public let docId: String?
+  public let page: Int?
+  public let firstQuestion: String
+  public let summary: String?
+  public let summaryCurrent: Bool
+  public let messageCount: Int
+  public let updatedAt: Date
+
+  enum CodingKeys: String, CodingKey { case threadId, docId, page, firstQuestion, summary, summaryCurrent, messageCount, updatedAt }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(threadId, forKey: .threadId)
+    try container.encode(docId, forKey: .docId)
+    try container.encode(page, forKey: .page)
+    try container.encode(firstQuestion, forKey: .firstQuestion)
+    try container.encode(summary, forKey: .summary)
+    try container.encode(summaryCurrent, forKey: .summaryCurrent)
+    try container.encode(messageCount, forKey: .messageCount)
+    try container.encode(updatedAt, forKey: .updatedAt)
+  }
+}
+
+/// `stria history --threads`: one entry per conversation with its summary.
+public struct ThreadsOutput: Encodable {
+  public let threads: [ThreadOutput]
+}

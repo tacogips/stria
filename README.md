@@ -33,7 +33,7 @@ To try the app without touching your real library, run `STRIA_HOME=$(mktemp -d) 
 
 - Library: previously imported PDFs with title, page count and import/OCR progress. Import with the toolbar button, `Cmd-O` or drag and drop. Opening a document expands its page-image cache in the background.
 - Reader: a left sidebar with Contents (PDF outline, current section highlighted), Thumbnails and OCR search results from the toolbar search field. The center PDF view scrolls continuously and vertically. The toolbar shows an `n / N` page field, and the reader restores the last-read page for each document.
-- Agent inspector: a right pane with a scope picker (This page, Nearby pages, Whole PDF), a transcript with page-citation chips that jump to the cited page, New Chat, and history for This page or This PDF.
+- Agent inspector: a right pane with a scope picker (This page, Nearby pages, Whole PDF), a transcript with page-citation chips that jump to the cited page, New Chat, Resume Previous Chat, a button that jumps to the page where the open chat started, and a History tab listing conversations for This page or This PDF with an AI summary and the first question (summaries are written after each answer; turn this off in Settings). Pane widths are remembered across launches.
 
 | Command | Shortcut |
 | --- | --- |
@@ -42,8 +42,11 @@ To try the app without touching your real library, run `STRIA_HOME=$(mktemp -d) 
 | Library | `Cmd-Shift-L` |
 | Go to Page | `Cmd-Opt-G` |
 | Next / Previous Page | `Cmd-Opt-Down` / `Cmd-Opt-Up` |
-| Send question | `Cmd-Return` in the input field |
+| Send question | `Cmd-Return` or `Ctrl-M` in the input field |
+| Focus chat input | `Cmd-L` |
 | New Chat | `Cmd-Shift-N` |
+| Resume Previous Chat | `Cmd-Shift-R` |
+| Go to Chat Start Page | `Cmd-Shift-J` |
 
 ## Data root
 
@@ -78,7 +81,7 @@ A gateway OCR reply that is empty, or that says no image was received, is record
 - `stria page text <docId> <page>`: return page OCR text
 - `stria search <query> [--doc <docId>] [--limit <n>]`: search OCR text across PDFs or within one PDF; terms shorter than 3 characters use LIKE matching ranked by occurrence count
 - `stria ask <question> [--doc <docId>] [--page <n>] [--query <terms>] [--limit <n>] [--thread <id>]`: retrieve context pages and ask the configured agent; `--page` requires `--doc`, `--limit` caps the context pages, and `--thread` continues an earlier conversation. The output lists `citations` (pages the answer cites) and `contextPages` (every page sent)
-- `stria history [--doc <docId>] [--page <n>] [--limit <n>]`: read saved conversations
+- `stria history [--doc <docId>] [--page <n>] [--limit <n>] [--threads]`: read saved messages, or with `--threads` one entry per conversation (first question, summary, message count)
 - `stria config get [<key>]` / `stria config set <key> <value>`: inspect or edit configuration
 - `stria paths`: print resolved data-root paths
 
@@ -110,7 +113,7 @@ Single keys, in the style of chilla, that pause while a text field is being edit
 - `Esc`: close search results, or back to the library
 - `Shift+L` / `Shift+R`: collapse or expand the left pane / the agent pane
 - `/` (or `Cmd-F`): search the OCR text in a popup; results open in the center pane with page thumbnails and highlighted hits, `Esc` returns
-- `i`: focus the agent chat input
+- `i`: focus the agent chat input; `n`: new chat; `r`: resume the previous chat about this PDF (repeat for older ones); `s`: go to the page where the open chat started
 - `Ctrl+D` / `Ctrl+U`: page the PDF down / up; `j` / `k`: scroll one line
 - `Shift+D`: toggle light and dark mode (light is the default; Settings > Appearance also offers "System")
 - `?` (or Help > Keyboard Shortcuts, `Cmd-/`): show the full list, including the menu shortcuts (`Cmd-Opt-G` go to page, `Cmd-Opt-Up/Down` previous/next page, `Cmd-+`/`Cmd--` zoom, `Cmd-Return` send, `Cmd-.` cancel, `Cmd-Shift-L` library)

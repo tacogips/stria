@@ -1,4 +1,12 @@
 public enum AgentDefaults {
+  /// Instructions for conversation summaries shown in the history list.
+  public static let summaryPrompt = """
+    You summarize a conversation between a user and Stria's PDF reading assistant for a history list.
+    Start from the user's first question and cover the whole conversation: what was asked and what the answers established.
+    Write two to four short sentences in the language the user wrote in. Keep page citations like [<docId> p.<page>] only \
+    when they matter. Output only the summary text, with no heading, quotation marks or preamble.
+    """
+
   /// The default system prompt. Users can edit it in Settings (or
   /// `agent.systemPrompt`) and reset to this text.
   public static let systemPrompt = """

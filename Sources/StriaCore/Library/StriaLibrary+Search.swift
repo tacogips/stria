@@ -33,6 +33,21 @@ extension StriaLibrary {
     return try await store.history(documentId: documentId, page: page, limit: limit)
   }
 
+  /// Conversations for the history list, with their summaries.
+  public func threadOverviews(documentId: String? = nil, page: Int? = nil, limit: Int = 50) async throws -> [ThreadOverview] {
+    if let documentId, try await store.document(id: documentId) == nil {
+      throw StriaError.documentNotFound("Document not found: \(documentId)")
+    }
+    return try await store.threadOverviews(documentId: documentId, page: page, limit: limit)
+  }
+
+  /// Summarizes a conversation from its first question, stores and returns
+  /// the summary. The vendor and model resolve like a question's.
+  @discardableResult
+  public func summarizeThread(threadId: String, selection: AgentSelection? = nil) async throws -> String {
+    try await ThreadSummarizer(environment: environment, store: store).summarize(threadId: threadId, selection: selection)
+  }
+
   public func threadMessages(threadId: String) async throws -> [ChatMessageRecord] {
     try await store.threadMessages(threadId: threadId)
   }

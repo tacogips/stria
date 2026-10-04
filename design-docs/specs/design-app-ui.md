@@ -35,8 +35,17 @@ The reader toolbar has one Library button, one sidebar toggle, a page field,
 and one agent toggle. The Library button remains available when the sidebar
 is hidden. Below 540 points these controls share a compact group; the page
 field shows `n / N`, and previous/next remain available through menu shortcuts.
-Child panes do not set the window title. The agent header groups Chat/History
-and New Chat in one compact row, with no trailing spacer between them.
+Child panes do not set the window title. The agent header groups Chat/History,
+New Chat and Resume Previous Chat on the left; when the open chat started on a
+page of this PDF, a flag button labelled `p.N` on the right jumps back to it.
+
+Wide-window pane widths persist across launches (`readerLeftPaneWidth`,
+`readerAgentPaneWidth` in `UserDefaults`, defaults 240 and 360 points).
+`SplitWidthKeeper` finds the `NSSplitView` behind the `HSplitView`, saves a
+width only while the user drags a divider (the current event is a left-mouse
+drag in that window), and moves the dividers back to the saved widths after
+any other resize (window resize, tiling, a pane shown again), so the PDF takes
+the remaining width.
 
 ## Library (home)
 
@@ -224,16 +233,28 @@ library. One `SearchViewModel` (on `AppModel`) serves both screens.
   inline notice naming the reason and are not persisted.
 - The pane has two tabs, **Chat** and **History**, as a segmented control
   pinned at the top (the content below is top-aligned, so switching tabs
-  never moves the control). Chat holds the scope picker, transcript and composer. History
-  fills the pane with the past questions and answers; its own segmented
-  control switches between "This page" and "This PDF"
-  (`design-storage.md#chat-history-queries`), each row shows the role, page,
-  relative time and up to three lines of text, and an empty state names the
-  scope. The list refreshes when the tab is shown, after each answer, and on
-  page change debounced by 300 ms (and only in "This page" mode, where the
-  result can change). Selecting an entry reopens its thread in the Chat tab
-  and jumps to its page. Selecting an entry opens its thread and jumps
-  to its anchor page.
+  never moves the control). Chat holds the scope picker, transcript and
+  composer (no suggested questions). History lists conversations, not
+  messages; its own segmented control switches between "This page" and
+  "This PDF" (`design-storage.md#thread-overviews`). Each row shows the page,
+  message count, relative time, the conversation summary (up to four lines;
+  "Summarizing..." while one is written; a stale icon when newer messages
+  exist) and the first question in two secondary lines. The context menu
+  offers Summarize / Summarize Again. The list refreshes when the tab is
+  shown, after each answer, and on page change debounced by 300 ms (only in
+  "This page" mode). Selecting a row reopens its thread in the Chat tab and
+  jumps to its anchor page.
+- Summaries: with `agent.autoSummarize` (default true; Settings toggle
+  "Summarize conversations after each answer") each successful answer starts
+  a background `ThreadSummarizer` call with the composer's vendor and model
+  (`design-agent-integration.md#conversation-summaries`). A failure shows a
+  notice and keeps the previous summary.
+- Resume Previous Chat (`r`, `Cmd-Shift-R`, header button) reopens the most
+  recently updated conversation about this PDF from a new chat, and each
+  older one on repeated use; it jumps to that chat's anchor page and focuses
+  the input. With none left it shows "No earlier/older conversation about
+  this PDF." Go to Chat Start Page (`s`, `Cmd-Shift-J`, flag button) jumps
+  to the page of the open chat's first question.
 
 ## Visual Style and Appearance
 
@@ -306,7 +327,10 @@ while a text field or text view has focus, so typing is never interrupted:
 | `Shift+L` | Collapse or expand the left pane |
 | `Shift+R` | Collapse or expand the agent pane |
 | `/` | Open the OCR search popup |
-| `i` | Show the agent pane and focus its input |
+| `i` | Show the agent pane and focus its input (also `Cmd-L`) |
+| `n` | Start a new chat and focus the input |
+| `r` | Resume the previous chat about this PDF (repeat for older ones) |
+| `s` | Go to the page where the open chat started |
 | `Ctrl+D` / `Ctrl+U` | Page the PDF down / up (`PDFView.scrollPageDown/Up`) |
 | `j` / `k` | Scroll the PDF one line down / up |
 | `Shift+D` | Toggle light and dark mode |
@@ -319,7 +343,10 @@ input focus request is `AgentPaneViewModel.focusInputRequest`.
 ## Commands and Shortcuts
 
 Menu commands reach the focused reader through `focusedSceneValue(\.reader)`.
-Commands are disabled when no reader is focused.
+Commands are disabled when no reader is focused. The agent commands run the
+same `ReaderShortcut` handler as the single keys (`striaReaderShortcut`), so
+they also reveal a hidden agent pane. `Ctrl-M` is a local key monitor
+(`ControlMSendMonitor`) that sends only while the chat input has focus.
 
 | Menu | Item | Shortcut |
 | --- | --- | --- |
@@ -333,8 +360,11 @@ Commands are disabled when no reader is focused.
 | Go | Next Page / Previous Page | `Cmd-Opt-Down` / `Cmd-Opt-Up` |
 | View | Zoom In / Zoom Out / Actual Size / Zoom to Fit | `Cmd-+` / `Cmd--` / `Cmd-0` / `Cmd-9` |
 | Agent | Settings… (opens the Settings window, OCR and agent vendors) | `Cmd-Shift-,` |
-| Agent | Send | `Cmd-Return` (in the input field) |
+| Agent | Send | `Cmd-Return` or `Ctrl-M` (in the input field) |
+| Agent | Focus Chat Input | `Cmd-L` |
 | Agent | New Chat | `Cmd-Shift-N` |
+| Agent | Resume Previous Chat | `Cmd-Shift-R` |
+| Agent | Go to Chat Start Page | `Cmd-Shift-J` |
 | Agent | Cancel Question | `Cmd-.` |
 
 Every shortcut is declared once, on the menu command. Toolbar buttons call
