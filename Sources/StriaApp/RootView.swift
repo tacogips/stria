@@ -31,6 +31,10 @@ struct RootView: View {
     .focusedSceneValue(\.striaLibrary, { Task { await model.showLibrary() } })
     .task {
       await model.library.refresh()
+      // Development aid for STRIA_SNAPSHOT_DIR runs: open the most recent PDF.
+      if ProcessInfo.processInfo.environment["STRIA_SNAPSHOT_OPEN"] != nil, let first = model.library.rows.first {
+        await model.open(documentId: first.id)
+      }
     }
   }
 
