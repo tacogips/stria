@@ -6,7 +6,8 @@ public enum ConfigKeyPath {
     "agent.apiKeyEnvironment", "agent.autoSummarize", "agent.maxContextCharacters", "agent.maxImages", "agent.model",
     "agent.neighborPages", "agent.systemPrompt", "agent.timeoutSeconds", "agent.vendor", "ocr.apiKeyEnvironment",
     "ocr.autoRunOnImport", "ocr.concurrency", "ocr.model", "ocr.prompt", "ocr.timeoutSeconds", "ocr.vendor", "render.dpi",
-    "render.imageFormat", "render.maxPixelDimension", "render.quality"
+    "render.imageFormat", "render.maxPixelDimension", "render.quality", "summary.autoRunAfterOCR", "summary.language",
+    "summary.model", "summary.prompt", "summary.timeoutSeconds", "summary.vendor"
   ]
 
   public static func value(of key: String, in config: StriaConfig) throws(StriaError) -> JSONValue {
@@ -32,6 +33,12 @@ public enum ConfigKeyPath {
     case "agent.maxImages": return .int(config.agent.maxImages)
     case "agent.maxContextCharacters": return .int(config.agent.maxContextCharacters)
     case "agent.systemPrompt": return config.agent.systemPrompt.map(JSONValue.string) ?? .null
+    case "summary.vendor": return config.summary.vendor.map(JSONValue.string) ?? .null
+    case "summary.model": return config.summary.model.map(JSONValue.string) ?? .null
+    case "summary.prompt": return config.summary.prompt.map(JSONValue.string) ?? .null
+    case "summary.language": return .string(config.summary.language)
+    case "summary.autoRunAfterOCR": return .bool(config.summary.autoRunAfterOCR)
+    case "summary.timeoutSeconds": return .int(config.summary.timeoutSeconds)
     default: throw .usage("Unknown config key '\(key)'")
     }
   }
@@ -51,6 +58,8 @@ public enum ConfigKeyPath {
       try setRender(key, raw, in: &updated)
     } else if key.hasPrefix("ocr.") {
       try setOCR(key, raw, in: &updated)
+    } else if key.hasPrefix("summary.") {
+      try setSummary(key, raw, in: &updated)
     } else {
       try setAgent(key, raw, in: &updated)
     }
@@ -72,6 +81,9 @@ public enum ConfigKeyPath {
     case "agent.model": updated.agent.model = nil
     case "agent.apiKeyEnvironment": updated.agent.apiKeyEnvironment = nil
     case "agent.systemPrompt": updated.agent.systemPrompt = nil
+    case "summary.vendor": updated.summary.vendor = nil
+    case "summary.model": updated.summary.model = nil
+    case "summary.prompt": updated.summary.prompt = nil
     default:
       if let vendor = credentialVendor(key) { updated.agent.credentials[vendor] = nil } else { throw .usage("Config key '\(key)' cannot be null") }
     }
@@ -100,6 +112,18 @@ public enum ConfigKeyPath {
     case "ocr.autoRunOnImport": updated.ocr.autoRunOnImport = try boolean(raw, key: key)
     case "ocr.prompt": updated.ocr.prompt = raw
     case "ocr.timeoutSeconds": updated.ocr.timeoutSeconds = try integer(raw, key: key)
+    default: throw .usage("Unknown config key '\(key)'")
+    }
+  }
+
+  private static func setSummary(_ key: String, _ raw: String, in updated: inout StriaConfig) throws(StriaError) {
+    switch key {
+    case "summary.vendor": updated.summary.vendor = raw
+    case "summary.model": updated.summary.model = raw
+    case "summary.prompt": updated.summary.prompt = raw
+    case "summary.language": updated.summary.language = raw
+    case "summary.autoRunAfterOCR": updated.summary.autoRunAfterOCR = try boolean(raw, key: key)
+    case "summary.timeoutSeconds": updated.summary.timeoutSeconds = try integer(raw, key: key)
     default: throw .usage("Unknown config key '\(key)'")
     }
   }

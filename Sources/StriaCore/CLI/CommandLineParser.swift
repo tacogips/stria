@@ -43,6 +43,11 @@ public enum CommandLineParser {
       let parsed = try options(arguments, flags: ["--retry-failed"], values: ["--pages"], command: command)
       try requirePositionals(parsed.positionals, count: 1, command: command)
       return .ocr(docId: parsed.positionals[0], pages: parsed.values["--pages"], retryFailed: parsed.flags.contains("--retry-failed"))
+    case "summarize":
+      let parsed = try options(arguments, flags: [], values: ["--pages", "--instruction", "--language"], command: command)
+      try requirePositionals(parsed.positionals, count: 1, command: command)
+      return .summarize(docId: parsed.positionals[0], pages: parsed.values["--pages"],
+                        instruction: parsed.values["--instruction"], language: parsed.values["--language"])
     case "list":
       try rejectOptions(arguments, command: command)
       try requirePositionals(arguments, count: 0, command: command)
@@ -56,7 +61,7 @@ public enum CommandLineParser {
       try requirePositionals(parsed.positionals, count: 1, command: command)
       return .remove(docId: parsed.positionals[0])
     case "page":
-      guard let subcommand = arguments.first else { throw .usage("page requires image or text") }
+      guard let subcommand = arguments.first else { throw .usage("page requires image, text or summary") }
       let rest = Array(arguments.dropFirst())
       switch subcommand {
       case "image":
@@ -67,7 +72,11 @@ public enum CommandLineParser {
         let parsed = try options(rest, flags: [], values: [], command: "page text")
         try requirePositionals(parsed.positionals, count: 2, command: "page text")
         return .pageText(docId: parsed.positionals[0], page: try positiveInteger(parsed.positionals[1], name: "page"))
-      default: throw .usage("Unknown page command '\(subcommand)'; expected image or text")
+      case "summary":
+        let parsed = try options(rest, flags: [], values: [], command: "page summary")
+        try requirePositionals(parsed.positionals, count: 2, command: "page summary")
+        return .pageSummary(docId: parsed.positionals[0], page: try positiveInteger(parsed.positionals[1], name: "page"))
+      default: throw .usage("Unknown page command '\(subcommand)'; expected image, text or summary")
       }
     case "search":
       let parsed = try options(arguments, flags: [], values: ["--doc", "--limit"], command: command)

@@ -126,7 +126,8 @@ one transaction and bumps `user_version`. Opening a DB whose version is newer
 than the binary knows fails with `databaseTooNew` and leaves the DB
 unmodified. Re-opening an up-to-date DB runs nothing. Migration 1 creates
 the schema; migration 2 adds the `chat_threads` summary columns; migration 3
-adds `chat_threads.title`. Later schema
+adds `chat_threads.title`; migration 4 adds `page_summaries`
+(`design-page-summaries.md#storage`), which no search query reads. Later schema
 changes add new numbered migrations and never edit earlier ones.
 
 ### Search Backend

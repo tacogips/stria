@@ -8,19 +8,21 @@ import StriaCore
 struct AgentPaneView: View {
   @Bindable var agent: AgentPaneViewModel
   let reader: ReaderViewModel
+  let library: LibraryViewModel
   var configRevision = 0
   @State private var tab: Tab = .chat
   @FocusState private var inputFocused: Bool
   @State private var sendKey = ControlMSendMonitor()
 
-  enum Tab: Hashable { case chat, history }
+  enum Tab: Hashable { case chat, history, summary }
 
   var body: some View {
     VStack(spacing: 0) {
       HStack(spacing: 8) {
         IconSegmentedControl(selection: $tab, segments: [
           IconSegment(value: Tab.chat, symbol: "bubble.left.and.bubble.right", help: "Chat: ask about this PDF"),
-          IconSegment(value: Tab.history, symbol: "clock.arrow.circlepath", help: "History: earlier questions and answers")
+          IconSegment(value: Tab.history, symbol: "clock.arrow.circlepath", help: "History: earlier questions and answers"),
+          IconSegment(value: Tab.summary, symbol: "doc.plaintext", help: "Summary: this page's summary")
         ])
         Divider().frame(height: 22)
         Button { agent.newChat(); agent.requestInputFocus() } label: {
@@ -77,6 +79,8 @@ struct AgentPaneView: View {
         composer
       case .history:
         history
+      case .summary:
+        PageSummaryPane(library: library, reader: reader, configRevision: configRevision)
       }
     }
   }

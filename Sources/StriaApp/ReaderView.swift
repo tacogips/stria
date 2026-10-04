@@ -33,7 +33,7 @@ struct ReaderView: View {
         }
         .sheet(isPresented: $compactAgent) {
           compactPane(title: "Agent", geometry: geometry, scrollsWhenShort: true) {
-            AgentPaneView(agent: agent, reader: reader, configRevision: model.configRevision)
+            AgentPaneView(agent: agent, reader: reader, library: model.library, configRevision: model.configRevision)
           }
         }
     }
@@ -97,7 +97,7 @@ struct ReaderView: View {
           }
         }
       if agentVisible {
-        AgentPaneView(agent: agent, reader: reader, configRevision: model.configRevision)
+        AgentPaneView(agent: agent, reader: reader, library: model.library, configRevision: model.configRevision)
           .frame(minWidth: 300, idealWidth: agentPaneWidth, maxWidth: 600)
           .background(Flat.panel)
 

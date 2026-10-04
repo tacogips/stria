@@ -5,7 +5,6 @@ import StriaCore
 /// a page list such as "1-3, 8". The sheet is the confirmation, so it names
 /// the vendor and what happens to existing text.
 struct OCRRunSheet: View {
-  enum Choice: Hashable { case remaining, all, pages }
 
   let row: LibraryRow
   /// Prefills the page list (the reader passes its current page).
@@ -13,7 +12,7 @@ struct OCRRunSheet: View {
   let vendorDescription: String
   let run: (OCRRange) -> Void
   @Environment(\.dismiss) private var dismiss
-  @State private var choice: Choice = .remaining
+  @State private var choice: PageRangeChoice = .remaining
   @State private var pagesText = ""
   @FocusState private var pagesFocused: Bool
 
@@ -23,26 +22,13 @@ struct OCRRunSheet: View {
     VStack(alignment: .leading, spacing: 14) {
       Text("Run OCR").font(.headline)
       Text(row.title).foregroundStyle(.secondary).lineLimit(2)
-      VStack(alignment: .leading, spacing: 8) {
-        radio(.remaining) {
-          Text(remainingCount == 0
-               ? "Remaining pages (none: every page is OCRed)"
-               : "Remaining pages (\(remainingCount) not OCRed or failed)")
-        }
-        radio(.all) { Text(row.pageCount == 1 ? "The only page" : "All \(row.pageCount) pages") }
-        radio(.pages) {
-          HStack(spacing: 8) {
-            Text("Pages")
-            TextField("e.g. 1-3, 8", text: $pagesText)
-              .textFieldStyle(FlatTextFieldStyle())
-              .frame(width: 160)
-              .focused($pagesFocused)
-              .onSubmit(commit)
-            Text("of \(row.pageCount)").foregroundStyle(.secondary)
-          }
-        }
-      }
-      .onChange(of: pagesFocused) { _, focused in if focused { choice = .pages } }
+      PageRangeChoices(
+        choice: $choice, pagesText: $pagesText, pagesFocused: $pagesFocused,
+        remainingLabel: remainingCount == 0
+          ? "Remaining pages (none: every page is OCRed)"
+          : "Remaining pages (\(remainingCount) not OCRed or failed)",
+        pageCount: row.pageCount, onSubmit: commit
+      )
 
       Group {
         switch validation {
@@ -77,41 +63,10 @@ struct OCRRunSheet: View {
     }
   }
 
-  private func radio<Label: View>(_ value: Choice, @ViewBuilder label: () -> Label) -> some View {
-    HStack(spacing: 8) {
-      Button {
-        choice = value
-        pagesFocused = value == .pages
-      } label: {
-        Image(systemName: choice == value ? "largecircle.fill.circle" : "circle")
-          .foregroundStyle(choice == value ? Color.accentColor : Color.secondary)
-      }
-      .buttonStyle(.plain)
-      .accessibilityAddTraits(choice == value ? [.isSelected] : [])
-      label()
-        .contentShape(Rectangle())
-        .onTapGesture { choice = value }
-    }
-  }
+  private var range: OCRRange { choice.range(pagesText: pagesText) }
 
-  private var range: OCRRange {
-    switch choice {
-    case .remaining: .remaining
-    case .all: .all
-    case .pages: .pages(pagesText)
-    }
-  }
-
-  /// The number of pages the run covers, or why the page list is invalid.
   private var validation: Result<Int, StriaError> {
-    do {
-      switch try range.selection(pageCount: row.pageCount) {
-      case .pages(let pages): return .success(pages.count)
-      case .pending, .pendingAndFailed: return .success(remainingCount)
-      }
-    } catch {
-      return .failure(error)
-    }
+    pageRangeValidation(range, pageCount: row.pageCount, remainingCount: remainingCount)
   }
 
   private var canRun: Bool {

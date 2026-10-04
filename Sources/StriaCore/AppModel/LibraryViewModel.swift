@@ -90,7 +90,14 @@ public final class LibraryViewModel {
   public private(set) var thumbnails: [String: CGImage] = [:]
   public static let thumbnailMaxPixel = 320
 
-  private let library: StriaLibrary
+  /// Progress of the page-summary run per document (absent when idle).
+  public internal(set) var summaryProgress: [String: PageSummaryProgress] = [:]
+  /// Bumped whenever a page summary may have changed, so views reload.
+  public internal(set) var summaryRevision = 0
+  /// Runs per document, chained so they never overlap (page order matters).
+  var summaryTasks: [String: (id: UUID, task: Task<Void, Never>)] = [:]
+
+  let library: StriaLibrary
   private var importTasks: [UUID: Task<Void, Never>] = [:]
   private var unavailableReasons: [String: String] = [:]
   private var renderedPages: [String: Int] = [:]
@@ -153,6 +160,7 @@ public final class LibraryViewModel {
         unavailableReasons[documentId] = nil
       }
       await refresh()
+      startAutoSummary(documentId: documentId, pages: summary.processed)
     } catch {
       alert = error.localizedDescription
     }
@@ -197,6 +205,7 @@ public final class LibraryViewModel {
       let summary = try await library.runOCR(documentId: documentId, selection: selection)
       unavailableReasons[documentId] = summary.unavailableReason
       await refresh()
+      startAutoSummary(documentId: documentId, pages: summary.processed)
     } catch {
       alert = (error as? StriaError)?.message ?? error.localizedDescription
     }
@@ -252,6 +261,7 @@ public final class LibraryViewModel {
         } else {
           unavailableReasons[result.document.id] = nil
           await refresh()
+          if result.ocr.done > 0 { startAutoSummary(documentId: result.document.id, pages: nil) }
         }
       case .failed(let error):
         if let id = eventDocumentId { busyIDs.remove(id) }

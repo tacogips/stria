@@ -47,6 +47,35 @@ import Testing
     #expect(settings.environmentHasValue("PATH"))
     #expect(!settings.environmentHasValue("STRIA_SURELY_UNSET_VARIABLE"))
 
+    // Page summaries: vendor, model suggestion, language and prompt template.
+    #expect(settings.summaryVendor == SettingsViewModel.notConfigured)
+    #expect(settings.summaryPromptIsDefault)
+    #expect(settings.summaryLanguage == PageSummaryLanguage.auto)
+    settings.summaryVendor = "codex"
+    settings.applySummarySuggestions()
+    #expect(settings.summaryModel == ModelCatalog.defaultModel(for: "codex"))
+    settings.summaryModel = ""
+    #expect(!settings.save())
+    #expect(settings.error?.contains("Page summaries: a model is required") == true)
+    settings.applySummarySuggestions()
+    settings.summaryAutoRun = true
+    settings.summaryLanguage = "Japanese"
+    settings.summaryPrompt = "Summarize in {language}, briefly."
+    #expect(!settings.summaryPromptIsDefault)
+    #expect(settings.save())
+    var summary = try ConfigStore.loadOrCreate(paths: paths).summary
+    #expect(summary.vendor == "codex")
+    #expect(summary.autoRunAfterOCR)
+    #expect(summary.language == "Japanese")
+    #expect(summary.prompt == "Summarize in {language}, briefly.")
+    #expect(model.library.summaryConfigured)
+    settings.resetSummaryPrompt()
+    #expect(settings.save())
+    summary = try ConfigStore.loadOrCreate(paths: paths).summary
+    #expect(summary.prompt == nil)
+    settings.summaryLanguage = "Klingon"
+    #expect(settings.summaryLanguageOptions.last == "Klingon")
+
     settings.resetSystemPrompt()
     #expect(settings.systemPromptIsDefault)
     settings.resetOCRPrompt()

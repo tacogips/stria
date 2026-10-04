@@ -10,6 +10,7 @@ public final class SettingsViewModel {
   /// "" stands for "not configured".
   public static let notConfigured = ""
   public static let ocrVendorOptions = [notConfigured, KnownVendors.pdfTextLayer] + KnownVendors.gateway
+  public static let summaryVendorOptions = [notConfigured] + KnownVendors.gateway
   /// API vendors whose credential variable name is set in Settings.
   public static let credentialVendors = KnownVendors.apiKeyVendors.sorted()
 
@@ -25,6 +26,13 @@ public final class SettingsViewModel {
   /// The prompt as shown for editing; the default text when none is set.
   public var agentSystemPrompt = AgentDefaults.systemPrompt
   public var agentAutoSummarize = true
+  public var summaryVendor = notConfigured
+  public var summaryModel = ""
+  public var summaryAutoRun = false
+  /// A `PageSummaryLanguage.options` entry (or a custom name from config).
+  public var summaryLanguage = PageSummaryLanguage.auto
+  /// The summary prompt template as shown for editing; the default when none is set.
+  public var summaryPrompt = PageSummaryDefaults.prompt
   public private(set) var error: String?
   public private(set) var savedAt: Date?
   public var onSaved: (() -> Void)?
@@ -71,8 +79,12 @@ public final class SettingsViewModel {
 
   public func fetchModels(ocr: Bool) async {
     _ = ocr
-    let vendor = ocrVendor
-    let keyName = Self.trimmed(ocrAPIKeyEnvironment)
+    await fetchModels(vendor: ocrVendor, apiKeyEnvironment: ocrAPIKeyEnvironment)
+  }
+
+  /// Fetches a vendor's models with the named key variable (empty = none).
+  public func fetchModels(vendor: String, apiKeyEnvironment: String) async {
+    let keyName = Self.trimmed(apiKeyEnvironment)
     isFetchingModels = true
     modelFetchError = nil
     defer { isFetchingModels = false }
@@ -96,6 +108,11 @@ public final class SettingsViewModel {
     ocrAutoRunOnImport = config.ocr.autoRunOnImport
     ocrConcurrency = config.ocr.concurrency
     ocrPrompt = config.ocr.prompt ?? OCRDefaults.prompt
+    summaryVendor = config.summary.vendor ?? Self.notConfigured
+    summaryModel = config.summary.model ?? ""
+    summaryAutoRun = config.summary.autoRunAfterOCR
+    summaryLanguage = config.summary.language
+    summaryPrompt = config.summary.prompt ?? PageSummaryDefaults.prompt
     credentials = config.agent.credentials
     for vendor in Self.credentialVendors where credentials[vendor] == nil { credentials[vendor] = "" }
     agentSystemPrompt = config.agent.systemPrompt ?? AgentDefaults.systemPrompt
@@ -114,6 +131,29 @@ public final class SettingsViewModel {
   }
 
   public func resetOCRPrompt() { ocrPrompt = OCRDefaults.prompt }
+
+  public var summaryPromptIsDefault: Bool {
+    summaryPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+      == PageSummaryDefaults.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  public func resetSummaryPrompt() { summaryPrompt = PageSummaryDefaults.prompt }
+
+  /// The language picker's entries, keeping a custom configured name.
+  public var summaryLanguageOptions: [String] {
+    PageSummaryLanguage.options.contains(summaryLanguage)
+      ? PageSummaryLanguage.options : PageSummaryLanguage.options + [summaryLanguage]
+  }
+
+  /// The credential variable a summary vendor uses (from Agent API Keys).
+  public var summaryCredentialName: String { credentials[summaryVendor] ?? "" }
+
+  /// Fills an empty model with the summary vendor's suggestion and drops a
+  /// model that belongs to another vendor.
+  public func applySummarySuggestions() {
+    if !summaryModel.isEmpty, !Self.modelMayBelong(summaryModel, to: summaryVendor) { summaryModel = "" }
+    if summaryModel.isEmpty, let model = Self.suggestedModel(for: summaryVendor) { summaryModel = model }
+  }
 
   public static func displayName(for vendor: String) -> String {
     switch vendor {
@@ -186,6 +226,14 @@ public final class SettingsViewModel {
     // The default is stored as nil, so a future default change reaches users who never edited it.
     config.agent.systemPrompt = systemPromptIsDefault ? nil : Self.trimmed(agentSystemPrompt)
     config.agent.autoSummarize = agentAutoSummarize
+    config.summary.vendor = summaryVendor == Self.notConfigured ? nil : summaryVendor
+    config.summary.model = Self.trimmed(summaryModel)
+    config.summary.autoRunAfterOCR = summaryAutoRun
+    config.summary.language = Self.trimmed(summaryLanguage) ?? PageSummaryLanguage.auto
+    config.summary.prompt = summaryPromptIsDefault ? nil : Self.trimmed(summaryPrompt)
+    if Self.needsModel(summaryVendor), config.summary.model == nil {
+      throw .config("Page summaries: a model is required for \(Self.displayName(for: summaryVendor))")
+    }
     if Self.needsModel(ocrVendor), config.ocr.model == nil { throw .config("OCR: a model is required for \(Self.displayName(for: ocrVendor))") }
     if Self.requiresAPIKey(ocrVendor), config.ocr.apiKeyEnvironment == nil {
       throw .config("OCR: an API key environment variable name is required for \(Self.displayName(for: ocrVendor))")

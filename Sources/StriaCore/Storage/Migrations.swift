@@ -5,7 +5,7 @@ struct MigrationResult {
 }
 
 enum Migrations {
-  static let version = 3
+  static let version = 4
 
   static func run(_ database: SQLiteConnection, forceLikeSearch: Bool) throws -> MigrationResult {
     // busy_timeout comes first: even reading user_version can hit the lock of
@@ -53,6 +53,13 @@ enum Migrations {
         try database.execute("PRAGMA user_version=3")
       }
     }
+    if try userVersion(database) < 4 {
+      try database.transaction {
+        guard try userVersion(database) < 4 else { return }
+        try addPageSummaries(database)
+        try database.execute("PRAGMA user_version=4")
+      }
+    }
     return MigrationResult(backend: try storedBackend(database))
   }
 
@@ -76,6 +83,21 @@ enum Migrations {
   /// header and the history list.
   static func addThreadTitleColumn(_ db: SQLiteConnection) throws {
     try db.execute("ALTER TABLE chat_threads ADD COLUMN title TEXT;")
+  }
+
+  /// Migration 4: per-page summaries, kept out of the search index.
+  /// `source_ocr_updated_at` is the page's `ocr_updated_at` the summary was
+  /// written from; a newer OCR run makes the summary stale.
+  static func addPageSummaries(_ db: SQLiteConnection) throws {
+    try db.execute("""
+      CREATE TABLE page_summaries(
+        document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+        page_number INTEGER NOT NULL CHECK(page_number >= 1),
+        status TEXT NOT NULL CHECK(status IN ('done','failed')),
+        summary TEXT, error TEXT, language TEXT NOT NULL, instruction TEXT,
+        vendor TEXT NOT NULL, model TEXT, source_ocr_updated_at TEXT, updated_at TEXT NOT NULL,
+        PRIMARY KEY(document_id, page_number));
+      """)
   }
 
   /// Schema version 1, kept as the first step of every fresh database.

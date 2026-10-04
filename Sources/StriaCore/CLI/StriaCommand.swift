@@ -38,6 +38,8 @@ public enum StriaCommand {
         value = try await DocumentCommands.run(invocation.command, library: library, currentDirectory: currentDirectory)
       case .search, .ask, .history:
         value = try await QueryCommands.run(invocation.command, library: library)
+      case .pageSummary, .summarize:
+        value = try await SummaryCommands.run(invocation.command, library: library)
       case .configGet, .configSet, .paths:
         value = try ConfigCommands.run(invocation.command, config: &config, paths: paths)
       case .help, .version:

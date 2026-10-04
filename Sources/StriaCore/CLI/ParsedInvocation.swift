@@ -18,6 +18,8 @@ public enum CLICommand: Equatable, Sendable {
   case remove(docId: String)
   case pageImage(docId: String, page: Int, output: String?)
   case pageText(docId: String, page: Int)
+  case pageSummary(docId: String, page: Int)
+  case summarize(docId: String, pages: String?, instruction: String?, language: String?)
   case search(query: String, docId: String?, limit: Int?)
   case ask(question: String, docId: String?, page: Int?, query: String?, limit: Int?, thread: String?, vendor: String?, model: String?)
   case history(docId: String?, page: Int?, limit: Int?, threads: Bool)

@@ -302,6 +302,12 @@ once, after its first answer and before the summary; the agent pane's wand
 button and the History context menu rewrite it on demand. A failure keeps
 the previous title and shows a notice.
 
+### Page summaries
+
+Per-page summaries after OCR use their own `summary` config (vendor, model,
+prompt template with `{language}`, language, auto-run, timeout) and the same
+`AgentService`; see `design-page-summaries.md`.
+
 ## agent-gateway Integration
 
 Dependency: `.package(url: "https://github.com/tacogips/agent-gateway.git",

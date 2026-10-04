@@ -236,7 +236,8 @@ library. One `SearchViewModel` (on `AppModel`) serves both screens.
   is anchored to the page that was current at its first question.
 - `unavailable` errors (for example, a credential env var is unset) show an
   inline notice naming the reason and are not persisted.
-- The pane has two tabs, **Chat** and **History**, as a segmented control
+- The pane has three tabs, **Chat**, **History** and **Summary** (the
+  current page's summary, `design-page-summaries.md#app`), as a segmented control
   pinned at the top (the content below is top-aligned, so switching tabs
   never moves the control). Chat holds a title bar, the scope picker,
   transcript and composer (no suggested questions). The title bar shows the
@@ -308,6 +309,9 @@ with `StriaLibrary.saveConfig` on Save (nothing is written before). Sections:
   the concurrency stepper. Choosing a vendor fills empty model and variable
   fields with suggestions and clears a model the new vendor does not know, so
   a model id is never sent to the wrong vendor.
+- Page Summaries: auto-run toggle, vendor, model, language picker and prompt
+  template editor (`design-page-summaries.md#app`). The agent pane's third
+  tab, Summary, shows the current page's summary with a redo sheet.
 - OCR Prompt: a text editor showing the prompt sent with each page image
   (`OCRDefaults.prompt` when `ocr.prompt` is null), "Using the default
   prompt." / "Custom prompt.", and Reset to Default. Saving text equal to the

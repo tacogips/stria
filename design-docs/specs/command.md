@@ -133,6 +133,11 @@ file was written now or when `--output` is used.
 `{"docId", "page", "ocrStatus", "text", "ocrError", "ocrVendor", "ocrModel"}`.
 `text` is null unless `ocrStatus` is `done`.
 
+### `stria page summary <docId> <page>` / `stria summarize <docId> [--pages <list>] [--instruction <text>] [--language <name>]`
+
+Read or write per-page summaries; see `design-page-summaries.md#cli`.
+Summaries are never part of `search`.
+
 ### `stria search <query> [--doc <docId>] [--limit <n>]`
 
 ```json

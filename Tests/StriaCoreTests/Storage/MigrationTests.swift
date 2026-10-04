@@ -11,8 +11,8 @@ import Testing
       #expect(backend == .fts5 || backend == .like)
       let reopened = try openStorage(paths: paths)
       #expect(await reopened.searchBackend == backend)
-      #expect(try sqliteScalar(path: paths.database.path, sql: "PRAGMA user_version") == "3")
-      for table in ["meta", "documents", "pages", "agent_runs", "chat_threads", "chat_messages"] {
+      #expect(try sqliteScalar(path: paths.database.path, sql: "PRAGMA user_version") == "4")
+      for table in ["meta", "documents", "pages", "agent_runs", "chat_threads", "chat_messages", "page_summaries"] {
         #expect(try sqliteScalar(path: paths.database.path, sql: "SELECT name FROM sqlite_master WHERE type='table' AND name='\(table)'") == table)
       }
     }
@@ -21,7 +21,7 @@ import Testing
   @Test func newerVersionIsNotModifiedAndForcedLikeSkipsFTS() async throws {
     try await withTestDataRoot { paths in
       try paths.ensureDirectories()
-      try sqliteExecute(path: paths.database.path, sql: "PRAGMA user_version=4")
+      try sqliteExecute(path: paths.database.path, sql: "PRAGMA user_version=5")
       let before = SHA256.hash(data: try Data(contentsOf: paths.database)).map { String(format: "%02x", $0) }.joined()
       do {
         _ = try StriaStore(databaseURL: paths.database)
@@ -54,12 +54,12 @@ import Testing
         PRAGMA user_version=1;
         """)
       _ = try StriaStore(databaseURL: paths.database)
-      #expect(try sqliteScalar(path: paths.database.path, sql: "PRAGMA user_version") == "3")
+      #expect(try sqliteScalar(path: paths.database.path, sql: "PRAGMA user_version") == "4")
       #expect(try sqliteScalar(path: paths.database.path, sql: "SELECT COUNT(*) FROM pragma_table_info('chat_threads') WHERE name='title'") == "1")
       #expect(try sqliteScalar(path: paths.database.path, sql: "SELECT scope FROM chat_threads WHERE id='old'") == "page")
       #expect(try sqliteScalar(path: paths.database.path, sql: "SELECT COUNT(*) FROM pragma_table_info('chat_threads') WHERE name IN ('summary','summary_through_message_id','summary_updated_at')") == "3")
       _ = try StriaStore(databaseURL: paths.database)
-      #expect(try sqliteScalar(path: paths.database.path, sql: "PRAGMA user_version") == "3")
+      #expect(try sqliteScalar(path: paths.database.path, sql: "PRAGMA user_version") == "4")
     }
   }
 }

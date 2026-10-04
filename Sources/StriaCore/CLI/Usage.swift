@@ -12,6 +12,8 @@ public enum Usage {
     remove <docId>
     page image <docId> <page> [--output <path>]
     page text <docId> <page>
+    page summary <docId> <page>
+    summarize <docId> [--pages <list>] [--instruction <text>] [--language <name>]
     search <query> [--doc <docId>] [--limit <n>]
     ask <question> [--doc <docId>] [--page <n>] [--query <terms>] [--limit <n>] [--thread <id>] [--vendor <v> [--model <m>]]
     history [--doc <docId>] [--page <n>] [--limit <n>] [--threads]
@@ -29,7 +31,8 @@ public enum Usage {
 
   Workflow for agents (RAG over imported PDFs):
     - Find pages: search "<phrase>" [--doc <docId>] -> results[].docId, page, snippet, imagePath
-    - Read a page: page image <docId> <page> -> path of a PNG to view; page text -> OCR text
+    - Read a page: page image <docId> <page> -> path of a PNG to view; page text -> OCR text;
+      page summary -> the page's summary (summaries are not searched)
     - Answer and cite docId + page; show <docId> gives the outline for context
     - Or let stria answer: ask "<question>" [--doc <docId>] [--thread <id>] -> answer, citations
   """

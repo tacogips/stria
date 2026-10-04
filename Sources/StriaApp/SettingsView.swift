@@ -54,7 +54,9 @@ struct SettingsView: View {
         .pickerStyle(.menu)
         .onChange(of: settings.ocrVendor) { _, _ in settings.applySuggestions(ocr: true) }
         if SettingsViewModel.needsModel(settings.ocrVendor) {
-          ModelField(settings: settings, vendor: settings.ocrVendor, model: $settings.ocrModel, ocr: true)
+          ModelField(settings: settings, vendor: settings.ocrVendor, model: $settings.ocrModel) {
+            await settings.fetchModels(ocr: true)
+          }
         }
         if SettingsViewModel.requiresAPIKey(settings.ocrVendor) {
           TextField("API key environment variable", text: $settings.ocrAPIKeyEnvironment,
@@ -85,6 +87,7 @@ struct SettingsView: View {
           Changes apply to the next OCR run; use Run OCR to redo pages already OCRed.
           """)
       }
+      PageSummarySettingsSection(settings: settings)
       Section {
         ForEach(SettingsViewModel.credentialVendors, id: \.self) { vendor in
           HStack {
@@ -139,11 +142,12 @@ struct SettingsView: View {
 /// any other id and, for API vendors, a live refresh from the vendor. The
 /// option list is computed once per vendor (or fetch), not on every render,
 /// so choosing an entry applies without a visible delay.
-private struct ModelField: View {
+struct ModelField: View {
   @Bindable var settings: SettingsViewModel
   let vendor: String
   @Binding var model: String
-  let ocr: Bool
+  /// Fetches the vendor's live model list (with the right key variable).
+  let fetch: () async -> Void
   @State private var custom = false
   @State private var options: [String] = []
 
@@ -184,7 +188,7 @@ private struct ModelField: View {
     if settings.canFetchModels(for: vendor) {
       HStack {
         Button(settings.isFetchingModels ? "Fetching…" : "Fetch models from vendor") {
-          Task { await settings.fetchModels(ocr: ocr) }
+          Task { await fetch() }
         }
         .disabled(settings.isFetchingModels)
         if let error = settings.modelFetchError {
