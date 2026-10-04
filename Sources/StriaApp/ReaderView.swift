@@ -12,6 +12,8 @@ struct ReaderView: View {
   @State private var availableWidth: CGFloat = 1100
   @State private var showPageSheet = false
   @State private var showShortcutHelp = false
+  /// The document's library row while the OCR run sheet is open.
+  @State private var ocrRow: LibraryRow?
   @State private var columnVisibility: NavigationSplitViewVisibility = .all
   @State private var shortcuts = ReaderShortcutMonitor()
   @AppStorage(Appearance.storageKey) private var appearance = Appearance.default
@@ -123,6 +125,7 @@ struct ReaderView: View {
     .focusedSceneValue(\.striaAgentVisibility, agentControl)
     .focusedSceneValue(\.striaShortcutHelp, $showShortcutHelp)
     .focusedSceneValue(\.striaSidebar, sidebarControl)
+    .focusedSceneValue(\.striaRunOCR, { presentOCR() })
     .toolbar {
       if availableWidth < 540 {
         ToolbarItem(placement: .principal) {
@@ -130,6 +133,7 @@ struct ReaderView: View {
             libraryButton
             sidebarButton
             PageFieldView(reader: reader, compact: true)
+            ocrButton
             agentButton
           }
           .buttonStyle(.plain)
@@ -144,13 +148,20 @@ struct ReaderView: View {
         ToolbarItem(placement: .principal) {
           PageFieldView(reader: reader)
         }
-        ToolbarItem(placement: .primaryAction) {
+        ToolbarItemGroup(placement: .primaryAction) {
+          ocrButton
           agentButton
         }
       }
     }
     .sheet(isPresented: $showPageSheet) {
       GoToPageSheet(reader: reader, isPresented: $showPageSheet)
+    }
+    .sheet(item: $ocrRow) { row in
+      OCRRunSheet(row: row, initialPages: String(reader.currentPage),
+                  vendorDescription: model.settings.ocrVendorDescription) { range in
+        Task { await model.library.runOCR(documentId: row.id, range: range) }
+      }
     }
     .sheet(isPresented: $showShortcutHelp) {
       ShortcutHelpSheet(isPresented: $showShortcutHelp)
@@ -166,6 +177,30 @@ struct ReaderView: View {
     }
     .accessibilityLabel("Back to the library")
     .help("Back to the library (Esc or Cmd-Shift-L)")
+  }
+
+  private var documentRow: LibraryRow? { model.library.rows.first { $0.id == reader.documentId } }
+
+  private func presentOCR() {
+    guard model.library.ocrConfigured, let row = documentRow, !row.isBusy else { return }
+    ocrRow = row
+  }
+
+  @ViewBuilder private var ocrButton: some View {
+    let busy = documentRow?.isBusy == true
+    Button { presentOCR() } label: {
+      if busy {
+        ProgressView().controlSize(.small)
+      } else {
+        Label("Run OCR", systemImage: "text.viewfinder").labelStyle(.iconOnly)
+      }
+    }
+    .disabled(!model.library.ocrConfigured || busy || documentRow == nil)
+    .accessibilityLabel(busy ? "OCR running" : "Run OCR")
+    .help(busy ? "OCR is running on this PDF"
+          : model.library.ocrConfigured
+          ? "Run OCR on this page, a page range, the remaining pages or all pages (Cmd-Shift-O)"
+          : "Choose an OCR vendor in Settings first (Agent > Settings…)")
   }
 
   private var sidebarButton: some View {

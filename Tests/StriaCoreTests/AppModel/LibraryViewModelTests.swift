@@ -146,4 +146,31 @@ import Testing
       #expect(await ocr.requests.count == 4)
     }
   }
+
+  @Test func ocrRunsOnAChosenPageRangeOnly() async throws {
+    try await withAppModelDataRoot { paths in
+      let ocr = FakeOCRService()
+      var config = StriaConfig.testing
+      config.ocr.autoRunOnImport = false
+      let (library, source) = try makeAppModelFixture(paths: paths, pageTexts: ["one", "two", "three"], ocr: ocr, config: config)
+      let model = LibraryViewModel(library: library)
+      model.importFiles([source])
+      await model.waitForImports()
+      let id = try #require(model.rows.first?.id)
+      await ocr.script(docId: id, page: 2, .success("two again"))
+      await ocr.script(docId: id, page: 3, .success("three again"))
+      await model.runOCR(documentId: id, range: .pages(" 2 - 3 "))
+      #expect(model.alert == nil)
+      #expect(await ocr.requests.map(\.page).sorted() == [2, 3])
+      #expect(model.rows.first?.ocr.done == 2)
+      #expect(try await library.pageText(documentId: id, page: 3).ocrText == "three again")
+
+      await model.runOCR(documentId: id, range: .pages("4"))
+      #expect(model.alert?.contains("exceeds page count 3") == true)
+      model.alert = nil
+      await model.runOCR(documentId: id, range: .pages("  "))
+      #expect(model.alert == "Enter pages such as 1-3, 8")
+      #expect(await ocr.requests.count == 2)
+    }
+  }
 }

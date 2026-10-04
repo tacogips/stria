@@ -116,7 +116,7 @@ struct StriaCommands: Commands {
     CommandGroup(replacing: .newItem) {
       Button("Import PDF…") { importAction?() }
         .keyboardShortcut("o", modifiers: .command)
-      Button("Run OCR on Selected Document") { runOCR?() }
+      Button("Run OCR…") { runOCR?() }
         .keyboardShortcut("o", modifiers: [.command, .shift])
         .disabled(runOCR == nil)
     }

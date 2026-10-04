@@ -79,9 +79,10 @@ the remaining width.
   downscaled (`StriaLibrary.firstPageThumbnail`, longest side 320 px),
   loaded on demand and cached in `LibraryViewModel.thumbnails`; a document
   still rendering shows a placeholder and loads when it becomes ready.
-- To open a document, double-click its row or card (or select it and press
-  Return). A single click selects it for OCR and removal; selected cards have
-  an accent border. Card accessibility activation also opens the document.
+- To open a document, click its row or card once (or select it with the
+  arrow keys and press Return). The last opened document stays selected for
+  the toolbar Run OCR button and the Delete key; selected cards have an
+  accent border. Card accessibility activation also opens the document.
   The route switches to the reader first (its "Opening document" indicator
   shows), the `PDFDocument` is parsed off the main actor, `last_opened_at`
   is set, and background cache expansion of all pages starts. A failed open
@@ -90,13 +91,17 @@ the remaining width.
   rendering: "OCR done" (green), "OCR n/N" (partial, blue), "Not OCRed"
   (grey) or "OCR n failed" (orange), with a tooltip giving the counts
   (`LibraryRow.ocrState`).
-- Row context menu: "Run OCR on Remaining Pages..." (pending and failed),
-  "Re-OCR All Pages..." (every page, replacing existing text; available
-  whatever the current state) and "Remove..."; the toolbar Run OCR button
-  (`Cmd-Shift-O`) picks remaining pages, or all pages when the document is
-  complete. Every OCR run asks for confirmation first, naming the page
-  count, the OCR vendor and model, and whether existing text is replaced.
-  The earlier "Run OCR" / "Retry Failed OCR" items are replaced by these (also the Delete key on the selected row). Removal asks for
+- Row context menu: "Run OCR..." and "Remove..." (also the Delete key on
+  the selected row). Run OCR (context menu, library toolbar button for the
+  selected document, reader toolbar button, File > Run OCR..., `Cmd-Shift-O`)
+  opens `OCRRunSheet`, which is the confirmation: radio choices "Remaining
+  pages" (pending and failed; preselected when any), "All N pages" and
+  "Pages" with a page-list field ("1-3, 8"; spaces allowed;
+  `OCRRange.pages`, parsed by `PageListParser`). In the reader the field is
+  prefilled with the current page and preselected. The sheet names the page
+  count, the OCR vendor and model, and that existing text on chosen pages is
+  replaced; an invalid list shows the reason and disables Run OCR. While a
+  run is in progress the reader's OCR button shows a spinner. Removal asks for
   confirmation, names what is deleted (stored copy, page images, OCR text,
   chat history) and states that the imported file itself is untouched. It
   calls `StriaLibrary.removeDocument` (`design-storage.md#document-removal`).
@@ -353,7 +358,7 @@ they also reveal a hidden agent pane. `Ctrl-M` is a local key monitor
 | File | Import PDF... | `Cmd-O` |
 | View | Show/Hide Sidebar | `Ctrl-Cmd-S` |
 | View | Library as List / Library as Cards | `Cmd-1` / `Cmd-2` |
-| File | Run OCR on Selected Document | `Cmd-Shift-O` |
+| File | Run OCR... (library: selected document; reader: this PDF) | `Cmd-Shift-O` |
 | View | Show/Hide Agent | `Cmd-Opt-0` |
 | View | Library | `Cmd-Shift-L` |
 | Go | Go to Page... | `Cmd-Opt-G` |

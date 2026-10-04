@@ -25,6 +25,27 @@ public enum DocumentOCRState: Equatable, Sendable {
   case hasFailures
 }
 
+/// Which pages an OCR run from the app covers.
+public enum OCRRange: Equatable, Sendable {
+  /// Pages not OCRed yet or that failed.
+  case remaining
+  /// Every page; existing text is replaced.
+  case all
+  /// A page list such as "1-3, 8" (spaces allowed).
+  case pages(String)
+
+  public func selection(pageCount: Int) throws(StriaError) -> OCRSelection {
+    switch self {
+    case .remaining: return .pendingAndFailed
+    case .all: return .pages(Array(1...max(pageCount, 1)))
+    case .pages(let text):
+      let compact = text.filter { !$0.isWhitespace }
+      guard !compact.isEmpty else { throw .usage("Enter pages such as 1-3, 8") }
+      return .pages(try PageListParser.parse(compact, pageCount: pageCount))
+    }
+  }
+}
+
 public struct LibraryRow: Identifiable, Equatable, Sendable {
   public let id: String
   public var title: String
@@ -156,11 +177,24 @@ public final class LibraryViewModel {
 
   /// OCR every page again, whatever its state (done pages are replaced).
   public func rerunOCRAllPages(documentId: String) async {
+    await runOCR(documentId: documentId, range: .all)
+  }
+
+  /// Runs OCR on the chosen pages; pages already OCRed in a chosen range or
+  /// in `.all` are replaced. An invalid page list sets `alert`.
+  public func runOCR(documentId: String, range: OCRRange) async {
     guard let row = rows.first(where: { $0.id == documentId }), row.pageCount > 0 else { return }
+    let selection: OCRSelection
+    do {
+      selection = try range.selection(pageCount: row.pageCount)
+    } catch {
+      alert = error.message
+      return
+    }
     setBusy(documentId, true)
     defer { setBusy(documentId, false) }
     do {
-      let summary = try await library.runOCR(documentId: documentId, selection: .pages(Array(1...row.pageCount)))
+      let summary = try await library.runOCR(documentId: documentId, selection: selection)
       unavailableReasons[documentId] = summary.unavailableReason
       await refresh()
     } catch {
