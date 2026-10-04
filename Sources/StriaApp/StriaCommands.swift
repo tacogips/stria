@@ -85,7 +85,7 @@ struct StriaCommands: Commands {
       Divider()
       Button("New Chat") { agent?.newChat() }
         .keyboardShortcut("n", modifiers: [.command, .shift])
-        .disabled(agent == nil)
+        .disabled(agent == nil || agent?.inFlight == true)
       Button("Cancel Question") { agent?.cancel() }
         .keyboardShortcut(".", modifiers: .command)
         .disabled(agent?.inFlight != true)

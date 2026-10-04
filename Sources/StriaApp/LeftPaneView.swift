@@ -3,24 +3,10 @@ import StriaCore
 
 struct LeftPaneView: View {
   @Bindable var reader: ReaderViewModel
-  var onBack: (() -> Void)?
   @State private var expandedIDs: Set<String> = []
 
   var body: some View {
     VStack(spacing: 0) {
-      HStack {
-        if let onBack {
-          Button(action: onBack) {
-            Image(systemName: "chevron.backward")
-          }
-          .buttonStyle(.plain)
-          .help("Back to the library (Esc or Cmd-Shift-L)")
-          .accessibilityLabel("Back to the library")
-        }
-        Spacer()
-      }
-      .padding(.horizontal, 12)
-      .padding(.top, 10)
       IconSegmentedControl(selection: $reader.sidebarMode, segments: sidebarSegments)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
@@ -35,7 +21,6 @@ struct LeftPaneView: View {
         }
       }
     }
-    .navigationTitle("Contents")
   }
 
   private let sidebarSegments = [
@@ -49,7 +34,8 @@ struct LeftPaneView: View {
         List(1...max(reader.pageCount, 1), id: \.self, selection: pageSelection) { page in
           Text("Page \(page)").id(page)
         }
-        .listStyle(.sidebar)
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
         .onChange(of: reader.currentPage) { _, page in proxy.scrollTo(page) }
       }
     } else {
@@ -59,7 +45,8 @@ struct LeftPaneView: View {
             OutlineRowView(row: row, expandedIDs: $expandedIDs)
           }
         }
-        .listStyle(.sidebar)
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
         .onAppear { revealCurrentSection(proxy) }
         .onChange(of: reader.currentOutlineNodeID) { _, _ in revealCurrentSection(proxy) }
       }

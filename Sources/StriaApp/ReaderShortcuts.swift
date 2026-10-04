@@ -71,11 +71,14 @@ enum ReaderShortcut: CaseIterable {
 @MainActor
 final class ReaderShortcutMonitor {
   private var monitor: Any?
+  private let menuTracking = MenuTrackingState()
 
   func install(_ handler: @escaping @MainActor (ReaderShortcut) -> Void) {
     remove()
-    monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-      guard !Self.isEditingText(), let shortcut = ReaderShortcut.match(event) else { return event }
+    menuTracking.start()
+    monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+      guard let self else { return event }
+      guard !self.menuTracking.isTracking, !Self.isEditingText(), let shortcut = ReaderShortcut.match(event) else { return event }
       // Esc belongs to a sheet or popover while one is open.
       if shortcut == .backToLibrary, Self.sheetIsOpen() { return event }
       handler(shortcut)
@@ -86,6 +89,7 @@ final class ReaderShortcutMonitor {
   func remove() {
     if let monitor { NSEvent.removeMonitor(monitor) }
     monitor = nil
+    menuTracking.stop()
   }
 
   /// True while a sheet (Go to Page, shortcut help, a confirmation) is up.
@@ -105,32 +109,34 @@ struct ShortcutHelpSheet: View {
   @Binding var isPresented: Bool
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
-      Text("Keyboard Shortcuts").font(.headline)
-      Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 6) {
-        ForEach(ReaderShortcut.allCases, id: \.self) { shortcut in
-          GridRow {
-            Text(shortcut.keys).font(.system(.body, design: .monospaced)).frame(width: 70, alignment: .leading)
-            Text(shortcut.title)
+    ScrollView {
+      VStack(alignment: .leading, spacing: 12) {
+        Text("Keyboard Shortcuts").font(.headline)
+        Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 6) {
+          ForEach(ReaderShortcut.allCases, id: \.self) { shortcut in
+            GridRow {
+              Text(shortcut.keys).font(.system(.body, design: .monospaced)).frame(width: 70, alignment: .leading)
+              Text(shortcut.title)
+            }
           }
+          Divider().gridCellColumns(2)
+          GridRow { Text("Ctrl-Cmd-S").font(.system(.body, design: .monospaced)); Text("Hide / show the sidebar") }
+          GridRow { Text("Cmd-Opt-0").font(.system(.body, design: .monospaced)); Text("Hide / show the agent pane") }
+          GridRow { Text("Cmd-Opt-G").font(.system(.body, design: .monospaced)); Text("Go to page") }
+          GridRow { Text("Cmd-Opt-Up/Down").font(.system(.body, design: .monospaced)); Text("Previous / next page") }
+          GridRow { Text("Cmd-+ / Cmd--").font(.system(.body, design: .monospaced)); Text("Zoom in / out") }
+          GridRow { Text("Cmd-F").font(.system(.body, design: .monospaced)); Text("Search the OCR text") }
+          GridRow { Text("Cmd-Return").font(.system(.body, design: .monospaced)); Text("Send the question") }
+          GridRow { Text("Cmd-.").font(.system(.body, design: .monospaced)); Text("Cancel the question") }
+          GridRow { Text("Cmd-Shift-L").font(.system(.body, design: .monospaced)); Text("Back to the library") }
+          GridRow { Text("Cmd-Shift-D").font(.system(.body, design: .monospaced)); Text("Toggle light / dark (View > Appearance)") }
         }
-        Divider().gridCellColumns(2)
-        GridRow { Text("Ctrl-Cmd-S").font(.system(.body, design: .monospaced)); Text("Hide / show the sidebar") }
-        GridRow { Text("Cmd-Opt-0").font(.system(.body, design: .monospaced)); Text("Hide / show the agent pane") }
-        GridRow { Text("Cmd-Opt-G").font(.system(.body, design: .monospaced)); Text("Go to page") }
-        GridRow { Text("Cmd-Opt-Up/Down").font(.system(.body, design: .monospaced)); Text("Previous / next page") }
-        GridRow { Text("Cmd-+ / Cmd--").font(.system(.body, design: .monospaced)); Text("Zoom in / out") }
-        GridRow { Text("Cmd-F").font(.system(.body, design: .monospaced)); Text("Search the OCR text") }
-        GridRow { Text("Cmd-Return").font(.system(.body, design: .monospaced)); Text("Send the question") }
-        GridRow { Text("Cmd-.").font(.system(.body, design: .monospaced)); Text("Cancel the question") }
-        GridRow { Text("Cmd-Shift-L").font(.system(.body, design: .monospaced)); Text("Back to the library") }
-        GridRow { Text("Cmd-Shift-D").font(.system(.body, design: .monospaced)); Text("Toggle light / dark (View > Appearance)") }
+        Text("Single-key shortcuts pause while you type in a text field.").font(.caption).foregroundStyle(.secondary)
+        HStack { Spacer(); Button("Close") { isPresented = false }.keyboardShortcut(.cancelAction) }
       }
-      Text("Single-key shortcuts pause while you type in a text field.").font(.caption).foregroundStyle(.secondary)
-      HStack { Spacer(); Button("Close") { isPresented = false }.keyboardShortcut(.cancelAction) }
+      .padding(16)
     }
-    .padding(20)
-    .frame(width: 420)
+    .frame(minWidth: 280, idealWidth: 420, maxWidth: 420, maxHeight: 460)
   }
 }
 
@@ -139,11 +145,14 @@ struct ShortcutHelpSheet: View {
 @MainActor
 final class LocalKeyMonitor {
   private var monitor: Any?
+  private let menuTracking = MenuTrackingState()
 
   func install(_ handler: @escaping @MainActor (NSEvent) -> Bool) {
     remove()
-    monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-      guard let window = NSApp.keyWindow, window.attachedSheet == nil, window.sheetParent == nil else { return event }
+    menuTracking.start()
+    monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+      guard let self else { return event }
+      guard !self.menuTracking.isTracking, let window = NSApp.keyWindow, window.attachedSheet == nil, window.sheetParent == nil else { return event }
       if let responder = window.firstResponder, responder is NSTextView || responder is NSTextField { return event }
       return handler(event) ? nil : event
     }
@@ -152,5 +161,33 @@ final class LocalKeyMonitor {
   func remove() {
     if let monitor { NSEvent.removeMonitor(monitor) }
     monitor = nil
+    menuTracking.stop()
+  }
+}
+
+/// A menu owns Escape and typing while it is tracking; reader shortcuts must
+/// not navigate away or open a search sheet underneath it.
+@MainActor
+private final class MenuTrackingState {
+  private(set) var isTracking = false
+  private var observers: [NSObjectProtocol] = []
+
+  func start() {
+    stop()
+    let center = NotificationCenter.default
+    observers = [
+      center.addObserver(forName: NSMenu.didBeginTrackingNotification, object: nil, queue: .main) { [weak self] _ in
+        MainActor.assumeIsolated { self?.isTracking = true }
+      },
+      center.addObserver(forName: NSMenu.didEndTrackingNotification, object: nil, queue: .main) { [weak self] _ in
+        MainActor.assumeIsolated { self?.isTracking = false }
+      }
+    ]
+  }
+
+  func stop() {
+    observers.forEach { NotificationCenter.default.removeObserver($0) }
+    observers = []
+    isTracking = false
   }
 }

@@ -41,9 +41,11 @@ struct StriaReaderApp: App {
           StartupErrorView(message: startupError ?? "Stria could not start.")
         }
       }
-      .frame(minWidth: 1100, minHeight: 700)
+      .frame(minWidth: 320, minHeight: 240)
       .preferredColorScheme(appearance.colorScheme)
     }
+    .defaultSize(width: 1100, height: 700)
+    .windowResizability(.contentMinSize)
     .commands {
       StriaCommands()
     }
@@ -84,6 +86,19 @@ enum WindowSnapshotter {
   }
 
   private static func capture(into directory: URL) {
+    let manifest: [String: Any] = [
+      "bundleIdentifier": Bundle.main.bundleIdentifier ?? "",
+      "isHidden": NSApp.isHidden,
+      "activationPolicy": NSApp.activationPolicy().rawValue,
+      "windows": NSApp.windows.map { window in
+        ["title": window.title, "isVisible": window.isVisible,
+         "isMiniaturized": window.isMiniaturized, "frame": NSStringFromRect(window.frame),
+         "minimumContentSize": NSStringFromSize(window.contentMinSize)] as [String: Any]
+      }
+    ]
+    if let data = try? JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys]) {
+      try? data.write(to: directory.appendingPathComponent("windows.json"), options: .atomic)
+    }
     for (index, window) in NSApp.windows.enumerated() where window.isVisible {
       guard let view = window.contentView?.superview ?? window.contentView else { continue }
       // AppKit drawing (title bar, toolbar)...

@@ -15,28 +15,33 @@ struct AgentPaneView: View {
 
   var body: some View {
     VStack(spacing: 0) {
-      IconSegmentedControl(selection: $tab, segments: [
-        IconSegment(value: Tab.chat, symbol: "bubble.left.and.bubble.right", help: "Chat: ask about this PDF"),
-        IconSegment(value: Tab.history, symbol: "clock.arrow.circlepath", help: "History: earlier questions and answers")
-      ])
+      HStack(spacing: 8) {
+        IconSegmentedControl(selection: $tab, segments: [
+          IconSegment(value: Tab.chat, symbol: "bubble.left.and.bubble.right", help: "Chat: ask about this PDF"),
+          IconSegment(value: Tab.history, symbol: "clock.arrow.circlepath", help: "History: earlier questions and answers")
+        ])
+        Divider().frame(height: 22)
+        Button { agent.newChat(); tab = .chat } label: {
+          Image(systemName: "square.and.pencil")
+        }
+        .buttonStyle(.plain)
+        .disabled(agent.inFlight)
+        .help("Start a new conversation (Cmd-Shift-N)")
+        .accessibilityLabel("New Chat")
+      }
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.horizontal)
-      .padding(.vertical, 10)
+      .padding(.vertical, 8)
       Divider()
       tabContent
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
+    .onAppear {
+      if agent.focusInputRequest > 0 { tab = .chat; inputFocused = true }
+    }
     .onChange(of: agent.focusInputRequest) { _, _ in
       tab = .chat
       inputFocused = true
-    }
-    .navigationTitle("Agent")
-    .toolbar {
-      ToolbarItem(placement: .primaryAction) {
-        Button { agent.newChat() } label: { Label("New Chat", systemImage: "square.and.pencil") }
-          .disabled(agent.inFlight)
-          .help("Start a new conversation (Cmd-Shift-N)")
-      }
     }
   }
 
@@ -61,10 +66,10 @@ struct AgentPaneView: View {
     }
   }
 
-  /// Vendor menu and model picker, shown at the composer's bottom right.
+  /// Vendor and model controls stacked along the composer's bottom edge.
   /// API vendors without a usable key are disabled with the reason.
   private var modelSelector: some View {
-    HStack(spacing: 6) {
+    VStack(alignment: .leading, spacing: 4) {
       Menu {
         ForEach(AgentPaneViewModel.vendorOptions, id: \.self) { vendor in
           let availability = agent.availability(of: vendor)
@@ -83,7 +88,8 @@ struct AgentPaneView: View {
         Text(agent.selectedVendor.map { SettingsViewModel.displayName(for: $0) } ?? "Choose vendor…")
       }
       .menuStyle(.borderlessButton)
-      .fixedSize()
+      .lineLimit(1)
+      .frame(maxWidth: .infinity, alignment: .leading)
       .help("Vendor that answers the question")
       if let vendor = agent.selectedVendor {
         Picker("Model", selection: Binding(
@@ -94,7 +100,7 @@ struct AgentPaneView: View {
         }
         .pickerStyle(.menu)
         .labelsHidden()
-        .fixedSize()
+        .frame(maxWidth: .infinity, alignment: .leading)
         .help("Model for this vendor")
       }
     }
@@ -104,7 +110,7 @@ struct AgentPaneView: View {
   /// Shown above the composer when the selection cannot be used.
   @ViewBuilder private var selectionWarning: some View {
     if let vendor = agent.selectedVendor, !agent.availability(of: vendor).isReady {
-      HStack(spacing: 8) {
+      VStack(alignment: .leading, spacing: 6) {
         Label(warningText(for: agent.availability(of: vendor)), systemImage: "exclamationmark.triangle")
           .foregroundStyle(.orange)
         SettingsLink { Text("Open Settings…") }
@@ -113,7 +119,7 @@ struct AgentPaneView: View {
       .padding(.horizontal)
       .padding(.top, 6)
     } else if agent.selectedVendor == nil {
-      Text("Choose a vendor and model at the bottom right of the box below.")
+      Text("Choose a vendor and model below.")
         .font(.caption).foregroundStyle(.secondary)
         .padding(.horizontal)
         .padding(.top, 6)
@@ -142,13 +148,15 @@ struct AgentPaneView: View {
         .font(.caption)
         .foregroundStyle(.secondary)
     }
-    .padding()
+    .padding(.horizontal, 12)
+    .padding(.vertical, 8)
   }
 
   private var transcript: some View {
     ScrollViewReader { proxy in
       ScrollView {
-        LazyVStack(spacing: 12) {
+        // Eager layout avoids a macOS sheet sizing loop when reopening long answers.
+        VStack(spacing: 12) {
           if agent.transcript.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
               Text("Try asking").font(.headline)
@@ -157,7 +165,11 @@ struct AgentPaneView: View {
                   agent.input = question
                   agent.submit()
                 }
-                .buttonStyle(.link)
+                .buttonStyle(.plain)
+                .foregroundStyle(Color.accentColor)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .disabled(agent.inFlight || !agent.canSend)
               }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -174,10 +186,12 @@ struct AgentPaneView: View {
               .id("streaming")
           }
         }
+        .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
       }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
       .onChange(of: agent.transcript.count) { _, _ in
-        if let id = agent.transcript.last?.id { withAnimation { proxy.scrollTo(id, anchor: .bottom) } }
+        if let id = agent.transcript.last?.id { proxy.scrollTo(id, anchor: .bottom) }
       }
       .onChange(of: agent.streamingAnswer) { _, answer in
         if answer != nil { proxy.scrollTo("streaming", anchor: .bottom) }
@@ -198,8 +212,8 @@ struct AgentPaneView: View {
             .font(.body)
             .scrollContentBackground(.hidden)
             .focused($inputFocused)
-            .frame(minHeight: 96, maxHeight: 240)
-            .fixedSize(horizontal: false, vertical: true)
+            .frame(height: 96)
+            .accessibilityLabel("Question")
           if agent.input.isEmpty {
             Text("Ask about this PDF…")
               .foregroundStyle(.tertiary)
@@ -211,7 +225,6 @@ struct AgentPaneView: View {
         .padding(.horizontal, 8)
         .padding(.top, 8)
         HStack(spacing: 8) {
-          Spacer()
           modelSelector
             .id(configRevision)
           if agent.inFlight {
@@ -314,6 +327,7 @@ private struct MessageView: View {
           .font(.caption.bold())
           .foregroundStyle(.secondary)
         Text(Self.attributedContent(message.content, documentId: documentId))
+          .fixedSize(horizontal: false, vertical: true)
           .textSelection(.enabled)
           .foregroundStyle(message.status == .error ? Color.red : Color.primary)
           .environment(\.openURL, OpenURLAction { url in
@@ -322,6 +336,7 @@ private struct MessageView: View {
             return .handled
           })
       }
+      .frame(maxWidth: .infinity, alignment: .leading)
       .padding(10)
       .background(Flat.assistantBubble, in: RoundedRectangle(cornerRadius: Flat.bubbleRadius))
       .overlay(RoundedRectangle(cornerRadius: Flat.bubbleRadius)
@@ -366,7 +381,7 @@ private struct StreamingAnswerView: View {
           ProgressView().controlSize(.mini)
         }
         if !text.isEmpty {
-          Text(text).textSelection(.enabled)
+          Text(text).fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
         }
       }
       .padding(10)

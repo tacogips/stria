@@ -65,7 +65,9 @@ import Testing
     try await withTestDataRoot { paths in
       _ = try await prepareAskDocument(paths: paths, id: "doc", texts: [1: "text"])
       let fake = FakeAgentService()
-      let api = try StriaLibrary.open(environment: makeTestEnvironment(paths: paths, agent: fake))
+      var apiConfig = StriaConfig.testing
+      apiConfig.agent.vendor = "openai"
+      let api = try StriaLibrary.open(environment: makeTestEnvironment(paths: paths, agent: fake, config: apiConfig))
       _ = try await api.ask(AskRequest(question: "q", context: .page(docId: "doc", page: 1)))
       var config = StriaConfig.testing
       config.agent.vendor = "claude-code"

@@ -37,7 +37,7 @@ struct SearchPrompt: View {
       }
     }
     .padding(16)
-    .frame(width: 520)
+    .frame(minWidth: 280, idealWidth: 480, maxWidth: 520)
     .onAppear { focused = true }
   }
 }
@@ -101,7 +101,7 @@ struct SearchResultsView: View {
           .onTapGesture { onOpen(hit) }
           .task { await search.loadThumbnail(docId: hit.docId, page: hit.page) }
       }
-      .listStyle(.inset(alternatesRowBackgrounds: true))
+      .listStyle(.inset)
     }
   }
 }

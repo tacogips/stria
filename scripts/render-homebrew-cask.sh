@@ -70,8 +70,7 @@ cask "stria" do
   sha256 arm:   "$darwin_arm64_sha",
          intel: "$darwin_x64_sha"
 
-  url "$release_base_url/$artifact_name-#{version}-#{arch}.dmg",
-      verified: "github.com/tacogips/stria/releases/download/"
+  url "$release_base_url/$artifact_name-#{version}-#{arch}.dmg"
   name "Stria"
   desc "PDF reader with OCR-indexed page search and an AI agent pane"
   homepage "https://github.com/tacogips/stria"

@@ -5,19 +5,22 @@ import StriaCore
 /// scroll-driven page change never overwrites what the user is typing.
 struct PageFieldView: View {
   @Bindable var reader: ReaderViewModel
+  var compact = false
   @State private var text = ""
   @FocusState private var isFocused: Bool
 
   var body: some View {
     HStack(spacing: 6) {
-      Button { reader.previousPage() } label: { Image(systemName: "chevron.left") }
-        .disabled(reader.currentPage <= 1)
-        .help("Previous page (Cmd-Opt-Up)")
-        .accessibilityLabel("Previous page")
+      if !compact {
+        Button { reader.previousPage() } label: { Image(systemName: "chevron.left") }
+          .disabled(reader.currentPage <= 1)
+          .help("Previous page (Cmd-Opt-Up)")
+          .accessibilityLabel("Previous page")
+      }
       TextField("Page", text: $text)
-        .frame(width: 48)
+        .frame(width: compact ? 32 : 48)
         .multilineTextAlignment(.trailing)
-        .textFieldStyle(FlatTextFieldStyle())
+        .textFieldStyle(.roundedBorder)
         .focused($isFocused)
         .onSubmit {
           reader.pageFieldText = text
@@ -27,12 +30,16 @@ struct PageFieldView: View {
         }
         .accessibilityLabel("Page number")
         .help("Type a page number and press Return (Cmd-Opt-G opens Go to Page)")
-      Text("of \(reader.pageCount)").foregroundStyle(.secondary)
-      Button { reader.nextPage() } label: { Image(systemName: "chevron.right") }
-        .disabled(reader.currentPage >= reader.pageCount)
-        .help("Next page (Cmd-Opt-Down)")
-        .accessibilityLabel("Next page")
+      Text(compact ? "/ \(reader.pageCount)" : "of \(reader.pageCount)").foregroundStyle(.secondary)
+        .accessibilityLabel("Total pages")
+      if !compact {
+        Button { reader.nextPage() } label: { Image(systemName: "chevron.right") }
+          .disabled(reader.currentPage >= reader.pageCount)
+          .help("Next page (Cmd-Opt-Down)")
+          .accessibilityLabel("Next page")
+      }
     }
+    .accessibilityElement(children: .contain)
     .onAppear { text = String(reader.currentPage) }
     .onChange(of: reader.currentPage) { _, page in
       if !isFocused { text = String(page) }

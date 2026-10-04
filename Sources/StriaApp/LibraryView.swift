@@ -14,6 +14,7 @@ struct PendingOCR: Identifiable {
 struct LibraryView: View {
   @Bindable var model: AppModel
   @FocusedValue(\.striaImport) private var importAction
+  @State private var availableWidth: CGFloat = 1100
   @State private var selection: String?
   @State private var pendingRemoval: LibraryRow?
   /// A document waiting for the user to confirm an OCR run.
@@ -24,7 +25,11 @@ struct LibraryView: View {
   @State private var keys = LocalKeyMonitor()
 
   var body: some View {
-    withDialogs
+    GeometryReader { geometry in
+      withDialogs
+        .onAppear { availableWidth = geometry.size.width }
+        .onChange(of: geometry.size.width) { _, width in availableWidth = width }
+    }
   }
 
   private var content: some View {
@@ -54,6 +59,7 @@ struct LibraryView: View {
   private var withNavigation: some View {
     content
     .navigationTitle("Library")
+    .toolbarRole(.editor)
     .navigationSubtitle(subtitle)
     .focusedSceneValue(\.striaLibraryViewMode, $viewMode)
     .focusedSceneValue(\.striaRunOCR, { runOCRForSelection() })
@@ -80,36 +86,68 @@ struct LibraryView: View {
       return !urls.isEmpty
     }
     .toolbar {
-      // Native controls only: the system sizes their toolbar capsules.
-      ToolbarItem(placement: .navigation) {
-        Picker("View", selection: $viewMode) {
-          Image(systemName: "list.bullet").tag(LibraryViewMode.list)
-            .accessibilityLabel("List")
-          Image(systemName: "square.grid.2x2").tag(LibraryViewMode.card)
-            .accessibilityLabel("Cards")
+      if availableWidth < 540 {
+        ToolbarItem(placement: .principal) {
+          HStack(spacing: 12) {
+            viewPicker.frame(width: 72)
+            searchButton
+            ocrButton
+            importButton
+          }
+          .buttonStyle(.plain)
+          .labelStyle(.iconOnly)
+          .accessibilityElement(children: .contain)
+          .fixedSize()
         }
-        .pickerStyle(.segmented)
-        .help("List (Cmd-1) or cards (Cmd-2)")
-      }
-      ToolbarItemGroup(placement: .primaryAction) {
-        Button { model.search.present() } label: {
-          Label("Search", systemImage: "magnifyingglass")
+      } else {
+        ToolbarItem(placement: .navigation) { viewPicker }
+        ToolbarItemGroup(placement: .primaryAction) {
+          searchButton
+          ocrButton
+          importButton
         }
-        .help("Search the OCR text of all PDFs (/ or Cmd-F)")
-        Button { runOCRForSelection() } label: {
-          Label("Run OCR", systemImage: "text.viewfinder")
-        }
-        .disabled(selection == nil || !model.library.ocrConfigured)
-        .help(model.library.ocrConfigured
-              ? "OCR the selected PDF (Cmd-Shift-O): remaining pages, or all pages again when it is complete. Asks first."
-              : "Choose an OCR vendor in Settings first (Agent > Settings…)")
-        Button { importAction?() } label: {
-          Label("Import PDF", systemImage: "plus")
-            .labelStyle(.titleAndIcon)
-        }
-        .help("Add PDF files to the library (Cmd-O); you can also drop them on the window")
       }
     }
+  }
+
+  private var viewPicker: some View {
+    Picker("View", selection: $viewMode) {
+      Image(systemName: "list.bullet").tag(LibraryViewMode.list).accessibilityLabel("List")
+      Image(systemName: "square.grid.2x2").tag(LibraryViewMode.card).accessibilityLabel("Cards")
+    }
+    .pickerStyle(.segmented)
+    .labelsHidden()
+    .disabled(model.search.isShowingResults)
+    .help("List (Cmd-1) or cards (Cmd-2)")
+  }
+
+  @ViewBuilder private var searchButton: some View {
+    if !model.search.isShowingResults {
+      Button { model.search.present() } label: { Label("Search", systemImage: "magnifyingglass") }
+        .accessibilityLabel("Search")
+        .help("Search the OCR text of all PDFs (/ or Cmd-F)")
+    }
+  }
+
+  private var ocrButton: some View {
+    Button { runOCRForSelection() } label: { Label("Run OCR", systemImage: "text.viewfinder") }
+      .accessibilityLabel("Run OCR")
+      .disabled(selection == nil || !model.library.ocrConfigured || model.search.isShowingResults)
+      .help(model.library.ocrConfigured
+            ? "OCR the selected PDF (Cmd-Shift-O): remaining pages, or all pages again when it is complete. Asks first."
+            : "Choose an OCR vendor in Settings first (Agent > Settings…)")
+  }
+
+  private var importButton: some View {
+    Button { importAction?() } label: {
+      if availableWidth < 540 {
+        Label("Import PDF", systemImage: "plus").labelStyle(.iconOnly)
+      } else {
+        Label("Import PDF", systemImage: "plus").labelStyle(.titleAndIcon)
+      }
+    }
+    .accessibilityLabel("Import PDF")
+    .help("Add PDF files to the library (Cmd-O); you can also drop them on the window")
   }
 
   private var withDialogs: some View {
@@ -122,6 +160,7 @@ struct LibraryView: View {
     } message: {
       Text(model.library.alert ?? "")
     }
+    .onAppear { selection = model.library.selectedID }
     .onChange(of: model.library.selectedID) { _, id in selection = id }
     .confirmationDialog(
       pendingOCR.map(confirmationTitle) ?? "",
@@ -164,8 +203,6 @@ struct LibraryView: View {
       Label("Your Library Is Empty", systemImage: "books.vertical")
     } description: {
       Text("Import a PDF to start reading. You can also drop PDF files here.")
-    } actions: {
-      Button("Import PDF…") { importAction?() }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
@@ -182,21 +219,24 @@ struct LibraryView: View {
               : Color.clear
           )
           .onHover { hovering in hoveredID = hovering ? row.id : (hoveredID == row.id ? nil : hoveredID) }
-          .onTapGesture { open(row.id) }
+          .onTapGesture(count: 2) { open(row.id) }
           .contextMenu { rowMenu(row) }
           .task(id: row.importStatus) { await model.library.loadThumbnail(documentId: row.id) }
       }
     }
-    .listStyle(.inset(alternatesRowBackgrounds: true))
+    .listStyle(.inset)
   }
 
   private var documentCards: some View {
     ScrollView {
       LazyVGrid(columns: [GridItem(.adaptive(minimum: 180, maximum: 220), spacing: 16)], spacing: 16) {
         ForEach(model.library.rows) { row in
-          LibraryCardView(row: row, thumbnail: model.library.thumbnails[row.id], hovered: hoveredID == row.id)
+          LibraryCardView(row: row, thumbnail: model.library.thumbnails[row.id], hovered: hoveredID == row.id, selected: selection == row.id)
             .onHover { hovering in hoveredID = hovering ? row.id : (hoveredID == row.id ? nil : hoveredID) }
-            .onTapGesture { open(row.id) }
+            .onTapGesture(count: 2) { open(row.id) }
+            .onTapGesture { selection = row.id }
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { open(row.id) }
             .contextMenu { rowMenu(row) }
             .task(id: row.importStatus) { await model.library.loadThumbnail(documentId: row.id) }
         }
@@ -204,6 +244,7 @@ struct LibraryView: View {
       .padding(16)
     }
     .background(Flat.panel)
+    .focusable()
   }
 
   @ViewBuilder private func rowMenu(_ row: LibraryRow) -> some View {
@@ -218,7 +259,7 @@ struct LibraryView: View {
   }
 
   private func runOCRForSelection() {
-    guard let selection, model.library.ocrConfigured,
+    guard !model.search.isShowingResults, let selection, model.library.ocrConfigured,
           let row = model.library.rows.first(where: { $0.id == selection }) else { return }
     pendingOCR = PendingOCR(row: row, kind: row.ocr.pending + row.ocr.failed > 0 ? .remaining : .allPages)
   }
@@ -232,7 +273,9 @@ struct LibraryView: View {
 
   private func confirmationMessage(_ pending: PendingOCR) -> String {
     let vendor = model.settings.ocrVendor
-    let using = "This calls \(SettingsViewModel.displayName(for: vendor)) (\(model.settings.ocrModel.isEmpty ? "no model" : model.settings.ocrModel)) once per page."
+    let modelName = model.settings.ocrModel.isEmpty ? "no model" : model.settings.ocrModel
+    let modelDetail = SettingsViewModel.needsModel(vendor) ? " (\(modelName))" : ""
+    let using = "This calls \(SettingsViewModel.displayName(for: vendor))\(modelDetail) once per page."
     switch pending.kind {
     case .remaining: return using + " Pages already OCRed are kept."
     case .allPages: return using + " Existing OCR text is replaced; a page that fails keeps no text until it is retried."
@@ -285,18 +328,17 @@ private struct LibraryRowView: View {
     HStack(spacing: 12) {
       PageThumbnail(image: thumbnail, width: 44, height: 58)
       VStack(alignment: .leading, spacing: 4) {
-        HStack {
-          Text(row.title).font(.headline)
-          Spacer()
-          if let opened = row.lastOpenedAt {
-            Text("Opened \(RelativeAge.string(from: opened))").font(.caption).foregroundStyle(.tertiary)
-          }
-          Text("\(row.pageCount) pages").foregroundStyle(.secondary)
-        }
+        Text(row.title).font(.headline).lineLimit(1).truncationMode(.middle)
         HStack(spacing: 8) {
-          if row.importStatus == .ready { OCRBadge(row: row) }
-          Text(statusText).font(.caption).foregroundStyle(.secondary)
+          Text("\(row.pageCount) pages").font(.caption).foregroundStyle(.secondary)
+          if let opened = row.lastOpenedAt {
+            Text("Opened \(RelativeAge.string(from: opened))").font(.caption).foregroundStyle(.secondary)
+          }
         }
+        .lineLimit(1)
+        if row.importStatus == .ready { OCRBadge(row: row) }
+        Text(statusText).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+          .help(statusText)
       }
       if row.isBusy {
         ProgressView().controlSize(.small)
@@ -321,11 +363,18 @@ private struct SetupBanner: View {
   private let message = "Choose an OCR vendor to make imported pages searchable."
 
   var body: some View {
-    HStack(spacing: 12) {
-      Image(systemName: "gearshape").foregroundStyle(.secondary)
-      Text(message).font(.callout)
-      Spacer()
-      SettingsLink { Text("Open Settings…") }
+    ViewThatFits(in: .horizontal) {
+      HStack(spacing: 12) {
+        Image(systemName: "gearshape").foregroundStyle(.secondary)
+        Text(message).font(.callout).fixedSize()
+        Spacer()
+        SettingsLink { Text("Open Settings…") }
+      }
+      VStack(alignment: .leading, spacing: 8) {
+        Text(message).font(.callout)
+        SettingsLink { Text("Open Settings…") }
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 10)
@@ -339,6 +388,7 @@ private struct LibraryCardView: View {
   let row: LibraryRow
   let thumbnail: CGImage?
   let hovered: Bool
+  let selected: Bool
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -356,7 +406,7 @@ private struct LibraryCardView: View {
     .padding(10)
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(hovered ? Flat.hover : Flat.assistantBubble)
-    .overlay(Rectangle().stroke(Flat.border, lineWidth: 1))
+    .overlay(Rectangle().stroke(selected ? Color.accentColor : Flat.border, lineWidth: selected ? 2 : 1))
     .contentShape(Rectangle())
     .accessibilityElement(children: .combine)
   }

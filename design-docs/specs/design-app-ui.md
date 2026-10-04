@@ -19,35 +19,28 @@ it gets a Dock icon, a menu bar and keyboard focus. The data root comes from
 
 ## Window Structure
 
-There is a single `WindowGroup` with a minimum size of 1100 x 700. `AppModel`
-holds `route: .library | .reader(docId)`, and the root view switches between
-two screens:
+There is a single `WindowGroup` with a preferred launch size of 1100 x 700
+and a minimum content size of 320 x 240. Preferred size does not constrain
+AeroSpace tiles. Standard native close, minimize and fullscreen controls remain.
+`AppModel` holds `route: .library | .reader(docId)`.
 
-1. **Library** (home): `LibraryView`.
-2. **Reader**, laid out as
-   `NavigationSplitView(sidebar: LeftPane, detail: PDFPane)` with
-   `.inspector(isPresented:)` for the agent pane.
+The reader uses a flat `HSplitView`: contents/thumbnails, PDF, and agent.
+There is no native rounded sidebar or inspector container. The sidebar resizes
+from 180 to 400 points and the agent from 300 to 600. Below 760 points the
+sidebar opens as a sheet; below 1000 points the agent opens as a sheet. Their
+wide-window visibility preferences survive resizing. Sheets have a Done button;
+short agent sheets scroll their content so the composer remains reachable.
 
-The sidebar column resizes between 180 and 640 points and the inspector
-between 300 and 720, so either pane can be made wide enough for long outlines
-or answers.
-
-The reader toolbar contains:
-
-- leading: one sidebar toggle, Stria's own (the built-in one is removed
-  with `.toolbar(removing: .sidebarToggle)` on the sidebar column), matching
-  the agent-pane toggle on the trailing side; its tooltip names
-  `Ctrl-Cmd-S` / `Shift+L`. The left pane's header carries "< Library" (also
-  `Esc`, `Cmd-Shift-L`); when the sidebar is collapsed a small tab at the
-  PDF's left edge also brings it back, as in chilla;
-- principal: a page field showing `n of N` with previous and next buttons;
-- trailing: a `.searchable(placement: .toolbar)` search field and an
-  inspector toggle button.
+The reader toolbar has one Library button, one sidebar toggle, a page field,
+and one agent toggle. The Library button remains available when the sidebar
+is hidden. Below 540 points these controls share a compact group; the page
+field shows `n / N`, and previous/next remain available through menu shortcuts.
+Child panes do not set the window title. The agent header groups Chat/History
+and New Chat in one compact row, with no trailing spacer between them.
 
 ## Library (home)
 
-- A `List` of imported documents (inset style with alternating row
-  backgrounds; the row under the pointer is highlighted). Rows are ordered by
+- A `List` of imported documents (inset style; the row under the pointer is highlighted). Rows are ordered by
   most recent use: `COALESCE(last_opened_at, imported_at)` descending, so a
   new import appears at the top until something else is opened. Each row
   shows a document icon, the title, when it was last opened, the page count,
@@ -77,8 +70,9 @@ The reader toolbar contains:
   downscaled (`StriaLibrary.firstPageThumbnail`, longest side 320 px),
   loaded on demand and cached in `LibraryViewModel.thumbnails`; a document
   still rendering shows a placeholder and loads when it becomes ready.
-- To open a document, click its row or card once (or select it and press
-  Return).
+- To open a document, double-click its row or card (or select it and press
+  Return). A single click selects it for OCR and removal; selected cards have
+  an accent border. Card accessibility activation also opens the document.
   The route switches to the reader first (its "Opening document" indicator
   shows), the `PDFDocument` is parsed off the main actor, `last_opened_at`
   is set, and background cache expansion of all pages starts. A failed open
@@ -97,7 +91,7 @@ The reader toolbar contains:
   confirmation, names what is deleted (stored copy, page images, OCR text,
   chat history) and states that the imported file itself is untouched. It
   calls `StriaLibrary.removeDocument` (`design-storage.md#document-removal`).
-- Import errors (`invalidPDF`, IO) appear in an alert. A failed copy leaves
+- Import errors (`invalidPDF`, IO) appear in an alert in either the library or reader. A failed copy leaves
   no row in the list.
 - An empty library shows the import button and a drop hint as an overlay
   (not a list row). The window title is "Library"; the reader's title is the
@@ -191,7 +185,7 @@ library. One `SearchViewModel` (on `AppModel`) serves both screens.
 
 ## Reader: Right Inspector (agent pane)
 
-- Visibility: `.inspector(isPresented:)`, toggled from the toolbar button or
+- Visibility: the flat split pane or compact sheet, toggled from the toolbar button or
   View > Show Agent (`Cmd-Opt-0`). The width can be adjusted, and the pane
   is shown by default the first time.
 - Scope picker: "This page", "Nearby pages" or "Whole PDF"
@@ -214,9 +208,9 @@ library. One `SearchViewModel` (on `AppModel`) serves both screens.
 - Suggested questions: an empty thread shows three fixed prompts: "Summarize
   this page", "Explain the key terms on this page" and "What should I read
   next to understand this?". Clicking one sends it.
-- Input: a wide, tall rounded box spanning the pane (a text editor, 96 to
-  240 points high; Return inserts a new line). Along its bottom edge, at the
-  right, sit the vendor menu and model picker for the question and the
+- Input: a rounded box spanning the pane (a text editor, 96 points high;
+  Return inserts a new line). Along its bottom edge sit the vendor menu and
+  model picker, stacked to fit narrow panes, and the
   send button (an up-arrow; `Cmd-Return`), which becomes a stop button
   while an answer is in flight. A warning with an Open Settings link
   appears above the box when the selected vendor lacks its key. During the request an assistant bubble with a small
