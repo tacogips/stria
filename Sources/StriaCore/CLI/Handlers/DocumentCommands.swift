@@ -44,7 +44,8 @@ enum DocumentCommands {
       let result = try await library.pageText(documentId: docId, page: page)
       return PageTextOutput(docId: docId, page: page, ocrStatus: result.ocrStatus,
                             text: result.ocrStatus == .done ? result.ocrText : nil,
-                            ocrError: result.ocrError, ocrVendor: result.ocrVendor, ocrModel: result.ocrModel)
+                            ocrError: result.ocrError, ocrVendor: result.ocrVendor, ocrModel: result.ocrModel,
+                            tags: result.ocrStatus == .done ? result.ocrTags : [])
     default:
       throw StriaError.usage("Not a document command")
     }

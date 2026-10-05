@@ -312,6 +312,10 @@ with `StriaLibrary.saveConfig` on Save (nothing is written before). Sections:
 - Page Summaries: auto-run toggle, vendor, model, language picker and prompt
   template editor (`design-page-summaries.md#app`). The agent pane's third
   tab, Summary, shows the current page's summary with a redo sheet.
+- OCR also has "Retries for a malformed reply" (`ocr.formatRetries`, 0...5)
+  with a note on the JSON reply and the 2, 4, 8... second backoff. The Summary
+  tab lists the page's OCR tags as bordered chips above the summary; clicking
+  one searches every PDF for it.
 - OCR Prompt: a text editor showing the prompt sent with each page image
   (`OCRDefaults.prompt` when `ocr.prompt` is null), "Using the default
   prompt." / "Custom prompt.", and Reset to Default. Saving text equal to the

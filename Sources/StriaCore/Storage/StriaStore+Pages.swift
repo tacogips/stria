@@ -25,7 +25,8 @@ extension StriaStore {
 
   public func pageInfo(documentId: String, page: Int) throws -> PageInfo? {
     let statement = try database.prepare("""
-      SELECT document_id,page_number,image_format,width,height,ocr_status,ocr_text,ocr_vendor,ocr_model,ocr_error,ocr_attempts,ocr_updated_at
+      SELECT document_id,page_number,image_format,width,height,ocr_status,ocr_text,ocr_vendor,ocr_model,ocr_error,ocr_attempts,ocr_updated_at,
+        ocr_tags_json
       FROM pages WHERE document_id=? AND page_number=?
       """)
     try statement.bind(documentId, at: 1).bind(page, at: 2)
@@ -35,7 +36,8 @@ extension StriaStore {
 
   public func pageInfos(documentId: String) throws -> [PageInfo] {
     let statement = try database.prepare("""
-      SELECT document_id,page_number,image_format,width,height,ocr_status,ocr_text,ocr_vendor,ocr_model,ocr_error,ocr_attempts,ocr_updated_at
+      SELECT document_id,page_number,image_format,width,height,ocr_status,ocr_text,ocr_vendor,ocr_model,ocr_error,ocr_attempts,ocr_updated_at,
+        ocr_tags_json
       FROM pages WHERE document_id=? ORDER BY page_number
       """)
     try statement.bind(documentId, at: 1)
@@ -63,17 +65,18 @@ extension StriaStore {
   }
 
   public func recordOCRSuccess(
-    documentId: String, page: Int, text: String, vendor: String, model: String?, run: AgentRunRecord
+    documentId: String, page: Int, text: String, tags: [String] = [], vendor: String, model: String?, run: AgentRunRecord
   ) throws {
     try database.transaction {
       try insertRun(run)
       let normalized = SearchQueryBuilder.normalize(text)
       let update = try database.prepare("""
         UPDATE pages SET ocr_status='done',ocr_text=?,search_text=?,ocr_vendor=?,ocr_model=?,ocr_error=NULL,
-          ocr_updated_at=? WHERE document_id=? AND page_number=?
+          ocr_updated_at=?,ocr_tags_json=? WHERE document_id=? AND page_number=?
         """)
+      let tagsJSON = String(bytes: try JSONEncoder().encode(tags), encoding: .utf8) ?? "[]"
       try update.bind(text, at: 1).bind(normalized, at: 2).bind(vendor, at: 3).bind(model, at: 4)
-        .bind(nowString(), at: 5).bind(documentId, at: 6).bind(page, at: 7)
+        .bind(nowString(), at: 5).bind(tagsJSON, at: 6).bind(documentId, at: 7).bind(page, at: 8)
       _ = try update.step()
       guard database.changes > 0 else { throw StriaError.pageNotFound("Page \(page) not found in document \(documentId)") }
       if searchBackend == .fts5 { try replaceFTS(documentId: documentId, page: page, text: normalized) }
@@ -86,7 +89,7 @@ extension StriaStore {
     try database.transaction {
       try insertRun(run)
       let update = try database.prepare("""
-        UPDATE pages SET ocr_status='failed',ocr_error=?,ocr_attempts=ocr_attempts+1,ocr_text=NULL,search_text=NULL,
+        UPDATE pages SET ocr_status='failed',ocr_error=?,ocr_attempts=ocr_attempts+1,ocr_text=NULL,search_text=NULL,ocr_tags_json=NULL,
           ocr_vendor=?,ocr_model=?,ocr_updated_at=? WHERE document_id=? AND page_number=?
         """)
       try update.bind(error, at: 1).bind(vendor, at: 2).bind(model, at: 3).bind(nowString(), at: 4)
@@ -104,7 +107,8 @@ extension StriaStore {
     }
     return PageInfo(documentId: docId, pageNumber: row.int(1), imageFormat: format, width: row.int(3), height: row.int(4),
                     ocrStatus: status, ocrText: row.string(6), ocrVendor: row.string(7), ocrModel: row.string(8),
-                    ocrError: row.string(9), ocrAttempts: row.int(10), ocrUpdatedAt: row.string(11).flatMap(StriaDateFormat.date(from:)))
+                    ocrError: row.string(9), ocrAttempts: row.int(10), ocrUpdatedAt: row.string(11).flatMap(StriaDateFormat.date(from:)),
+                    ocrTags: row.string(12).flatMap { try? JSONDecoder().decode([String].self, from: Data($0.utf8)) } ?? [])
   }
 
   private func replaceFTS(documentId: String, page: Int, text: String) throws {

@@ -10,6 +10,8 @@ struct AgentPaneView: View {
   let reader: ReaderViewModel
   let library: LibraryViewModel
   var configRevision = 0
+  /// Searches every PDF (a page tag in the Summary tab).
+  var onSearch: (String) -> Void = { _ in }
   @State private var tab: Tab = .chat
   @FocusState private var inputFocused: Bool
   @State private var sendKey = ControlMSendMonitor()
@@ -22,7 +24,7 @@ struct AgentPaneView: View {
         IconSegmentedControl(selection: $tab, segments: [
           IconSegment(value: Tab.chat, symbol: "bubble.left.and.bubble.right", help: "Chat: ask about this PDF"),
           IconSegment(value: Tab.history, symbol: "clock.arrow.circlepath", help: "History: earlier questions and answers"),
-          IconSegment(value: Tab.summary, symbol: "doc.plaintext", help: "Summary: this page's summary")
+          IconSegment(value: Tab.summary, symbol: "doc.plaintext", help: "Summary: this page's tags and summary")
         ])
         Divider().frame(height: 22)
         Button { agent.newChat(); agent.requestInputFocus() } label: {
@@ -80,7 +82,7 @@ struct AgentPaneView: View {
       case .history:
         history
       case .summary:
-        PageSummaryPane(library: library, reader: reader, configRevision: configRevision)
+        PageSummaryPane(library: library, reader: reader, configRevision: configRevision, onTag: onSearch)
       }
     }
   }

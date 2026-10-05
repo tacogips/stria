@@ -10,7 +10,7 @@ public enum KnownVendors {
 
 private enum RenderConfigCodingKeys: String, CodingKey { case dpi, imageFormat, quality, maxPixelDimension }
 private enum OCRConfigCodingKeys: String, CodingKey {
-  case vendor, model, apiKeyEnvironment, concurrency, prompt, timeoutSeconds, autoRunOnImport
+  case vendor, model, apiKeyEnvironment, concurrency, prompt, timeoutSeconds, autoRunOnImport, formatRetries
 }
 private enum AgentConfigCodingKeys: String, CodingKey {
   case vendor, model, apiKeyEnvironment, neighborPages, maxImages, maxContextCharacters, systemPrompt, timeoutSeconds, credentials,
@@ -49,14 +49,17 @@ public struct StriaConfig: Codable, Equatable, Sendable {
     public var timeoutSeconds: Int
     /// Whether an import OCRs its pages right away, or waits for "Run OCR".
     public var autoRunOnImport: Bool
+    /// How often a reply that is not the `{"body", "tags"}` JSON object is
+    /// asked again (with backoff) before the page fails.
+    public var formatRetries: Int
 
     public var isConfigured: Bool { vendor != nil }
 
     public init(vendor: String?, model: String?, apiKeyEnvironment: String?, concurrency: Int, prompt: String?,
-                timeoutSeconds: Int = 300, autoRunOnImport: Bool = true) {
+                timeoutSeconds: Int = 300, autoRunOnImport: Bool = true, formatRetries: Int = OCRDefaults.formatRetries) {
       self.vendor = vendor; self.model = model; self.apiKeyEnvironment = apiKeyEnvironment
       self.concurrency = concurrency; self.prompt = prompt; self.timeoutSeconds = timeoutSeconds
-      self.autoRunOnImport = autoRunOnImport
+      self.autoRunOnImport = autoRunOnImport; self.formatRetries = formatRetries
     }
     public init(from decoder: Decoder) throws {
       let c = try decoder.container(keyedBy: OCRConfigCodingKeys.self)
@@ -66,14 +69,15 @@ public struct StriaConfig: Codable, Equatable, Sendable {
                 concurrency: try c.decodeIfPresent(Int.self, forKey: .concurrency) ?? 2,
                 prompt: try decodeOptional(String.self, key: .prompt, in: c, defaultValue: nil),
                 timeoutSeconds: try c.decodeIfPresent(Int.self, forKey: .timeoutSeconds) ?? 300,
-                autoRunOnImport: try c.decodeIfPresent(Bool.self, forKey: .autoRunOnImport) ?? true)
+                autoRunOnImport: try c.decodeIfPresent(Bool.self, forKey: .autoRunOnImport) ?? true,
+                formatRetries: try c.decodeIfPresent(Int.self, forKey: .formatRetries) ?? OCRDefaults.formatRetries)
     }
     public func encode(to encoder: Encoder) throws {
       var c = encoder.container(keyedBy: OCRConfigCodingKeys.self)
       try c.encode(vendor, forKey: .vendor); try c.encode(model, forKey: .model)
       try c.encode(apiKeyEnvironment, forKey: .apiKeyEnvironment); try c.encode(concurrency, forKey: .concurrency)
       try c.encode(prompt, forKey: .prompt); try c.encode(timeoutSeconds, forKey: .timeoutSeconds)
-      try c.encode(autoRunOnImport, forKey: .autoRunOnImport)
+      try c.encode(autoRunOnImport, forKey: .autoRunOnImport); try c.encode(formatRetries, forKey: .formatRetries)
     }
   }
 
@@ -169,7 +173,8 @@ public struct StriaConfig: Codable, Equatable, Sendable {
           (1024...8192).contains(render.maxPixelDimension), (1...8).contains(ocr.concurrency),
           (0...5).contains(agent.neighborPages), (1...10).contains(agent.maxImages),
           (1000...500_000).contains(agent.maxContextCharacters),
-          (10...3600).contains(ocr.timeoutSeconds), (10...3600).contains(agent.timeoutSeconds) else {
+          (10...3600).contains(ocr.timeoutSeconds), (10...3600).contains(agent.timeoutSeconds),
+          (0...5).contains(ocr.formatRetries) else {
       throw .config("Configuration values are outside their allowed ranges")
     }
     if let vendor = ocr.vendor, !KnownVendors.gateway.contains(vendor), vendor != KnownVendors.pdfTextLayer {

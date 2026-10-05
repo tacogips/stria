@@ -5,7 +5,7 @@ struct MigrationResult {
 }
 
 enum Migrations {
-  static let version = 4
+  static let version = 5
 
   static func run(_ database: SQLiteConnection, forceLikeSearch: Bool) throws -> MigrationResult {
     // busy_timeout comes first: even reading user_version can hit the lock of
@@ -58,6 +58,13 @@ enum Migrations {
         guard try userVersion(database) < 4 else { return }
         try addPageSummaries(database)
         try database.execute("PRAGMA user_version=4")
+      }
+    }
+    if try userVersion(database) < 5 {
+      try database.transaction {
+        guard try userVersion(database) < 5 else { return }
+        try database.execute("ALTER TABLE pages ADD COLUMN ocr_tags_json TEXT;")
+        try database.execute("PRAGMA user_version=5")
       }
     }
     return MigrationResult(backend: try storedBackend(database))

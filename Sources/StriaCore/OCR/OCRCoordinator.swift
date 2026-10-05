@@ -84,11 +84,10 @@ struct OCRCoordinator: Sendable {
     let settings = ServiceSettings(ocr: config)
     let start = library.environment.clock()
     let runId = UUID().uuidString
-    let result: OCRResult
+    let reply: ParsedOCRReply
     do {
-      result = try await library.environment.ocrService.recognize(
-        OCRRequest(docId: document.id, page: page, pngPath: imageURL, prompt: config.prompt ?? OCRDefaults.prompt, settings: settings)
-      )
+      reply = try await recognize(OCRRequest(docId: document.id, page: page, pngPath: imageURL,
+                                             prompt: config.prompt ?? OCRDefaults.prompt, settings: settings))
     } catch ServiceError.unavailable(let reason) {
       return OCRPageOutcome(page: page, error: nil, unavailableReason: reason)
     } catch is CancellationError {
@@ -111,11 +110,39 @@ struct OCRCoordinator: Sendable {
     }
     let finish = library.environment.clock()
     let run = makeRun(id: runId, document: document, page: page, settings: settings, status: .ok, error: nil, start: start, finish: finish)
-    try await library.store.recordOCRSuccess(documentId: document.id, page: page,
-                                             text: OCRTextPostProcessor.clean(result.text), vendor: settings.vendor,
-                                             model: settings.model, run: run)
+    try await library.store.recordOCRSuccess(documentId: document.id, page: page, text: reply.body, tags: reply.tags,
+                                             vendor: settings.vendor, model: settings.model, run: run)
     appendLog(run)
     return OCRPageOutcome(page: page, error: nil, unavailableReason: nil)
+  }
+
+  /// One page's OCR call. Model vendors must answer with the `{"body",
+  /// "tags"}` JSON object; a reply in another shape is asked again after a
+  /// growing pause, up to `ocr.formatRetries` times, then the page fails.
+  /// The local PDF text layer answers plain text and has no tags.
+  private func recognize(_ base: OCRRequest) async throws -> ParsedOCRReply {
+    guard base.settings.vendor != KnownVendors.pdfTextLayer else {
+      let result = try await library.environment.ocrService.recognize(base)
+      return ParsedOCRReply(body: OCRTextPostProcessor.clean(result.text), tags: [])
+    }
+    var request = base
+    request.prompt = base.prompt + "\n\n" + OCRDefaults.jsonFormatInstruction
+    request.format = .json
+    let retries = min(max(library.environment.config.ocr.formatRetries, 0), 5)
+    var attempt = 0
+    while true {
+      let result = try await library.environment.ocrService.recognize(request)
+      do {
+        return try OCRReplyParser.parse(result.text)
+      } catch {
+        guard attempt < retries else {
+          let tries = attempt + 1
+          throw ServiceError.failed("\(error.message) (after \(tries) attempt\(tries == 1 ? "" : "s"))")
+        }
+        attempt += 1
+        try await Task.sleep(for: library.environment.ocrRetryDelay(attempt))
+      }
+    }
   }
 
   private func makeRun(id: String, document: DocumentRecord, page: Int, settings: ServiceSettings,

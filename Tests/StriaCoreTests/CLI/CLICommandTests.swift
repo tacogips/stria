@@ -99,7 +99,7 @@ import Testing
       let image = try json((await execute(["page", "image", id, "1"], home: home, paths: paths, ocr: ocr, agent: agent)).stdout)
       #expect(Set(image.keys) == Set(["docId", "page", "path", "width", "height", "format", "cached"]))
       let pageText = try json((await execute(["page", "text", id, "1"], home: home, paths: paths, ocr: ocr, agent: agent)).stdout)
-      #expect(Set(pageText.keys) == Set(["docId", "page", "ocrStatus", "text", "ocrError", "ocrVendor", "ocrModel"]))
+      #expect(Set(pageText.keys) == Set(["docId", "page", "ocrStatus", "text", "tags", "ocrError", "ocrVendor", "ocrModel"]))
       #expect(pageText["text"] == .null)
 
       await ocr.script(docId: id, page: 1, .success("unique key phrase"))

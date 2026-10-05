@@ -5,7 +5,7 @@ public enum ConfigKeyPath {
   public static let keys = credentialKeys + [
     "agent.apiKeyEnvironment", "agent.autoSummarize", "agent.maxContextCharacters", "agent.maxImages", "agent.model",
     "agent.neighborPages", "agent.systemPrompt", "agent.timeoutSeconds", "agent.vendor", "ocr.apiKeyEnvironment",
-    "ocr.autoRunOnImport", "ocr.concurrency", "ocr.model", "ocr.prompt", "ocr.timeoutSeconds", "ocr.vendor", "render.dpi",
+    "ocr.autoRunOnImport", "ocr.concurrency", "ocr.formatRetries", "ocr.model", "ocr.prompt", "ocr.timeoutSeconds", "ocr.vendor", "render.dpi",
     "render.imageFormat", "render.maxPixelDimension", "render.quality", "summary.autoRunAfterOCR", "summary.language",
     "summary.model", "summary.prompt", "summary.timeoutSeconds", "summary.vendor"
   ]
@@ -22,6 +22,7 @@ public enum ConfigKeyPath {
     case "ocr.model": return config.ocr.model.map(JSONValue.string) ?? .null
     case "ocr.apiKeyEnvironment": return config.ocr.apiKeyEnvironment.map(JSONValue.string) ?? .null
     case "ocr.concurrency": return .int(config.ocr.concurrency)
+    case "ocr.formatRetries": return .int(config.ocr.formatRetries)
     case "ocr.prompt": return config.ocr.prompt.map(JSONValue.string) ?? .null
     case "ocr.timeoutSeconds": return .int(config.ocr.timeoutSeconds)
     case "agent.timeoutSeconds": return .int(config.agent.timeoutSeconds)
@@ -109,6 +110,7 @@ public enum ConfigKeyPath {
     case "ocr.model": updated.ocr.model = raw
     case "ocr.apiKeyEnvironment": updated.ocr.apiKeyEnvironment = raw
     case "ocr.concurrency": updated.ocr.concurrency = try integer(raw, key: key)
+    case "ocr.formatRetries": updated.ocr.formatRetries = try integer(raw, key: key)
     case "ocr.autoRunOnImport": updated.ocr.autoRunOnImport = try boolean(raw, key: key)
     case "ocr.prompt": updated.ocr.prompt = raw
     case "ocr.timeoutSeconds": updated.ocr.timeoutSeconds = try integer(raw, key: key)

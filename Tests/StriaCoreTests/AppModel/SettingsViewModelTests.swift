@@ -30,6 +30,8 @@ import Testing
     settings.credentials["gemini"] = ""
     settings.agentSystemPrompt = "custom prompt"
     settings.ocrPrompt = "  Transcribe this page.\n"
+    #expect(settings.ocrFormatRetries == 2)
+    settings.ocrFormatRetries = 4
     #expect(!settings.ocrPromptIsDefault)
     #expect(settings.save())
     #expect(settings.error == nil)
@@ -40,6 +42,7 @@ import Testing
     #expect(saved.ocr.vendor == "claude-code")
     #expect(saved.agent.systemPrompt == "custom prompt")
     #expect(saved.ocr.prompt == "Transcribe this page.")
+    #expect(saved.ocr.formatRetries == 4)
     #expect(library.environment.config.ocr.prompt == "Transcribe this page.")
     #expect(saved.agent.credentials["openai"] == "MY_OPENAI_KEY")
     #expect(saved.agent.credentials["gemini"] == nil)

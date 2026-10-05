@@ -130,8 +130,9 @@ file was written now or when `--output` is used.
 
 ### `stria page text <docId> <page>`
 
-`{"docId", "page", "ocrStatus", "text", "ocrError", "ocrVendor", "ocrModel"}`.
-`text` is null unless `ocrStatus` is `done`.
+`{"docId", "page", "ocrStatus", "text", "tags", "ocrError", "ocrVendor", "ocrModel"}`.
+`text` is null and `tags` is `[]` unless `ocrStatus` is `done`. `tags` are the
+key terms, people, events and the like the OCR model returned with the page.
 
 ### `stria page summary <docId> <page>` / `stria summarize <docId> [--pages <list>] [--instruction <text>] [--language <name>]`
 

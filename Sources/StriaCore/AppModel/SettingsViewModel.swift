@@ -19,6 +19,7 @@ public final class SettingsViewModel {
   public var ocrAPIKeyEnvironment = ""
   public var ocrAutoRunOnImport = true
   public var ocrConcurrency = 2
+  public var ocrFormatRetries = OCRDefaults.formatRetries
   /// The OCR prompt as shown for editing; the default text when none is set.
   public var ocrPrompt = OCRDefaults.prompt
   /// Credential variable name per API vendor ("" = none).
@@ -107,6 +108,7 @@ public final class SettingsViewModel {
     ocrAPIKeyEnvironment = config.ocr.apiKeyEnvironment ?? ""
     ocrAutoRunOnImport = config.ocr.autoRunOnImport
     ocrConcurrency = config.ocr.concurrency
+    ocrFormatRetries = config.ocr.formatRetries
     ocrPrompt = config.ocr.prompt ?? OCRDefaults.prompt
     summaryVendor = config.summary.vendor ?? Self.notConfigured
     summaryModel = config.summary.model ?? ""
@@ -218,6 +220,7 @@ public final class SettingsViewModel {
     config.ocr.apiKeyEnvironment = Self.trimmed(ocrAPIKeyEnvironment)
     config.ocr.autoRunOnImport = ocrAutoRunOnImport
     config.ocr.concurrency = ocrConcurrency
+    config.ocr.formatRetries = ocrFormatRetries
     // Stored as null while it matches the default, so a later default reaches users who never edited it.
     config.ocr.prompt = ocrPromptIsDefault ? nil : Self.trimmed(ocrPrompt)
     config.agent.credentials = credentials.reduce(into: [:]) { result, entry in

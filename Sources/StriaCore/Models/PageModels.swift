@@ -4,12 +4,14 @@ public struct PageInfo: Codable, Equatable, Sendable {
   public var documentId: String; public var pageNumber: Int; public var imageFormat: ImageFormat; public var width: Int; public var height: Int
   public var ocrStatus: OCRStatus; public var ocrText: String?; public var ocrVendor: String?; public var ocrModel: String?
   public var ocrError: String?; public var ocrAttempts: Int; public var ocrUpdatedAt: Date?
+  /// Key terms, people, events and the like the OCR model tagged the page with.
+  public var ocrTags: [String]
   public init(documentId: String, pageNumber: Int, imageFormat: ImageFormat, width: Int, height: Int, ocrStatus: OCRStatus,
               ocrText: String? = nil, ocrVendor: String? = nil, ocrModel: String? = nil, ocrError: String? = nil,
-              ocrAttempts: Int = 0, ocrUpdatedAt: Date? = nil) {
+              ocrAttempts: Int = 0, ocrUpdatedAt: Date? = nil, ocrTags: [String] = []) {
     self.documentId = documentId; self.pageNumber = pageNumber; self.imageFormat = imageFormat; self.width = width; self.height = height
     self.ocrStatus = ocrStatus; self.ocrText = ocrText; self.ocrVendor = ocrVendor; self.ocrModel = ocrModel
-    self.ocrError = ocrError; self.ocrAttempts = ocrAttempts; self.ocrUpdatedAt = ocrUpdatedAt
+    self.ocrError = ocrError; self.ocrAttempts = ocrAttempts; self.ocrUpdatedAt = ocrUpdatedAt; self.ocrTags = ocrTags
   }
 }
 public struct StoredPageImage: Equatable, Sendable {

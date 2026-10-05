@@ -16,13 +16,21 @@ public struct StriaEnvironment: Sendable {
   public let paths: StriaPaths; public let ocrService: any OCRService
   public let agentService: any AgentService; public let clock: @Sendable () -> Date
   public let onRunLogFailure: (@Sendable (String) -> Void)?
+  /// The wait before OCR retry `n` (1-based) of a malformed reply.
+  public let ocrRetryDelay: @Sendable (Int) -> Duration
   private let configBox: ConfigBox
   public var config: StriaConfig { configBox.config }
 
   public init(paths: StriaPaths, config: StriaConfig, ocrService: any OCRService, agentService: any AgentService,
-              clock: @escaping @Sendable () -> Date = { Date() }, onRunLogFailure: (@Sendable (String) -> Void)? = nil) {
+              clock: @escaping @Sendable () -> Date = { Date() }, onRunLogFailure: (@Sendable (String) -> Void)? = nil,
+              ocrRetryDelay: @escaping @Sendable (Int) -> Duration = StriaEnvironment.exponentialBackoff) {
     self.paths = paths; configBox = ConfigBox(config); self.ocrService = ocrService; self.agentService = agentService
-    self.clock = clock; self.onRunLogFailure = onRunLogFailure
+    self.clock = clock; self.onRunLogFailure = onRunLogFailure; self.ocrRetryDelay = ocrRetryDelay
+  }
+
+  /// 2, 4, 8, ... seconds, capped at 30.
+  public static let exponentialBackoff: @Sendable (Int) -> Duration = { attempt in
+    .seconds(min(30, 1 << min(max(attempt, 1), 5)))
   }
 
   /// Replaces the in-memory configuration (the file is written by `StriaLibrary.saveConfig`).

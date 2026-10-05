@@ -14,9 +14,9 @@ public extension LibraryViewModel {
     return "\(SettingsViewModel.displayName(for: vendor)) (\(config.model ?? "no model"))"
   }
 
-  /// The page's OCR state, which decides whether it can be summarized.
-  func pageOCRStatus(documentId: String, page: Int) async -> OCRStatus? {
-    try? await library.store.pageInfo(documentId: documentId, page: page)?.ocrStatus
+  /// The page's OCR state and tags (the state decides whether it can be summarized).
+  func pageInfo(documentId: String, page: Int) async -> PageInfo? {
+    try? await library.store.pageInfo(documentId: documentId, page: page)
   }
 
   /// Summarizes pages chosen like an OCR run: `.remaining` means OCRed pages

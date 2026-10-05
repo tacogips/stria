@@ -32,5 +32,6 @@ public func makeTestEnvironment(
   config: StriaConfig = .testing,
   clock: @escaping @Sendable () -> Date = { Date() }
 ) -> StriaEnvironment {
-  StriaEnvironment(paths: paths, config: config, ocrService: ocr, agentService: agent, clock: clock)
+  StriaEnvironment(paths: paths, config: config, ocrService: ocr, agentService: agent, clock: clock,
+                    ocrRetryDelay: { _ in .zero })
 }

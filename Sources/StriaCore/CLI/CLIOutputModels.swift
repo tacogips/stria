@@ -118,8 +118,9 @@ public struct PageTextOutput: Encodable {
   public let ocrError: String?
   public let ocrVendor: String?
   public let ocrModel: String?
+  public var tags: [String] = []
 
-  enum CodingKeys: String, CodingKey { case docId, page, ocrStatus, text, ocrError, ocrVendor, ocrModel }
+  enum CodingKeys: String, CodingKey { case docId, page, ocrStatus, text, tags, ocrError, ocrVendor, ocrModel }
 
   public func encode(to encoder: Encoder) throws {
     var container = encoder.container(keyedBy: CodingKeys.self)
@@ -127,6 +128,7 @@ public struct PageTextOutput: Encodable {
     try container.encode(page, forKey: .page)
     try container.encode(ocrStatus, forKey: .ocrStatus)
     try container.encode(text, forKey: .text)
+    try container.encode(tags, forKey: .tags)
     try container.encode(ocrError, forKey: .ocrError)
     try container.encode(ocrVendor, forKey: .ocrVendor)
     try container.encode(ocrModel, forKey: .ocrModel)

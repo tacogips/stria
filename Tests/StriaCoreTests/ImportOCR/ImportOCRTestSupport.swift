@@ -6,7 +6,7 @@ func makeImportFixture(paths: StriaPaths, pageTexts: [String], ocr: FakeOCRServi
   let source = paths.root.appendingPathComponent("fixture.pdf")
   try SamplePDFFactory.makePDF(at: source, pages: pageTexts)
   let environment = StriaEnvironment(paths: paths, config: .testing, ocrService: ocr, agentService: FakeAgentService(),
-                                     onRunLogFailure: onRunLogFailure)
+                                     onRunLogFailure: onRunLogFailure, ocrRetryDelay: { _ in .zero })
   return (try StriaLibrary.open(environment: environment), source)
 }
 

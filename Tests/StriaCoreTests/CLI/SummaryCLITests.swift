@@ -18,6 +18,10 @@ import Testing
       #expect(await execute(["config", "set", "summary.vendor", "claude-code"], home: home, paths: paths, ocr: ocr, agent: agent).exitCode == 0)
       #expect(await execute(["config", "set", "summary.model", "m"], home: home, paths: paths, ocr: ocr, agent: agent).exitCode == 0)
 
+      let text = await execute(["page", "text", id, "1"], home: home, paths: paths, ocr: ocr, agent: agent)
+      #expect(try json(text.stdout)["tags"]?.arrayValue == [])
+      #expect(try json(text.stdout)["text"]?.stringValue == "text \(id) p1")
+
       let empty = await execute(["page", "summary", id, "1"], home: home, paths: paths, ocr: ocr, agent: agent)
       #expect(try json(empty.stdout)["status"]?.stringValue == "none")
       #expect(try json(empty.stdout)["summary"] == .null)

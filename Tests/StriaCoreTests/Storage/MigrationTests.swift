@@ -11,7 +11,7 @@ import Testing
       #expect(backend == .fts5 || backend == .like)
       let reopened = try openStorage(paths: paths)
       #expect(await reopened.searchBackend == backend)
-      #expect(try sqliteScalar(path: paths.database.path, sql: "PRAGMA user_version") == "4")
+      #expect(try sqliteScalar(path: paths.database.path, sql: "PRAGMA user_version") == "5")
       for table in ["meta", "documents", "pages", "agent_runs", "chat_threads", "chat_messages", "page_summaries"] {
         #expect(try sqliteScalar(path: paths.database.path, sql: "SELECT name FROM sqlite_master WHERE type='table' AND name='\(table)'") == table)
       }
@@ -21,7 +21,7 @@ import Testing
   @Test func newerVersionIsNotModifiedAndForcedLikeSkipsFTS() async throws {
     try await withTestDataRoot { paths in
       try paths.ensureDirectories()
-      try sqliteExecute(path: paths.database.path, sql: "PRAGMA user_version=5")
+      try sqliteExecute(path: paths.database.path, sql: "PRAGMA user_version=6")
       let before = SHA256.hash(data: try Data(contentsOf: paths.database)).map { String(format: "%02x", $0) }.joined()
       do {
         _ = try StriaStore(databaseURL: paths.database)
@@ -51,15 +51,18 @@ import Testing
         CREATE TABLE chat_threads(id TEXT PRIMARY KEY, document_id TEXT, page_number INTEGER, scope TEXT NOT NULL,
           created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
         INSERT INTO chat_threads VALUES('old','doc',1,'page','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
+        CREATE TABLE pages(document_id TEXT NOT NULL, page_number INTEGER NOT NULL, ocr_status TEXT NOT NULL,
+          ocr_text TEXT, ocr_updated_at TEXT, PRIMARY KEY(document_id, page_number));
         PRAGMA user_version=1;
         """)
       _ = try StriaStore(databaseURL: paths.database)
-      #expect(try sqliteScalar(path: paths.database.path, sql: "PRAGMA user_version") == "4")
+      #expect(try sqliteScalar(path: paths.database.path, sql: "PRAGMA user_version") == "5")
       #expect(try sqliteScalar(path: paths.database.path, sql: "SELECT COUNT(*) FROM pragma_table_info('chat_threads') WHERE name='title'") == "1")
+      #expect(try sqliteScalar(path: paths.database.path, sql: "SELECT COUNT(*) FROM pragma_table_info('pages') WHERE name='ocr_tags_json'") == "1")
       #expect(try sqliteScalar(path: paths.database.path, sql: "SELECT scope FROM chat_threads WHERE id='old'") == "page")
       #expect(try sqliteScalar(path: paths.database.path, sql: "SELECT COUNT(*) FROM pragma_table_info('chat_threads') WHERE name IN ('summary','summary_through_message_id','summary_updated_at')") == "3")
       _ = try StriaStore(databaseURL: paths.database)
-      #expect(try sqliteScalar(path: paths.database.path, sql: "PRAGMA user_version") == "4")
+      #expect(try sqliteScalar(path: paths.database.path, sql: "PRAGMA user_version") == "5")
     }
   }
 }

@@ -72,6 +72,13 @@ public final class SearchViewModel {
     isShowingResults = true
   }
 
+  /// Runs a search for a given text (a page tag) across every PDF.
+  public func search(for text: String) async {
+    query = text
+    scope = .allDocuments
+    await submit()
+  }
+
   /// Leaves the results screen (Esc or the back icon); the query is kept
   /// for the next search.
   public func close() {

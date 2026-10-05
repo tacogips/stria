@@ -33,7 +33,7 @@ struct ReaderView: View {
         }
         .sheet(isPresented: $compactAgent) {
           compactPane(title: "Agent", geometry: geometry, scrollsWhenShort: true) {
-            AgentPaneView(agent: agent, reader: reader, library: model.library, configRevision: model.configRevision)
+            agentPane()
           }
         }
     }
@@ -97,7 +97,7 @@ struct ReaderView: View {
           }
         }
       if agentVisible {
-        AgentPaneView(agent: agent, reader: reader, library: model.library, configRevision: model.configRevision)
+        agentPane()
           .frame(minWidth: 300, idealWidth: agentPaneWidth, maxWidth: 600)
           .background(Flat.panel)
 
@@ -169,6 +169,13 @@ struct ReaderView: View {
     .task { await agent.reloadHistory() }
     .onAppear { shortcuts.install(handle) }
     .onDisappear { shortcuts.remove() }
+  }
+
+  private func agentPane() -> AgentPaneView {
+    AgentPaneView(agent: agent, reader: reader, library: model.library, configRevision: model.configRevision) { text in
+      compactAgent = false
+      Task { await model.search.search(for: text) }
+    }
   }
 
   private var libraryButton: some View {

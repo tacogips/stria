@@ -119,15 +119,44 @@ reply is `failed` (`#ocr-reply-check`).
 - The run summary is
   `{ processed, done, failed, pending, failures: [{page, error}] }`.
 
-Default OCR prompt (`OCRDefaults.prompt`):
+Default OCR prompt (`OCRDefaults.prompt`, editable in Settings > OCR Prompt):
 
 > Transcribe all text visible in this page image. The text may be Japanese,
 > English or both; vertical Japanese text is read top to bottom, right to
 > left. Preserve the reading order and line breaks. Keep numbers, dates and
 > names exactly as printed and do not translate. Write each table row on one
-> line with cells separated by " | ". Output only the transcribed text with
-> no commentary, headings or code fences. If the page has no text, output
-> nothing.
+> line with cells separated by " | ". Transcribe only; add no commentary or
+> headings.
+
+### JSON reply and tags
+
+Model vendors answer every page with one JSON object:
+
+```json
+{"body": "<transcribed text>", "tags": ["<key term, person, organization, place, event or date>", "..."]}
+```
+
+- `OCRCoordinator` appends `OCRDefaults.jsonFormatInstruction` to the prompt
+  (default or custom), so an edited prompt cannot break the contract, and
+  sends `OCRRequest.format = .json`. The `pdf-text-layer` vendor stays plain
+  text with no tags.
+- `OCRReplyParser.parse` takes the text from the first `{` to the last `}`
+  (code fences tolerated) and requires a string `body` and an array of
+  string `tags`. The body is cleaned like before (`[NO TEXT]` becomes "").
+  Tags are trimmed (also of `#`), de-duplicated ignoring case and width,
+  capped at 40 tags of 80 characters each, in the model's order.
+- A reply in any other shape is asked again after
+  `StriaEnvironment.ocrRetryDelay(n)` (2, 4, 8, 16, 30, 30 seconds),
+  up to `ocr.formatRetries` times (default 2, 0...5, Settings > OCR "Retries
+  for a malformed reply"). When the retries run out the page is `failed`
+  with the parser's reason and the attempt count, e.g. `OCR reply is not a
+  JSON object (after 3 attempts)`, and the run continues with other pages.
+  Service errors (`unavailable`, `failed`, the reply check below) are not
+  retried here.
+- The body is stored in `ocr_text` and indexed for search as before; tags go
+  to `pages.ocr_tags_json` (migration 5) and are not indexed. A failed OCR
+  clears both. `stria page text` returns `tags`, and the agent pane's Summary
+  tab shows them as chips that search every PDF for the tag.
 
 ### OCR reply check
 
@@ -170,9 +199,9 @@ rejected. That page stays `failed` and can be read with `stria page image`.
 The rejection reasons are fixed strings. They never quote the reply,
 because run records must not contain OCR text.
 
-The default prompt asks the model to answer exactly `[NO TEXT]` for a page
-without text. `GatewayOCRService` turns that reply into `done` with empty
-text, so blank and figure-only pages are not rejected and retried forever;
+A page without text is `{"body": "", "tags": []}`; a bare `[NO TEXT]`
+reply (the earlier plain-text contract) is still turned into empty text by
+`GatewayOCRService` and then retried as a format error. Empty text is `done`, so blank and figure-only pages are not rejected and retried forever;
 a genuinely empty reply still means the image did not reach the model. See
 `../user-qa/ocr-empty-reply.md`.
 

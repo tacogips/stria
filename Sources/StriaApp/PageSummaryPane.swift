@@ -1,14 +1,18 @@
 import SwiftUI
 import StriaCore
 
-/// The agent pane's Summary tab: the current page's summary, the run in
-/// progress, and a button that summarizes again with instructions.
+/// The agent pane's Summary tab: the current page's OCR tags (click one to
+/// search every PDF for it), its summary, the run in progress, and a button
+/// that summarizes again with instructions.
 struct PageSummaryPane: View {
   @Bindable var library: LibraryViewModel
   let reader: ReaderViewModel
   var configRevision = 0
+  /// Searches every PDF for a tag.
+  var onTag: (String) -> Void = { _ in }
   @State private var record: PageSummaryRecord?
   @State private var ocrStatus: OCRStatus?
+  @State private var tags: [String] = []
   @State private var missingCount = 0
   @State private var loaded = false
   @State private var sheetRow: LibraryRow?
@@ -22,9 +26,12 @@ struct PageSummaryPane: View {
       header
       Divider()
       ScrollView {
-        content
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .padding()
+        VStack(alignment: .leading, spacing: 14) {
+          if !tags.isEmpty { tagList }
+          content
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
       }
     }
     .task(id: LoadKey(document: reader.documentId, page: page, revision: library.summaryRevision, config: configRevision,
@@ -64,6 +71,27 @@ struct PageSummaryPane: View {
     }
     .padding(.horizontal)
     .padding(.vertical, 8)
+  }
+
+  private var tagList: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Text("Tags").font(.caption.bold()).foregroundStyle(.secondary)
+      FlowLayout(spacing: 6) {
+        ForEach(tags, id: \.self) { tag in
+          Button { onTag(tag) } label: {
+            Text(tag)
+              .font(.caption)
+              .lineLimit(1)
+              .padding(.horizontal, 8)
+              .padding(.vertical, 3)
+              .overlay(Rectangle().stroke(Flat.border, lineWidth: 1))
+              .contentShape(Rectangle())
+          }
+          .buttonStyle(.plain)
+          .help("Search every PDF for \"\(tag)\"")
+        }
+      }
+    }
   }
 
   @ViewBuilder private var content: some View {
@@ -132,7 +160,9 @@ struct PageSummaryPane: View {
 
   private func load() async {
     record = await library.pageSummary(documentId: reader.documentId, page: page)
-    ocrStatus = await library.pageOCRStatus(documentId: reader.documentId, page: page)
+    let info = await library.pageInfo(documentId: reader.documentId, page: page)
+    ocrStatus = info?.ocrStatus
+    tags = info?.ocrStatus == .done ? info?.ocrTags ?? [] : []
     loaded = true
   }
 }

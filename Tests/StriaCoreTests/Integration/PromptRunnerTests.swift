@@ -124,7 +124,7 @@ private extension URL {
       let request = OCRRequest(docId: "doc", page: 1, pngPath: png, prompt: OCRDefaults.prompt,
                                settings: ServiceSettings(vendor: "claude-code", model: "m", apiKeyEnvironment: nil))
       #expect(try await service.recognize(request).text == "")
-      #expect(OCRDefaults.prompt.contains(OCRDefaults.noTextSentinel))
+      #expect(OCRDefaults.jsonFormatInstruction.contains("\"body\""))
     }
   }
 }

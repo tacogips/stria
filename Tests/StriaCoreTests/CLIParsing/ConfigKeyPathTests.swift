@@ -2,11 +2,11 @@ import StriaCore
 import Testing
 
 @Suite struct ConfigKeyPathTests {
-  @Test func exposesExactlyThirtyOneLeafKeys() throws {
-    #expect(ConfigKeyPath.keys.count == 31)
+  @Test func exposesExactlyThirtyTwoLeafKeys() throws {
+    #expect(ConfigKeyPath.keys.count == 32)
     #expect(Set(ConfigKeyPath.keys) == Set(ConfigKeyPath.credentialKeys + [
       "render.dpi", "render.imageFormat", "render.quality", "render.maxPixelDimension",
-      "ocr.vendor", "ocr.model", "ocr.apiKeyEnvironment", "ocr.concurrency", "ocr.prompt", "ocr.timeoutSeconds", "ocr.autoRunOnImport",
+      "ocr.vendor", "ocr.model", "ocr.apiKeyEnvironment", "ocr.concurrency", "ocr.prompt", "ocr.timeoutSeconds", "ocr.autoRunOnImport", "ocr.formatRetries",
       "agent.vendor", "agent.model", "agent.apiKeyEnvironment", "agent.neighborPages",
       "agent.maxImages", "agent.maxContextCharacters", "agent.systemPrompt", "agent.timeoutSeconds", "agent.autoSummarize",
       "summary.vendor", "summary.model", "summary.prompt", "summary.language", "summary.autoRunAfterOCR", "summary.timeoutSeconds"

@@ -66,6 +66,13 @@ struct SettingsView: View {
         }
         Toggle("Run OCR automatically after import", isOn: $settings.ocrAutoRunOnImport)
         Stepper("Concurrent pages: \(settings.ocrConcurrency)", value: $settings.ocrConcurrency, in: 1...8)
+        Stepper("Retries for a malformed reply: \(settings.ocrFormatRetries)", value: $settings.ocrFormatRetries, in: 0...5)
+        Text("""
+          Model vendors must answer with a JSON object holding the page text ("body") and its key terms, people and \
+          events ("tags"). Another reply is asked again after 2, 4, 8… seconds; when the retries run out the page \
+          is marked failed.
+          """)
+          .font(.caption).foregroundStyle(.secondary)
       }
       Section {
         TextEditor(text: $settings.ocrPrompt)

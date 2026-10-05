@@ -127,7 +127,9 @@ than the binary knows fails with `databaseTooNew` and leaves the DB
 unmodified. Re-opening an up-to-date DB runs nothing. Migration 1 creates
 the schema; migration 2 adds the `chat_threads` summary columns; migration 3
 adds `chat_threads.title`; migration 4 adds `page_summaries`
-(`design-page-summaries.md#storage`), which no search query reads. Later schema
+(`design-page-summaries.md#storage`), which no search query reads;
+migration 5 adds `pages.ocr_tags_json` (a JSON array of the OCR tags, not
+indexed; `design-agent-integration.md#json-reply-and-tags`). Later schema
 changes add new numbered migrations and never edit earlier ones.
 
 ### Search Backend
