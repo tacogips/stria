@@ -2,10 +2,40 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p Mobile/build/packages Mobile/build/tool-home Mobile/build/package-cache
-# Reuse resolved packages without mutating SwiftPM's .build directory.
-if [ ! -d Mobile/build/packages/checkouts ]; then
+# XcodeGen can retain a stale workspace pin. Always use the root package pin.
+resolved_dir=Mobile/StriaMobile.xcodeproj/project.xcworkspace/xcshareddata/swiftpm
+mkdir -p "$resolved_dir"
+cp Package.resolved "$resolved_dir/Package.resolved"
+agent_revision=$(python3 - <<'PYTHON'
+import json
+with open('Package.resolved') as stream:
+    pins = json.load(stream)['pins']
+print(next(pin['state']['revision'] for pin in pins if pin['identity'] == 'agent-gateway'))
+PYTHON
+)
+# Reuse resolved packages without mutating SwiftPM's .build directory. Refresh
+# both caches when the checkout is stale or the bare repository lacks the pin.
+cached_revision=$(git -C Mobile/build/packages/checkouts/agent-gateway rev-parse HEAD 2>/dev/null || true)
+repository_has_pin=false
+for repository in Mobile/build/packages/repositories/agent-gateway-*; do
+  if git -C "$repository" cat-file -e "$agent_revision^{commit}" 2>/dev/null; then
+    repository_has_pin=true
+    break
+  fi
+done
+if [ "$cached_revision" != "$agent_revision" ] || [ "$repository_has_pin" != true ]; then
+  source_revision=$(git -C .build/checkouts/agent-gateway rev-parse HEAD)
+  if [ "$source_revision" != "$agent_revision" ]; then
+    echo "The .build agent-gateway checkout must match the root Package.resolved before building iOS." >&2
+    exit 1
+  fi
+  rm -rf Mobile/build/packages/checkouts Mobile/build/packages/repositories
   cp -R .build/checkouts Mobile/build/packages/checkouts
   cp -R .build/repositories Mobile/build/packages/repositories
+  # Keep SwiftPM checkout metadata aligned with the refreshed source trees.
+  if [ -f .build/workspace-state.json ]; then
+    cp .build/workspace-state.json Mobile/build/packages/workspace-state.json
+  fi
 fi
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 # CoreSimulator may be unavailable in a restricted environment. A generic

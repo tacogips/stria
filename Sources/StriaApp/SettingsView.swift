@@ -97,6 +97,7 @@ struct SettingsView: View {
           """)
       }
       PageSummarySettingsSection(settings: settings)
+      VoiceInputSettingsSection(settings: settings)
       Section {
         ForEach(SettingsViewModel.credentialVendors, id: \.self) { vendor in
           HStack {

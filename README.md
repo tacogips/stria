@@ -42,6 +42,7 @@ To try the app without touching your real library, run `STRIA_HOME=$(mktemp -d) 
 | Library | `Cmd-Shift-L` |
 | Go to Page | `Cmd-Opt-G` |
 | Next / Previous Page | `Cmd-Opt-Down` / `Cmd-Opt-Up` |
+| Start / stop dictation | `m` or `Cmd-Shift-M` (Agent menu) |
 | Send question | `Cmd-Return` or `Ctrl-M` in the input field |
 | Focus chat input | `Cmd-L` |
 | New Chat | `Cmd-Shift-N` |
@@ -112,13 +113,41 @@ See [the CLI contract](design-docs/specs/command.md) for the JSON shapes.
 
 Alternatively, `stria ask "<question>"` performs retrieval and answering with the configured agent and saves the conversation.
 
+## Voice input
+
+On Mac, iPhone and iPad, the microphone next to Send turns speech into composer
+text. Click again to stop; edit the result before sending, or enable **Send
+automatically after dictation** in Settings > Voice Input. Existing typed text
+is kept, and Apple recognition shows live partial text. The recording limit is
+300 seconds by default (configurable from 10 to 1800); silence does not stop it.
+
+Apple is the default engine. On macOS 26 / iOS 26 it uses on-device speech models,
+installing language assets on demand. On earlier systems it uses on-device
+recognition when supported, otherwise Apple's server recognition. Settings
+states this fallback. OpenAI, Gemini and OpenRouter record AAC `.m4a` audio and
+send it to the selected vendor through agent-gateway after recording stops.
+Temporary audio lives in the library cache and is deleted after transcription,
+failure or cancellation. Vendor engines use the same per-vendor credential
+settings as chat: environment credentials on Mac and Keychain credentials on iOS.
+Unsupported vendors are not offered. Models have catalog suggestions and accept
+custom IDs; Auto language omits the vendor language hint.
+
+Stria asks for microphone permission and, with Apple recognition, speech
+recognition permission. If denied, enable Stria under Privacy & Security >
+Microphone / Speech Recognition in System Settings on Mac or Settings on iOS.
+On Mac, `m` or Agent > Start/Stop Dictation (`Cmd-Shift-M`) toggles recording;
+`Esc` cancels active dictation. Errors appear in the agent pane notice.
+The CLI exposes `voice.engine`, `voice.model`, `voice.language`, `voice.autoSend`
+and `voice.maxSeconds` through `stria config get/set`.
+
 ## Keyboard shortcuts in the reader
 
 Single keys, in the style of chilla, that pause while a text field is being edited:
 
-- `Esc`: close search results, or back to the library
+- `Esc`: cancel dictation while it is active; otherwise close search results, or back to the library
 - `Shift+L` / `Shift+R`: collapse or expand the left pane / the agent pane
 - `/` (or `Cmd-F`): search the OCR text in a popup; results open in the center pane with page thumbnails and highlighted hits, `Esc` returns
+- `m` (or `Cmd-Shift-M`): show the agent pane, focus the input, and start / stop dictation. During recording, `m` stops even with the input focused.
 - `i`: focus the agent chat input; `n`: new chat; `r`: resume the previous chat about this PDF (repeat for older ones); `s`: go to the page where the open chat started
 - `Ctrl+D` / `Ctrl+U`: page the PDF down / up; `j` / `k`: scroll one line
 - `Shift+D`: toggle light and dark mode (light is the default; Settings > Appearance also offers "System")

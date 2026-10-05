@@ -263,6 +263,8 @@ write_info_plist() {
   <key>CFBundleVersion</key><string>$version</string>
   <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
+  <key>NSMicrophoneUsageDescription</key><string>Stria records your voice to turn it into a chat message.</string>
+  <key>NSSpeechRecognitionUsageDescription</key><string>Stria turns your speech into text for the agent chat.</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSHumanReadableCopyright</key><string>Copyright tacogips. MIT License.</string>
   <key>CFBundleDocumentTypes</key>
@@ -343,7 +345,7 @@ build_target() {
 
   # Nested code first, then the bundle (no --deep).
   codesign --force --options runtime --timestamp --sign "$APPLE_SIGNING_IDENTITY" "$app_dir/Contents/MacOS/$product"
-  codesign --force --options runtime --timestamp --sign "$APPLE_SIGNING_IDENTITY" "$app_dir"
+  codesign --force --options runtime --timestamp --entitlements "$repo_root/Resources/Stria.entitlements" --sign "$APPLE_SIGNING_IDENTITY" "$app_dir"
   codesign --verify --strict --deep --verbose=2 "$app_dir"
 
   ditto -c -k --keepParent "$app_dir" "$app_zip"

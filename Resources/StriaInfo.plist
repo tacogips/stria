@@ -9,6 +9,8 @@
   <string>Stria</string>
   <key>CFBundleDisplayName</key>
   <string>Stria</string>
+  <key>NSMicrophoneUsageDescription</key><string>Stria records your voice to turn it into a chat message.</string>
+  <key>NSSpeechRecognitionUsageDescription</key><string>Stria turns your speech into text for the agent chat.</string>
   <key>NSHighResolutionCapable</key>
   <true/>
 </dict>

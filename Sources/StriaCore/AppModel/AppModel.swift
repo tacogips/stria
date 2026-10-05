@@ -45,6 +45,7 @@ public final class AppModel {
 
   /// Opens a document, optionally at a page (a library search hit).
   public func open(documentId: String, page: Int? = nil) async {
+    agent?.cancelDictation()
     // Route first: the reader screen shows its opening indicator while the
     // PDF loads; on failure the library comes back with the error.
     route = .reader(docId: documentId)
@@ -66,6 +67,7 @@ public final class AppModel {
   }
 
   public func showLibrary() async {
+    agent?.cancelDictation()
     await reader?.close()
     reader = nil
     agent = nil

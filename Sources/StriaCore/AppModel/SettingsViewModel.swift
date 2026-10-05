@@ -14,6 +14,15 @@ public final class SettingsViewModel {
   /// API vendors whose credential variable name is set in Settings.
   public static let credentialVendors = KnownVendors.apiKeyVendors.sorted()
 
+  public var voiceEngine = "apple"
+  public var voiceModel = ""
+  public var voiceLanguage = "auto"
+  public var voiceAutoSend = false
+  public var voiceMaxSeconds = 300
+  public var voiceLanguageOptions: [String] {
+    VoiceOptions.languages.contains(voiceLanguage) ? VoiceOptions.languages : VoiceOptions.languages + [voiceLanguage]
+  }
+
   public var syncEnabled = false
   public var syncDocuments = true
   public var syncOCR = true
@@ -141,6 +150,11 @@ public final class SettingsViewModel {
   /// Reloads the draft from the current configuration, discarding edits.
   public func load() {
     let config = library.environment.config
+    voiceEngine = config.voice.engine
+    voiceModel = config.voice.model ?? ""
+    voiceLanguage = config.voice.language
+    voiceAutoSend = config.voice.autoSend
+    voiceMaxSeconds = config.voice.maxSeconds
     syncEnabled = config.sync.enabled
     syncDocuments = config.sync.documents
     syncOCR = config.sync.ocr
@@ -260,6 +274,8 @@ public final class SettingsViewModel {
   /// The configuration the draft describes, or the reason it is invalid.
   public func draftConfig() throws(StriaError) -> StriaConfig {
     var config = library.environment.config
+    config.voice = StriaConfig.VoiceConfig(engine: voiceEngine, model: Self.trimmed(voiceModel), language: voiceLanguage,
+                                         autoSend: voiceAutoSend, maxSeconds: voiceMaxSeconds)
     config.sync = SyncConfig(enabled: syncEnabled, documents: syncDocuments, ocr: syncOCR, summaries: syncSummaries,
                              chats: syncChats, folder: Self.trimmed(syncFolder), intervalMinutes: syncIntervalMinutes)
     for vendor in [ocrVendor, summaryVendor, config.agent.vendor].compactMap({ $0 }) {

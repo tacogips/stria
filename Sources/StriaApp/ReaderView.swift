@@ -168,8 +168,14 @@ struct ReaderView: View {
       ShortcutHelpSheet(isPresented: $showShortcutHelp)
     }
     .task { await agent.reloadHistory() }
-    .onAppear { shortcuts.install(handle) }
-    .onDisappear { shortcuts.remove() }
+    .onAppear {
+      shortcuts.install(handle, cancelDictation: {
+        guard agent.dictationState.isActive else { return false }
+        agent.cancelDictation()
+        return true
+      }, isDictating: { agent.dictationState.isRecording })
+    }
+    .onDisappear { shortcuts.remove(); agent.cancelDictation() }
   }
 
   private func agentPane() -> AgentPaneView {
@@ -268,6 +274,9 @@ struct ReaderView: View {
     case .search: model.search.present()
     case .toggleLeftPane: toggleSidebar()
     case .toggleAgentPane: toggleAgent()
+    case .toggleDictation:
+      revealAgent()
+      agent.toggleDictation()
     case .focusAgentInput:
       revealAgent()
       agent.requestInputFocus()

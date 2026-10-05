@@ -84,6 +84,9 @@ struct StriaCommands: Commands {
       Button("Settings…") { openSettings() }
         .keyboardShortcut(",", modifiers: [.command, .shift])
       Divider()
+      Button(agent?.dictationState.isRecording == true ? "Stop Dictation" : "Start Dictation") { readerShortcut?(.toggleDictation) }
+        .keyboardShortcut("m", modifiers: [.command, .shift])
+        .disabled(readerShortcut == nil || agent?.inFlight == true || (agent?.dictationState.isActive == true && agent?.dictationState.isRecording != true))
       Button("Focus Chat Input") { readerShortcut?(.focusAgentInput) }
         .keyboardShortcut("l", modifiers: .command)
         .disabled(readerShortcut == nil)

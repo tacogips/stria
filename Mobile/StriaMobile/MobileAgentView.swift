@@ -5,6 +5,7 @@ struct MobileAgentView: View {
   let model: MobileModel
   let reader: ReaderViewModel
   @Bindable var agent: AgentPaneViewModel
+  @FocusState private var inputFocused: Bool
   @State private var tab: AgentPaneTab = .chat
   @State private var settingsPresented = false
   @Environment(\.horizontalSizeClass) private var sizeClass
@@ -32,6 +33,7 @@ struct MobileAgentView: View {
       MobileSearchResults(model: model)
     }
     .task { await agent.reloadHistory() }
+    .onChange(of: agent.focusInputRequest) { _, _ in tab = .chat; inputFocused = true }
     .onChange(of: agent.historyMode) { _, _ in Task { await agent.reloadHistory() } }
   }
 
@@ -112,7 +114,9 @@ struct MobileAgentView: View {
       Text(agent.scopeDescription).font(.caption).foregroundStyle(.secondary)
       HStack(alignment: .bottom) {
         TextField("Ask a question", text: $agent.input, axis: .vertical)
+          .focused($inputFocused)
           .lineLimit(1...5).padding(8).overlay(Rectangle().stroke(Flat.border))
+        VoiceInputButton(agent: agent)
         if agent.inFlight {
           Button("Cancel") { agent.cancel() }
         } else {

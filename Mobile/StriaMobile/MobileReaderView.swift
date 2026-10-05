@@ -113,6 +113,7 @@ struct MobileReaderView: View {
       .presentationDetents([.medium, .large])
       .presentationDragIndicator(.visible)
     }
+    .onDisappear { agent.cancelDictation() }
     .onChange(of: reader.currentPage) { _, _ in agent.scheduleHistoryReload() }
   }
 }

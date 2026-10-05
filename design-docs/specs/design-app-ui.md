@@ -342,14 +342,16 @@ Info.plist embedded in the executable (`Resources/StriaInfo.plist`).
 
 Single-key shortcuts in the style of chilla (`ReaderShortcut`, a local
 `NSEvent` monitor installed while the reader is on screen). They never fire
-while a text field or text view has focus, so typing is never interrupted:
+while a text field or text view has focus, except `m` stops recording and `Esc`
+cancels active dictation:
 
 | Keys | Action |
 | --- | --- |
-| `Esc` | Close search results; otherwise back to the library (unless a sheet is open) |
+| `Esc` | Cancel active dictation; otherwise close search results or return to the library (unless a sheet is open) |
 | `Shift+L` | Collapse or expand the left pane |
 | `Shift+R` | Collapse or expand the agent pane |
 | `/` | Open the OCR search popup |
+| `m` | Show the agent pane, focus the input and start / stop dictation (also `Cmd-Shift-M`) |
 | `i` | Show the agent pane and focus its input (also `Cmd-L`) |
 | `n` | Start a new chat and focus the input |
 | `r` | Resume the previous chat about this PDF (repeat for older ones) |
@@ -383,6 +385,7 @@ they also reveal a hidden agent pane. `Ctrl-M` is a local key monitor
 | Go | Next Page / Previous Page | `Cmd-Opt-Down` / `Cmd-Opt-Up` |
 | View | Zoom In / Zoom Out / Actual Size / Zoom to Fit | `Cmd-+` / `Cmd--` / `Cmd-0` / `Cmd-9` |
 | Agent | Settings… (opens the Settings window, OCR and agent vendors) | `Cmd-Shift-,` |
+| Agent | Start Dictation / Stop Dictation | `Cmd-Shift-M` |
 | Agent | Send | `Cmd-Return` or `Ctrl-M` (in the input field) |
 | Agent | Focus Chat Input | `Cmd-L` |
 | Agent | New Chat | `Cmd-Shift-N` |

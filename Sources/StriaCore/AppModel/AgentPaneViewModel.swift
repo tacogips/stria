@@ -33,6 +33,18 @@ public final class AgentPaneViewModel {
   public var onLocalChange: (() -> Void)?
   public var scope: AgentScope = .page
   public var input = ""
+  public var speechInput: SpeechInputController?
+  public var dictationState: DictationState { speechInput?.state ?? .idle }
+  public var voiceEngineName: String { library.environment.config.voice.engine }
+
+  public func toggleDictation() {
+    guard !inFlight else { return }
+    requestedTab = .chat
+    requestInputFocus()
+    speechInput?.toggle()
+  }
+
+  public func cancelDictation() { speechInput?.cancel() }
   public private(set) var threadId: String?
   public private(set) var transcript: [ChatMessageRecord] = []
   public private(set) var inFlight = false
@@ -65,7 +77,8 @@ public final class AgentPaneViewModel {
   private let historyDebounce: Duration
 
   public init(library: StriaLibrary, reader: ReaderViewModel, historyDebounce: Duration = .milliseconds(300),
-              processEnvironment: [String: String] = ProcessInfo.processInfo.environment) {
+              processEnvironment: [String: String] = ProcessInfo.processInfo.environment,
+              speechEngineFactory: ((StriaConfig.VoiceConfig) throws -> any SpeechTranscriptionEngine)? = nil) {
     self.library = library
     self.reader = reader
     self.historyDebounce = historyDebounce
@@ -73,6 +86,20 @@ public final class AgentPaneViewModel {
     // Start from config; loadSelection() replaces it with the last chat choice.
     selectedVendor = library.environment.config.agent.vendor
     selectedModel = library.environment.config.agent.model
+    speechInput = SpeechInputController(
+      config: { library.environment.config.voice },
+      makeEngine: speechEngineFactory ?? { voice in
+        if voice.engine == "apple" { return AppleSpeechEngine() }
+        var config = library.environment.config
+        config.voice = voice
+        return try VendorSpeechEngine(config: config, cache: library.environment.paths.cache,
+                                      credentialEnvironment: CredentialEnvironment(environment: processEnvironment,
+                                        platform: library.environment.platform, store: library.environment.credentialStore))
+      },
+      readInput: { [weak self] in self?.input ?? "" }, writeInput: { [weak self] in self?.input = $0 },
+      notice: { [weak self] in self?.notice = $0 }, submit: { [weak self] in self?.submit() },
+      focus: { [weak self] in self?.requestInputFocus() }
+    )
   }
 
   public static let vendorOptions = KnownVendors.selectable
@@ -127,7 +154,7 @@ public final class AgentPaneViewModel {
 
   public var canSend: Bool {
     guard let vendor = selectedVendor else { return false }
-    return selection != nil && availability(of: vendor).isReady && !inFlight
+    return selection != nil && availability(of: vendor).isReady && !inFlight && !dictationState.isActive
   }
 
   private func persistSelection() async {
@@ -182,7 +209,7 @@ public final class AgentPaneViewModel {
 
   public func send() async {
     let question = input.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !question.isEmpty, !inFlight else { return }
+    guard !question.isEmpty, !inFlight, !dictationState.isActive else { return }
     guard let selection, availability(of: selection.vendor).isReady else {
       if let vendor = selectedVendor, availability(of: vendor) == .unavailableOnThisPlatform {
         notice = KnownVendors.platformUnavailableReason
@@ -260,6 +287,7 @@ public final class AgentPaneViewModel {
 
   public func newChat() {
     guard !inFlight else { return }
+    cancelDictation()
     threadId = nil
     transcript = []
     currentThread = nil
@@ -303,6 +331,7 @@ public final class AgentPaneViewModel {
 
   /// Opens a conversation from the History tab and jumps to its page.
   public func selectThread(_ thread: ThreadOverview) async {
+    cancelDictation()
     threadId = thread.threadId
     await reloadTranscript()
     if thread.documentId == reader.documentId, let page = thread.pageNumber { reader.goToPage(page) }

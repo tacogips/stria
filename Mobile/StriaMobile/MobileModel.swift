@@ -47,6 +47,7 @@ final class MobileModel {
   func open(documentId: String, page: Int? = nil) async {
     openGeneration += 1
     let generation = openGeneration
+    agent?.cancelDictation()
     agent?.cancel()
     await reader?.close()
     reader = nil
@@ -73,6 +74,7 @@ final class MobileModel {
 
   func closeReader() async {
     openGeneration += 1
+    agent?.cancelDictation()
     agent?.cancel()
     await reader?.close()
     reader = nil

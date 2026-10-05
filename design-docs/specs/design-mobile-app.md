@@ -47,7 +47,7 @@ cannot be selected; only API vendors (`openai`, `anthropic`, `gemini`,
 - `Package.swift` adds `.iOS(.v17)`. `StriaCore` builds for iOS; the
   `stria` CLI and the macOS `stria-app` stay macOS executables.
 - agent-gateway is pinned to the `ios-support` revision
-  (`c68e1ffa3d7b1a20bbd8e5c8fb09e055b3f925fa`), whose library products build
+  (`af55cb6c30dedc1c61c47410ef8b0f997f24bf26`), whose library products build
   for iOS; process-based vendors fail there with `launchFailed(ENOTSUP)`.
 - The mobile app lives in `Mobile/`: an XcodeGen spec `Mobile/project.yml`
   generating `Mobile/StriaMobile.xcodeproj` (generated, not committed), app

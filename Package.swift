@@ -13,7 +13,7 @@ let package = Package(
   dependencies: [
     .package(
       url: "https://github.com/tacogips/agent-gateway.git",
-      revision: "c68e1ffa3d7b1a20bbd8e5c8fb09e055b3f925fa"
+      revision: "af55cb6c30dedc1c61c47410ef8b0f997f24bf26"
     )
   ],
   targets: [

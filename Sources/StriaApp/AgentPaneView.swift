@@ -278,6 +278,7 @@ struct AgentPaneView: View {
         HStack(spacing: 8) {
           modelSelector
             .id(configRevision)
+          VoiceInputButton(agent: agent)
           if agent.inFlight {
             Button { agent.cancel() } label: {
               Image(systemName: "stop.circle.fill").font(.title2)

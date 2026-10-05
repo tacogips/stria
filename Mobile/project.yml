@@ -28,6 +28,8 @@ targets:
       path: build/Info.plist
       properties:
         CFBundleDisplayName: Stria
+        NSMicrophoneUsageDescription: "Stria records your voice to turn it into a chat message."
+        NSSpeechRecognitionUsageDescription: "Stria turns your speech into text for the agent chat."
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait

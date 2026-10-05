@@ -17,6 +17,7 @@ struct MobileSettingsView: View {
       List {
         ocrSection
         summarySection
+        VoiceInputSettingsSection(settings: settings)
         Section("API Keys") {
           ForEach(KnownVendors.selectable(on: .iOS), id: \.self) { vendor in
             MobileCredentialRow(settings: settings, vendor: vendor)

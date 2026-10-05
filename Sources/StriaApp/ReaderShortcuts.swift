@@ -7,7 +7,7 @@ import StriaCore
 /// equivalents stay on the menus (`StriaCommands`).
 enum ReaderShortcut: CaseIterable {
   case backToLibrary, search, toggleLeftPane, toggleAgentPane, focusAgentInput, newChat, resumePreviousChat
-  case conversationStart, pageDown, pageUp, lineDown, lineUp, toggleTheme, help
+  case toggleDictation, conversationStart, pageDown, pageUp, lineDown, lineUp, toggleTheme, help
 
   var keys: String {
     switch self {
@@ -15,6 +15,7 @@ enum ReaderShortcut: CaseIterable {
     case .search: "/"
     case .toggleLeftPane: "Shift+L"
     case .toggleAgentPane: "Shift+R"
+    case .toggleDictation: "m"
     case .focusAgentInput: "i"
     case .newChat: "n"
     case .resumePreviousChat: "r"
@@ -34,6 +35,7 @@ enum ReaderShortcut: CaseIterable {
     case .search: "Search the OCR text"
     case .toggleLeftPane: "Collapse or expand the left pane"
     case .toggleAgentPane: "Collapse or expand the agent pane"
+    case .toggleDictation: "Start or stop voice dictation in the agent chat"
     case .focusAgentInput: "Focus the agent chat input"
     case .newChat: "Start a new chat"
     case .resumePreviousChat: "Resume the previous chat about this PDF (repeat for older ones)"
@@ -65,6 +67,7 @@ enum ReaderShortcut: CaseIterable {
     case ("R", true), ("r", true): return .toggleAgentPane
     case ("D", true), ("d", true): return .toggleTheme
     case ("/", _): return .search
+    case ("m", false): return .toggleDictation
     case ("i", false): return .focusAgentInput
     case ("n", false): return .newChat
     case ("r", false): return .resumePreviousChat
@@ -83,12 +86,15 @@ final class ReaderShortcutMonitor {
   private var monitor: Any?
   private let menuTracking = MenuTrackingState()
 
-  func install(_ handler: @escaping @MainActor (ReaderShortcut) -> Void) {
+  func install(_ handler: @escaping @MainActor (ReaderShortcut) -> Void, cancelDictation: @escaping @MainActor () -> Bool = { false },
+               isDictating: @escaping @MainActor () -> Bool = { false }) {
     remove()
     menuTracking.start()
     monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
       guard let self else { return event }
-      guard !self.menuTracking.isTracking, !Self.isEditingText(), let shortcut = ReaderShortcut.match(event) else { return event }
+      if !self.menuTracking.isTracking, event.keyCode == 53, cancelDictation() { return nil }
+      guard !self.menuTracking.isTracking, let shortcut = ReaderShortcut.match(event) else { return event }
+      guard !Self.isEditingText() || (shortcut == .toggleDictation && isDictating()) else { return event }
       // Esc belongs to a sheet or popover while one is open.
       if shortcut == .backToLibrary, Self.sheetIsOpen() { return event }
       handler(shortcut)
@@ -136,12 +142,13 @@ struct ShortcutHelpSheet: View {
           GridRow { Text("Cmd-Opt-Up/Down").font(.system(.body, design: .monospaced)); Text("Previous / next page") }
           GridRow { Text("Cmd-+ / Cmd--").font(.system(.body, design: .monospaced)); Text("Zoom in / out") }
           GridRow { Text("Cmd-F").font(.system(.body, design: .monospaced)); Text("Search the OCR text") }
+          GridRow { Text("Cmd-Shift-M").font(.system(.body, design: .monospaced)); Text("Start / stop dictation; Esc cancels") }
           GridRow { Text("Cmd-Return").font(.system(.body, design: .monospaced)); Text("Send the question") }
           GridRow { Text("Cmd-.").font(.system(.body, design: .monospaced)); Text("Cancel the question") }
           GridRow { Text("Cmd-Shift-L").font(.system(.body, design: .monospaced)); Text("Back to the library") }
           GridRow { Text("Cmd-Shift-D").font(.system(.body, design: .monospaced)); Text("Toggle light / dark (View > Appearance)") }
         }
-        Text("Single-key shortcuts pause while you type in a text field.").font(.caption).foregroundStyle(.secondary)
+        Text("Single-key shortcuts pause while you type. While recording, m stops and Esc cancels dictation.").font(.caption).foregroundStyle(.secondary)
         HStack { Spacer(); Button("Close") { isPresented = false }.keyboardShortcut(.cancelAction) }
       }
       .padding(16)

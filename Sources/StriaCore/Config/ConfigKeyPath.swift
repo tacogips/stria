@@ -8,12 +8,15 @@ public enum ConfigKeyPath {
     "ocr.autoRunOnImport", "ocr.concurrency", "ocr.formatRetries", "ocr.model", "ocr.prompt", "ocr.timeoutSeconds", "ocr.vendor", "render.dpi",
     "render.imageFormat", "render.maxPixelDimension", "render.quality", "summary.autoRunAfterOCR", "summary.language",
     "summary.model", "summary.prompt", "summary.timeoutSeconds", "summary.vendor",
-    "sync.enabled", "sync.documents", "sync.ocr", "sync.summaries", "sync.chats", "sync.folder", "sync.intervalMinutes"
+    "sync.enabled", "sync.documents", "sync.ocr", "sync.summaries", "sync.chats", "sync.folder", "sync.intervalMinutes",
+    "voice.engine", "voice.model", "voice.language", "voice.autoSend", "voice.maxSeconds"
   ]
 
   public static func value(of key: String, in config: StriaConfig) throws(StriaError) -> JSONValue {
     if let vendor = credentialVendor(key) { return config.agent.credentials[vendor].map(JSONValue.string) ?? .null }
     if key.hasPrefix("sync.") { return try syncValue(of: key, in: config.sync) }
+    if key.hasPrefix("summary.") { return try summaryValue(of: key, in: config.summary) }
+    if key.hasPrefix("voice.") { return try voiceValue(of: key, in: config.voice) }
     switch key {
     case "render.dpi": return .int(config.render.dpi)
     case "render.imageFormat": return .string(config.render.imageFormat.rawValue)
@@ -36,12 +39,40 @@ public enum ConfigKeyPath {
     case "agent.maxImages": return .int(config.agent.maxImages)
     case "agent.maxContextCharacters": return .int(config.agent.maxContextCharacters)
     case "agent.systemPrompt": return config.agent.systemPrompt.map(JSONValue.string) ?? .null
-    case "summary.vendor": return config.summary.vendor.map(JSONValue.string) ?? .null
-    case "summary.model": return config.summary.model.map(JSONValue.string) ?? .null
-    case "summary.prompt": return config.summary.prompt.map(JSONValue.string) ?? .null
-    case "summary.language": return .string(config.summary.language)
-    case "summary.autoRunAfterOCR": return .bool(config.summary.autoRunAfterOCR)
-    case "summary.timeoutSeconds": return .int(config.summary.timeoutSeconds)
+    default: throw .usage("Unknown config key '\(key)'")
+    }
+  }
+
+  private static func summaryValue(of key: String, in summary: StriaConfig.SummaryConfig) throws(StriaError) -> JSONValue {
+    switch key {
+    case "summary.vendor": return summary.vendor.map(JSONValue.string) ?? .null
+    case "summary.model": return summary.model.map(JSONValue.string) ?? .null
+    case "summary.prompt": return summary.prompt.map(JSONValue.string) ?? .null
+    case "summary.language": return .string(summary.language)
+    case "summary.autoRunAfterOCR": return .bool(summary.autoRunAfterOCR)
+    case "summary.timeoutSeconds": return .int(summary.timeoutSeconds)
+    default: throw .usage("Unknown config key '\(key)'")
+    }
+  }
+
+  private static func voiceValue(of key: String, in voice: StriaConfig.VoiceConfig) throws(StriaError) -> JSONValue {
+    switch key {
+    case "voice.engine": .string(voice.engine)
+    case "voice.model": voice.model.map(JSONValue.string) ?? .null
+    case "voice.language": .string(voice.language)
+    case "voice.autoSend": .bool(voice.autoSend)
+    case "voice.maxSeconds": .int(voice.maxSeconds)
+    default: throw .usage("Unknown config key '\(key)'")
+    }
+  }
+
+  private static func setVoice(_ key: String, _ raw: String, in updated: inout StriaConfig) throws(StriaError) {
+    switch key {
+    case "voice.engine": updated.voice.engine = raw
+    case "voice.model": updated.voice.model = raw
+    case "voice.language": updated.voice.language = raw
+    case "voice.autoSend": updated.voice.autoSend = try boolean(raw, key: key)
+    case "voice.maxSeconds": updated.voice.maxSeconds = try integer(raw, key: key)
     default: throw .usage("Unknown config key '\(key)'")
     }
   }
@@ -76,6 +107,8 @@ public enum ConfigKeyPath {
       try setOCR(key, raw, in: &updated)
     } else if key.hasPrefix("sync.") {
       try setSync(key, raw, in: &updated)
+    } else if key.hasPrefix("voice.") {
+      try setVoice(key, raw, in: &updated)
     } else if key.hasPrefix("summary.") {
       try setSummary(key, raw, in: &updated)
     } else {
@@ -91,6 +124,7 @@ public enum ConfigKeyPath {
 
   private static func clear(_ key: String, in updated: inout StriaConfig) throws(StriaError) {
     switch key {
+    case "voice.model": updated.voice.model = nil
     case "sync.folder": updated.sync.folder = nil
     case "ocr.vendor": updated.ocr.vendor = nil
     case "agent.vendor": updated.agent.vendor = nil
