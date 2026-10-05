@@ -2,7 +2,22 @@
 
 ## Status
 
-Specified (implementation by Codex, reviewed in this repo).
+Implemented (StriaCore engine, configuration, controller, macOS settings, CLI,
+and regression tests). The iOS folder picker and bookmark storage UI are part
+of the mobile app task. `SyncFolder.Provider` resolves a bookmark each pass
+and returns a `Location(url:securityScoped:)`; the engine brackets a pass with
+security-scoped access.
+
+Implementation decisions: explicit engine/CLI passes run even when automatic
+sync is disabled; `sync.enabled` controls app scheduling and deletion propagation.
+Deletion intents persist in SQLite `meta` atomically with local deletion, then
+publish immediately when possible or retry during the next pass. Tombstone
+transfers count as document transfers in reports. Timestamp ties keep the
+existing side, using the store's existing second-resolution UTC format.
+Filesystem coordination and timing have injectable boundaries for deterministic
+tests. Production uses `NSFileCoordinator`; native iCloud service behavior
+requires verification outside a restricted test sandbox. No other protocol
+deviations; iOS-only UI is intentionally deferred.
 
 ## Goal
 
@@ -169,7 +184,7 @@ the macOS default) and prints the report as JSON. `stria config` gains the
 ## Tests
 
 Two data roots and one shared temporary folder: import on A, sync A, sync B
-→ B has the document (rendered pages), OCR text and tags (searchable), and
+→ B has the document (rendered pages), searchable OCR body text and stored tags, and
 summaries; OCR redone on B wins on A after both sync; chats flow both ways;
 deletion tombstones propagate; disabled kinds are neither pushed nor pulled;
 a newer `format.json` is refused; `.icloud` placeholders are skipped and

@@ -90,6 +90,7 @@ public struct LibraryRow: Identifiable, Equatable, Sendable {
 @Observable
 public final class LibraryViewModel {
   public private(set) var rows: [LibraryRow] = []
+  public var onLocalChange: (() -> Void)?
   public var alert: String?
   public private(set) var isImporting = false
   public var selectedID: String?
@@ -166,7 +167,7 @@ public final class LibraryViewModel {
 
   public func runOCR(documentId: String, retryFailed: Bool) async {
     setBusy(documentId, true)
-    defer { setBusy(documentId, false) }
+    defer { setBusy(documentId, false); onLocalChange?() }
     do {
       let summary = try await library.runOCR(
         documentId: documentId,
@@ -218,7 +219,7 @@ public final class LibraryViewModel {
       return
     }
     setBusy(documentId, true)
-    defer { setBusy(documentId, false) }
+    defer { setBusy(documentId, false); onLocalChange?() }
     do {
       let summary = try await library.runOCR(documentId: documentId, selection: selection)
       unavailableReasons[documentId] = summary.unavailableReason
@@ -232,6 +233,7 @@ public final class LibraryViewModel {
   public func remove(documentId: String) async {
     do {
       try await library.removeDocument(id: documentId)
+      onLocalChange?()
       unavailableReasons[documentId] = nil
       renderedPages[documentId] = nil
       thumbnails[documentId] = nil
@@ -250,6 +252,7 @@ public final class LibraryViewModel {
   }
 
   private func consumeImport(at url: URL) async {
+    defer { onLocalChange?() }
     var eventDocumentId: String?
     let ocr = library.environment.config.ocr
     for await event in library.importEvents(at: url, runOCR: ocr.autoRunOnImport && ocr.isConfigured) {

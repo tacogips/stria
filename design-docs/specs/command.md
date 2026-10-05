@@ -251,3 +251,28 @@ failing fast. The script never touches `~/.local/stria`.
 `FakeAgentService`. That flow also covers `ask` followed by `history`
 returning the persisted exchange. This test is the "OCR via fake, persisted
 chats" part of the acceptance smoke.
+
+## `sync [--folder <path>]`
+
+Runs one iCloud Drive sync pass with the selected data root's per-kind `sync.*`
+settings. An explicit pass runs even when automatic sync (`sync.enabled`) is
+off. Folder precedence: `--folder`, `STRIA_SYNC_DIR`, macOS `sync.folder`, then
+`~/Library/Mobile Documents/com~apple~CloudDocs/Stria` when iCloud Drive exists.
+Relative `--folder` paths resolve against the current working directory.
+
+Output is a sorted-key JSON object:
+
+```json
+{"chats":{"pulled":0,"pushed":0},"documents":{"pulled":0,"pushed":0},"errors":[],"folder":"/absolute/path/Stria","ocr":{"pulled":0,"pushed":0},"pending":0,"summaries":{"pulled":0,"pushed":0}}
+```
+
+Counts include document tombstone transfers. `pending` counts placeholders
+whose downloads were requested; retry a pass after iCloud downloads them.
+Per-item failures appear in `errors` while other items continue (exit 0 with a
+report). An unavailable folder returns `serviceUnavailable` (exit 4). A newer
+sync format is refused before sync-folder or library changes (exit 1).
+Configuration and credentials are never written to the sync folder.
+
+Config leaf keys: `sync.enabled` (false), `sync.documents`, `sync.ocr`,
+`sync.summaries`, `sync.chats` (true), `sync.folder` (null or macOS override
+path), and `sync.intervalMinutes` (5; valid 1...120).

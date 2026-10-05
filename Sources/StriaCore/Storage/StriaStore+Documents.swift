@@ -68,7 +68,7 @@ extension StriaStore {
   /// Deletes the document row. Pages, chat threads and messages cascade;
   /// agent runs keep their rows with `document_id` set to null.
   public func deleteDocument(id: String) throws -> Bool {
-    try database.transaction {
+    try database.savepoint("delete_document") {
       if searchBackend == .fts5 {
         let fts = try database.prepare("DELETE FROM page_fts WHERE document_id=?")
         try fts.bind(id, at: 1)

@@ -145,6 +145,7 @@ extension LibraryViewModel {
   }
 
   private func performSummary(documentId: String, request: PageSummaryRequest) async {
+    defer { onLocalChange?() }
     setSummaryProgress(documentId, PageSummaryProgress(completed: 0, total: 0, currentPage: nil))
     let library = self.library
     let work = Task {

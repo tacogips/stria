@@ -78,6 +78,15 @@ struct LibraryView: View {
       return !urls.isEmpty
     }
     .toolbar {
+      ToolbarItem(placement: .automatic) {
+        if model.sync.isEnabled {
+          if model.sync.isSyncing {
+            ProgressView().controlSize(.small).help("Syncing with iCloud Drive")
+          } else if let error = model.sync.lastError {
+            Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange).help(error)
+          }
+        }
+      }
       if availableWidth < 540 {
         ToolbarItem(placement: .principal) {
           HStack(spacing: 12) {

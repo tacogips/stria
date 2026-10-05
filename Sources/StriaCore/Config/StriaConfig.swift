@@ -34,7 +34,7 @@ private enum AgentConfigCodingKeys: String, CodingKey {
   case vendor, model, apiKeyEnvironment, neighborPages, maxImages, maxContextCharacters, systemPrompt, timeoutSeconds, credentials,
     autoSummarize
 }
-private enum StriaConfigCodingKeys: String, CodingKey { case version, render, ocr, agent, summary }
+private enum StriaConfigCodingKeys: String, CodingKey { case version, render, ocr, agent, summary, sync }
 
 public struct StriaConfig: Codable, Equatable, Sendable {
   public struct RenderConfig: Codable, Equatable, Sendable {
@@ -165,6 +165,7 @@ public struct StriaConfig: Codable, Equatable, Sendable {
   public var render: RenderConfig
   public var ocr: OCRConfig
   public var agent: AgentConfig
+  public var sync: SyncConfig
   public var summary: SummaryConfig
   public static let defaults = StriaConfig(
     version: 1, render: .init(dpi: 150, imageFormat: .heic, quality: 0.75, maxPixelDimension: 4096),
@@ -172,8 +173,8 @@ public struct StriaConfig: Codable, Equatable, Sendable {
     agent: .init(vendor: nil, model: nil, apiKeyEnvironment: nil, neighborPages: 1, maxImages: 4, maxContextCharacters: 60_000, systemPrompt: nil)
   )
 
-  public init(version: Int = 1, render: RenderConfig, ocr: OCRConfig, agent: AgentConfig, summary: SummaryConfig = SummaryConfig()) {
-    self.version = version; self.render = render; self.ocr = ocr; self.agent = agent; self.summary = summary
+  public init(version: Int = 1, render: RenderConfig, ocr: OCRConfig, agent: AgentConfig, summary: SummaryConfig = SummaryConfig(), sync: SyncConfig = SyncConfig()) {
+    self.version = version; self.render = render; self.ocr = ocr; self.agent = agent; self.summary = summary; self.sync = sync
   }
   public init(from decoder: Decoder) throws {
     let c = try decoder.container(keyedBy: StriaConfigCodingKeys.self)
@@ -182,7 +183,8 @@ public struct StriaConfig: Codable, Equatable, Sendable {
               render: try c.decodeIfPresent(RenderConfig.self, forKey: .render) ?? defaults.render,
               ocr: try c.decodeIfPresent(OCRConfig.self, forKey: .ocr) ?? defaults.ocr,
               agent: try c.decodeIfPresent(AgentConfig.self, forKey: .agent) ?? defaults.agent,
-              summary: try c.decodeIfPresent(SummaryConfig.self, forKey: .summary) ?? defaults.summary)
+              summary: try c.decodeIfPresent(SummaryConfig.self, forKey: .summary) ?? defaults.summary,
+              sync: try c.decodeIfPresent(SyncConfig.self, forKey: .sync) ?? defaults.sync)
   }
 
   public func validate() throws(StriaError) {
@@ -202,6 +204,7 @@ public struct StriaConfig: Codable, Equatable, Sendable {
       throw .config("Unknown agent vendor '\(vendor)'")
     }
     try summary.validate()
+    try sync.validate()
     for name in [ocr.apiKeyEnvironment, agent.apiKeyEnvironment].compactMap({ $0 }) + Array(agent.credentials.values) {
       guard name.range(of: "^[A-Z_][A-Z0-9_]*$", options: .regularExpression) != nil else {
         throw .config("Invalid apiKeyEnvironment name")

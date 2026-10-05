@@ -25,5 +25,6 @@ public enum CLICommand: Equatable, Sendable {
   case history(docId: String?, page: Int?, limit: Int?, threads: Bool)
   case configGet(key: String?)
   case configSet(key: String, value: String)
+  case sync(folder: String?)
   case paths
 }

@@ -14,6 +14,13 @@ public final class SettingsViewModel {
   /// API vendors whose credential variable name is set in Settings.
   public static let credentialVendors = KnownVendors.apiKeyVendors.sorted()
 
+  public var syncEnabled = false
+  public var syncDocuments = true
+  public var syncOCR = true
+  public var syncSummaries = true
+  public var syncChats = true
+  public var syncFolder = ""
+  public var syncIntervalMinutes = 5
   public var ocrVendor = notConfigured
   public var ocrModel = ""
   public var ocrAPIKeyEnvironment = ""
@@ -134,6 +141,13 @@ public final class SettingsViewModel {
   /// Reloads the draft from the current configuration, discarding edits.
   public func load() {
     let config = library.environment.config
+    syncEnabled = config.sync.enabled
+    syncDocuments = config.sync.documents
+    syncOCR = config.sync.ocr
+    syncSummaries = config.sync.summaries
+    syncChats = config.sync.chats
+    syncFolder = config.sync.folder ?? ""
+    syncIntervalMinutes = config.sync.intervalMinutes
     ocrVendor = config.ocr.vendor ?? Self.notConfigured
     ocrModel = config.ocr.model ?? ""
     ocrAPIKeyEnvironment = config.ocr.apiKeyEnvironment ?? ""
@@ -246,6 +260,8 @@ public final class SettingsViewModel {
   /// The configuration the draft describes, or the reason it is invalid.
   public func draftConfig() throws(StriaError) -> StriaConfig {
     var config = library.environment.config
+    config.sync = SyncConfig(enabled: syncEnabled, documents: syncDocuments, ocr: syncOCR, summaries: syncSummaries,
+                             chats: syncChats, folder: Self.trimmed(syncFolder), intervalMinutes: syncIntervalMinutes)
     for vendor in [ocrVendor, summaryVendor, config.agent.vendor].compactMap({ $0 }) {
       guard KnownVendors.isAvailableOnThisPlatform(vendor, platform: library.environment.platform) else {
         throw .config(KnownVendors.platformUnavailableReason)

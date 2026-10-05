@@ -5,6 +5,7 @@ import StriaCore
 /// variable, and whether OCR runs automatically after import.
 struct SettingsView: View {
   @Bindable var settings: SettingsViewModel
+  let sync: SyncController
   @AppStorage(Appearance.storageKey) private var appearance = Appearance.default
 
   /// A scrolling form with the Save / Revert bar pinned below it, so the
@@ -38,6 +39,7 @@ struct SettingsView: View {
 
   private var form: some View {
     Form {
+      SyncSettingsSection(settings: settings, sync: sync)
       Section("Appearance") {
         Picker("Theme", selection: $appearance) {
           ForEach(Appearance.allCases, id: \.self) { Text($0.title).tag($0) }

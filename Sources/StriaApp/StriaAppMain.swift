@@ -6,6 +6,7 @@ import StriaCore
 struct StriaReaderApp: App {
   @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
   @State private var appModel: AppModel?
+  @Environment(\.scenePhase) private var scenePhase
   @State private var startupError: String?
   @AppStorage(Appearance.storageKey) private var appearance = Appearance.default
 
@@ -37,6 +38,7 @@ struct StriaReaderApp: App {
       Group {
         if let appModel {
           RootView(model: appModel)
+            .onChange(of: scenePhase) { _, phase in appModel.sync.setActive(phase == .active) }
         } else {
           StartupErrorView(message: startupError ?? "Stria could not start.")
         }
@@ -52,7 +54,7 @@ struct StriaReaderApp: App {
     Settings {
       Group {
         if let appModel {
-          SettingsView(settings: appModel.settings)
+          SettingsView(settings: appModel.settings, sync: appModel.sync)
         } else {
           StartupErrorView(message: startupError ?? "Stria could not start.")
         }

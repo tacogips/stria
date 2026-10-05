@@ -2,14 +2,15 @@ import StriaCore
 import Testing
 
 @Suite struct ConfigKeyPathTests {
-  @Test func exposesExactlyThirtyTwoLeafKeys() throws {
-    #expect(ConfigKeyPath.keys.count == 32)
+  @Test func exposesExactlyThirtyNineLeafKeys() throws {
+    #expect(ConfigKeyPath.keys.count == 39)
     #expect(Set(ConfigKeyPath.keys) == Set(ConfigKeyPath.credentialKeys + [
       "render.dpi", "render.imageFormat", "render.quality", "render.maxPixelDimension",
       "ocr.vendor", "ocr.model", "ocr.apiKeyEnvironment", "ocr.concurrency", "ocr.prompt", "ocr.timeoutSeconds", "ocr.autoRunOnImport", "ocr.formatRetries",
       "agent.vendor", "agent.model", "agent.apiKeyEnvironment", "agent.neighborPages",
       "agent.maxImages", "agent.maxContextCharacters", "agent.systemPrompt", "agent.timeoutSeconds", "agent.autoSummarize",
-      "summary.vendor", "summary.model", "summary.prompt", "summary.language", "summary.autoRunAfterOCR", "summary.timeoutSeconds"
+      "summary.vendor", "summary.model", "summary.prompt", "summary.language", "summary.autoRunAfterOCR", "summary.timeoutSeconds",
+      "sync.enabled", "sync.documents", "sync.ocr", "sync.summaries", "sync.chats", "sync.folder", "sync.intervalMinutes"
     ]))
     #expect(try ConfigKeyPath.value(of: "ocr.timeoutSeconds", in: .defaults) == .int(300))
     #expect(try ConfigKeyPath.value(of: "agent.autoSummarize", in: .defaults) == .bool(true))

@@ -154,3 +154,29 @@ Architecture, storage, agent integration, CLI and app UI designs are in [`design
 Stria provides a macOS app and CLI. An iPhone/iPad app is in progress;
 StriaCore supports iOS 17 and later. Local CLI vendors (Claude Code, Codex,
 Cursor) are available only on the Mac; API vendors work on both platforms.
+
+## iCloud sync
+
+On the Mac, open Settings, enable **Sync with iCloud Drive** in **iCloud Sync**,
+and Save. iCloud Drive must be enabled. Stria uses
+`~/Library/Mobile Documents/com~apple~CloudDocs/Stria`; **Choose Folder...**
+selects an override and **Use Default** restores the default. **Sync Now** saves
+the draft and runs a pass. Sync runs at launch, when active, periodically (every
+5 minutes by default), and shortly after local changes.
+
+Choose which data to sync: original PDFs and metadata, per-page OCR text and
+tags, page summaries, and chat history. Document OCR, summaries and chats
+require PDFs; library-wide chats follow the chat toggle alone. Each device
+renders page images itself. Configuration, vendors, models, prompts, API keys,
+agent run records, logs, and image caches stay on each device. A document
+removed with sync enabled is also removed on other devices by a tombstone.
+
+Page results and whole chat threads use last writer wins. Concurrent changes
+to the same chat thread keep the newer thread and its messages; they are not
+merged. Status shows transfer counts, pending iCloud downloads, and errors.
+The iOS folder picker and device-local bookmark step come with the mobile app;
+choose the same iCloud Drive/Stria folder there.
+
+For a manual pass, run `stria sync [--folder <path>]`. Enable automatic sync
+with `stria config set sync.enabled true`; the `sync.*` settings are per device.
+`STRIA_SYNC_DIR` overrides folder resolution for development and tests.

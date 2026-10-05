@@ -111,14 +111,14 @@ extension StriaStore {
                     ocrTags: row.string(12).flatMap { try? JSONDecoder().decode([String].self, from: Data($0.utf8)) } ?? [])
   }
 
-  private func replaceFTS(documentId: String, page: Int, text: String) throws {
+  func replaceFTS(documentId: String, page: Int, text: String) throws {
     try deleteFTS(documentId: documentId, page: page)
     let insert = try database.prepare("INSERT INTO page_fts(document_id,page_number,body) VALUES(?,?,?)")
     try insert.bind(documentId, at: 1).bind(String(page), at: 2).bind(text, at: 3)
     _ = try insert.step()
   }
 
-  private func deleteFTS(documentId: String, page: Int) throws {
+  func deleteFTS(documentId: String, page: Int) throws {
     let delete = try database.prepare("DELETE FROM page_fts WHERE document_id=? AND page_number=?")
     try delete.bind(documentId, at: 1).bind(String(page), at: 2)
     _ = try delete.step()

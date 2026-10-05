@@ -92,10 +92,17 @@ public extension StriaLibrary {
   /// OCR text, chats), the stored original and the expanded page cache.
   /// Files are removed after the DB commit, so a crash leaves orphan files
   /// rather than rows that point at missing files.
-  func removeDocument(id: String) async throws {
-    guard try await store.deleteDocument(id: id) else {
+  func removeDocument(id: String, propagateSync: Bool = true) async throws {
+    let sync = environment.config.sync
+    let syncing = propagateSync && sync.enabled && sync.documents
+    let deletedAt = environment.clock()
+    let removed = syncing
+      ? try await store.deleteDocumentForSync(id: id, deletedAt: deletedAt)
+      : try await store.deleteDocument(id: id)
+    guard removed else {
       throw StriaError.documentNotFound("Document not found: \(id)")
     }
+    if syncing { try? await SyncEngine(library: self).publishDeletion(id: id, date: deletedAt) }
     let manager = FileManager.default
     for url in [paths.original(docId: id), paths.cacheDirectory(docId: id)] where manager.fileExists(atPath: url.path) {
       do {

@@ -17,6 +17,7 @@ public final class AppModel {
   public private(set) var configRevision = 0
   public let settings: SettingsViewModel
   public let search: SearchViewModel
+  public let sync: SyncController
 
   private let striaLibrary: StriaLibrary
   private let debounce: Duration
@@ -25,11 +26,19 @@ public final class AppModel {
     striaLibrary = library
     self.debounce = debounce
     self.library = LibraryViewModel(library: library)
+    sync = SyncController(library: library)
     settings = SettingsViewModel(library: library)
     search = SearchViewModel(library: library)
+    self.library.onLocalChange = { [weak sync] in sync?.scheduleSoon() }
+    sync.onCompleted = { [weak self] in
+      await self?.library.refresh()
+      self?.library.summaryRevision += 1
+    }
+    sync.setActive(true)
     settings.onSaved = { [weak self] in
       guard let self else { return }
       configRevision += 1
+      sync.configurationChanged()
       Task { await self.library.refresh() }
     }
   }
@@ -47,6 +56,7 @@ public final class AppModel {
       search.setCurrentDocument(id: documentId, title: reader.title)
       self.reader = reader
       let agent = AgentPaneViewModel(library: striaLibrary, reader: reader)
+      agent.onLocalChange = { [weak sync] in sync?.scheduleSoon() }
       await agent.loadSelection()
       self.agent = agent
     } catch {

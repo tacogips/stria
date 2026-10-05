@@ -114,6 +114,10 @@ public enum CommandLineParser {
         return .configSet(key: rest[0], value: rest[1])
       default: throw .usage("Unknown config command '\(subcommand)'; expected get or set")
       }
+    case "sync":
+      let parsed = try options(arguments, flags: [], values: ["--folder"], command: command)
+      try requirePositionals(parsed.positionals, count: 0, command: command)
+      return .sync(folder: parsed.values["--folder"])
     case "paths":
       try rejectOptions(arguments, command: command)
       try requirePositionals(arguments, count: 0, command: command)

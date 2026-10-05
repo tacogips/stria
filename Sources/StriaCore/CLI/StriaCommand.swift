@@ -8,7 +8,8 @@ public enum StriaCommand {
     environment: [String: String],
     homeDirectory: URL,
     currentDirectory: URL,
-    services: ServiceFactory
+    services: ServiceFactory,
+    syncFileCoordinator: any SyncFileCoordinating = SystemSyncFileCoordinator()
   ) async -> CommandOutput {
     let invocation: ParsedInvocation
     do {
@@ -30,7 +31,9 @@ public enum StriaCommand {
       let selected = services(paths, config)
       let warning = RunLogWarning()
       let env = StriaEnvironment(paths: paths, config: config, ocrService: selected.0, agentService: selected.1,
-                                 onRunLogFailure: { warning.set($0) })
+                                 onRunLogFailure: { warning.set($0) },
+                                 syncFolder: SyncFolder(environment: environment, homeDirectory: homeDirectory),
+                                 syncFileCoordinator: syncFileCoordinator)
       let library = try StriaLibrary.open(environment: env)
       let value: any Encodable
       switch invocation.command {
@@ -40,6 +43,9 @@ public enum StriaCommand {
         value = try await QueryCommands.run(invocation.command, library: library)
       case .pageSummary, .summarize:
         value = try await SummaryCommands.run(invocation.command, library: library)
+      case .sync(let path):
+        let folder = path.map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath, relativeTo: currentDirectory).standardizedFileURL }
+        value = try await SyncEngine(library: library).sync(folder: folder)
       case .configGet, .configSet, .paths:
         value = try ConfigCommands.run(invocation.command, config: &config, paths: paths)
       case .help, .version:

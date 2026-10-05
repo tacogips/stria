@@ -89,8 +89,8 @@ extension StriaStore {
   }
 
   public func setThreadTitle(threadId: String, title: String) throws {
-    let statement = try database.prepare("UPDATE chat_threads SET title=? WHERE id=?")
-    try statement.bind(title, at: 1).bind(threadId, at: 2)
+    let statement = try database.prepare("UPDATE chat_threads SET title=?,updated_at=? WHERE id=?")
+    try statement.bind(title, at: 1).bind(nowString(), at: 2).bind(threadId, at: 3)
     _ = try statement.step()
     guard database.changes > 0 else { throw StriaError.database("Chat thread not found: \(threadId)") }
   }
@@ -124,9 +124,9 @@ extension StriaStore {
 
   public func setThreadSummary(threadId: String, summary: String, throughMessageId: Int64) throws {
     let statement = try database.prepare("""
-      UPDATE chat_threads SET summary=?,summary_through_message_id=?,summary_updated_at=? WHERE id=?
+      UPDATE chat_threads SET summary=?,summary_through_message_id=?,summary_updated_at=?,updated_at=? WHERE id=?
       """)
-    try statement.bind(summary, at: 1).bind(throughMessageId, at: 2).bind(nowString(), at: 3).bind(threadId, at: 4)
+    try statement.bind(summary, at: 1).bind(throughMessageId, at: 2).bind(nowString(), at: 3).bind(nowString(), at: 4).bind(threadId, at: 5)
     _ = try statement.step()
     guard database.changes > 0 else { throw StriaError.database("Chat thread not found: \(threadId)") }
   }

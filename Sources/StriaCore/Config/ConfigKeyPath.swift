@@ -7,11 +7,13 @@ public enum ConfigKeyPath {
     "agent.neighborPages", "agent.systemPrompt", "agent.timeoutSeconds", "agent.vendor", "ocr.apiKeyEnvironment",
     "ocr.autoRunOnImport", "ocr.concurrency", "ocr.formatRetries", "ocr.model", "ocr.prompt", "ocr.timeoutSeconds", "ocr.vendor", "render.dpi",
     "render.imageFormat", "render.maxPixelDimension", "render.quality", "summary.autoRunAfterOCR", "summary.language",
-    "summary.model", "summary.prompt", "summary.timeoutSeconds", "summary.vendor"
+    "summary.model", "summary.prompt", "summary.timeoutSeconds", "summary.vendor",
+    "sync.enabled", "sync.documents", "sync.ocr", "sync.summaries", "sync.chats", "sync.folder", "sync.intervalMinutes"
   ]
 
   public static func value(of key: String, in config: StriaConfig) throws(StriaError) -> JSONValue {
     if let vendor = credentialVendor(key) { return config.agent.credentials[vendor].map(JSONValue.string) ?? .null }
+    if key.hasPrefix("sync.") { return try syncValue(of: key, in: config.sync) }
     switch key {
     case "render.dpi": return .int(config.render.dpi)
     case "render.imageFormat": return .string(config.render.imageFormat.rawValue)
@@ -44,6 +46,19 @@ public enum ConfigKeyPath {
     }
   }
 
+  private static func syncValue(of key: String, in sync: SyncConfig) throws(StriaError) -> JSONValue {
+    switch key {
+    case "sync.enabled": return .bool(sync.enabled)
+    case "sync.documents": return .bool(sync.documents)
+    case "sync.ocr": return .bool(sync.ocr)
+    case "sync.summaries": return .bool(sync.summaries)
+    case "sync.chats": return .bool(sync.chats)
+    case "sync.folder": return sync.folder.map(JSONValue.string) ?? .null
+    case "sync.intervalMinutes": return .int(sync.intervalMinutes)
+    default: throw .usage("Unknown config key '\(key)'")
+    }
+  }
+
   private static func credentialVendor(_ key: String) -> String? {
     guard key.hasPrefix("agent.credentials.") else { return nil }
     let vendor = String(key.dropFirst("agent.credentials.".count))
@@ -59,6 +74,8 @@ public enum ConfigKeyPath {
       try setRender(key, raw, in: &updated)
     } else if key.hasPrefix("ocr.") {
       try setOCR(key, raw, in: &updated)
+    } else if key.hasPrefix("sync.") {
+      try setSync(key, raw, in: &updated)
     } else if key.hasPrefix("summary.") {
       try setSummary(key, raw, in: &updated)
     } else {
@@ -74,6 +91,7 @@ public enum ConfigKeyPath {
 
   private static func clear(_ key: String, in updated: inout StriaConfig) throws(StriaError) {
     switch key {
+    case "sync.folder": updated.sync.folder = nil
     case "ocr.vendor": updated.ocr.vendor = nil
     case "agent.vendor": updated.agent.vendor = nil
     case "ocr.model": updated.ocr.model = nil
@@ -87,6 +105,19 @@ public enum ConfigKeyPath {
     case "summary.prompt": updated.summary.prompt = nil
     default:
       if let vendor = credentialVendor(key) { updated.agent.credentials[vendor] = nil } else { throw .usage("Config key '\(key)' cannot be null") }
+    }
+  }
+
+  private static func setSync(_ key: String, _ raw: String, in updated: inout StriaConfig) throws(StriaError) {
+    switch key {
+    case "sync.enabled": updated.sync.enabled = try boolean(raw, key: key)
+    case "sync.documents": updated.sync.documents = try boolean(raw, key: key)
+    case "sync.ocr": updated.sync.ocr = try boolean(raw, key: key)
+    case "sync.summaries": updated.sync.summaries = try boolean(raw, key: key)
+    case "sync.chats": updated.sync.chats = try boolean(raw, key: key)
+    case "sync.folder": updated.sync.folder = raw
+    case "sync.intervalMinutes": updated.sync.intervalMinutes = try integer(raw, key: key)
+    default: throw .usage("Unknown config key '\(key)'")
     }
   }
 

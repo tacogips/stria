@@ -30,6 +30,7 @@ public enum VendorAvailability: Equatable, Sendable {
 @MainActor
 @Observable
 public final class AgentPaneViewModel {
+  public var onLocalChange: (() -> Void)?
   public var scope: AgentScope = .page
   public var input = ""
   public private(set) var threadId: String?
@@ -190,6 +191,7 @@ public final class AgentPaneViewModel {
       notice = selectedVendor == nil ? "Choose a vendor and model first." : "The selected vendor needs an API key; see Settings."
       return
     }
+    defer { onLocalChange?() }
     inFlight = true
     notice = nil
     let requestThreadId = threadId ?? UUID().uuidString
@@ -278,7 +280,7 @@ public final class AgentPaneViewModel {
   public func retitle(threadId: String? = nil, selection: AgentSelection? = nil) async {
     guard let target = threadId ?? self.threadId, !titlingThreadIDs.contains(target) else { return }
     titlingThreadIDs.insert(target)
-    defer { titlingThreadIDs.remove(target) }
+    defer { titlingThreadIDs.remove(target); onLocalChange?() }
     do {
       _ = try await library.titleThread(threadId: target, selection: selection ?? self.selection)
     } catch {
@@ -349,7 +351,7 @@ public final class AgentPaneViewModel {
   public func summarize(threadId: String, selection: AgentSelection? = nil) async {
     guard !summarizingThreadIDs.contains(threadId) else { return }
     summarizingThreadIDs.insert(threadId)
-    defer { summarizingThreadIDs.remove(threadId) }
+    defer { summarizingThreadIDs.remove(threadId); onLocalChange?() }
     do {
       _ = try await library.summarizeThread(threadId: threadId, selection: selection ?? self.selection)
     } catch {

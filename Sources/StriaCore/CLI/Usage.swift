@@ -19,6 +19,7 @@ public enum Usage {
     history [--doc <docId>] [--page <n>] [--limit <n>] [--threads]
     config get [<key>]
     config set <key> <value>
+    sync [--folder <path>]
     paths
 
   Global options: --home <path>, --json, --help / -h, --version
@@ -26,7 +27,7 @@ public enum Usage {
   Output: every command prints one JSON object on stdout (keys sorted, paths absolute,
   dates ISO-8601 UTC). On failure stdout is empty and stderr gets
   {"error":{"code":"...","message":"..."}}. Exit codes: 0 ok, 1 io/database,
-  2 usage or invalid PDF, 3 not found, 4 OCR/agent unavailable (config or credentials),
+  2 usage or invalid PDF, 3 not found, 4 service unavailable (config or credentials),
   5 OCR/agent call failed.
 
   Workflow for agents (RAG over imported PDFs):

@@ -4,7 +4,7 @@ public enum PageSummaryStatus: String, Codable, Sendable { case done, failed }
 
 /// A page's stored summary. It is kept apart from the OCR text and is never
 /// part of search.
-public struct PageSummaryRecord: Equatable, Sendable {
+public struct PageSummaryRecord: Codable, Equatable, Sendable {
   public var documentId: String
   public var pageNumber: Int
   public var status: PageSummaryStatus
