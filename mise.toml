@@ -19,6 +19,7 @@ fi
 [tools]
 swift = "6.3.3"
 swiftlint = "latest"
+xcodegen = "2.46.0"
 gitleaks = "latest"
 pre-commit = "latest"
 
@@ -112,3 +113,12 @@ else
   echo "Using existing custom Git hooks path: $hooks_path"
 fi
 '''
+
+[tasks."ios:generate"]
+description = "Generate the iPhone and iPad Xcode project"
+run = "xcodegen generate --spec Mobile/project.yml"
+
+[tasks."ios:build"]
+description = "Build Stria for iPhone and iPad simulators"
+depends = ["ios:generate"]
+run = "scripts/ios-build.sh"

@@ -2,6 +2,7 @@ included:
   - Package.swift
   - Sources
   - Tests
+  - Mobile/StriaMobile
 
 excluded:
   - .build

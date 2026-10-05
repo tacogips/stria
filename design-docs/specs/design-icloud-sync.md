@@ -3,8 +3,8 @@
 ## Status
 
 Implemented (StriaCore engine, configuration, controller, macOS settings, CLI,
-and regression tests). The iOS folder picker and bookmark storage UI are part
-of the mobile app task. `SyncFolder.Provider` resolves a bookmark each pass
+and regression tests). The iOS folder picker and bookmark storage UI are implemented in
+`Mobile/StriaMobile/MobileSettingsView.swift` and `MobileModel.swift`. `SyncFolder.Provider` resolves a bookmark each pass
 and returns a `Location(url:securityScoped:)`; the engine brackets a pass with
 security-scoped access.
 
@@ -17,7 +17,8 @@ existing side, using the store's existing second-resolution UTC format.
 Filesystem coordination and timing have injectable boundaries for deterministic
 tests. Production uses `NSFileCoordinator`; native iCloud service behavior
 requires verification outside a restricted test sandbox. No other protocol
-deviations; iOS-only UI is intentionally deferred.
+deviations. The mobile controller resolves the device-local folder bookmark
+on each pass; native iCloud behavior needs unrestricted device verification.
 
 ## Goal
 

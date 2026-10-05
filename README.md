@@ -180,3 +180,37 @@ choose the same iCloud Drive/Stria folder there.
 For a manual pass, run `stria sync [--folder <path>]`. Enable automatic sync
 with `stria config set sync.enabled true`; the `sync.*` settings are per device.
 `STRIA_SYNC_DIR` overrides folder resolution for development and tests.
+
+## iPhone and iPad
+
+The iOS 17+ app shares StriaCore with the Mac reader. Generate and build the
+Xcode project for iPhone 17 and an available iPad simulator:
+
+```bash
+mise run ios:build
+open Mobile/StriaMobile.xcodeproj
+```
+
+Select the StriaMobile scheme and a simulator in Xcode, then Run. For a device,
+select your Apple development team under Signing & Capabilities and use a
+provisioning profile for `me.tacogips.stria.mobile`. Simulator builds disable signing.
+The generated project and build artifacts stay under `Mobile/` and are ignored.
+Dependencies reuse the existing resolved checkouts; the agent-gateway pin is unchanged.
+
+Tap **+** to copy PDFs from Files. The library searches OCR across PDFs; the
+reader offers contents, OCR, page navigation, and Chat / History / Summary.
+The agent is a trailing column on iPad and a sheet on iPhone. Mobile vendors
+are API vendors; Claude Code, Codex, and Cursor CLI are unavailable. API keys
+are saved per vendor in the device Keychain, never in `config.json`.
+
+In Settings, enable iCloud Sync and choose or create **iCloud Drive/Stria**.
+Pick the same folder on each device. The folder bookmark is device-local;
+configuration and API keys are not synced. Sync runs while the app is active,
+after local changes, and through Sync Now.
+
+Debug builds accept `-StriaSampleImport` to generate and import a three-page
+sample PDF. Run `scripts/ios-simulator-screenshots.sh` outside a restricted
+sandbox to build, boot, install, and capture the iPhone library, reader, Chat,
+Settings and OCR vendor list, plus the iPad library and reader with agent column.
+Screenshots are saved under `Mobile/build/screenshots/`. The script uses
+additional DEBUG-only navigation arguments to reproduce those screens.

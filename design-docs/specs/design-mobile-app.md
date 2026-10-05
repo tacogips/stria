@@ -2,7 +2,36 @@
 
 ## Status
 
-Specified (implementation by Codex, reviewed in this repo).
+Implemented in `Mobile/StriaMobile` with an XcodeGen app target and mise tasks.
+Mac build and all 215 tests pass (serial execution); SwiftLint has zero violations.
+StriaCore builds for iOS and all mobile sources pass iOS type checking.
+The isolated simulator app compile/link build also passes for device families 1,2.
+Full icon-enabled simulator builds and screenshots require an unrestricted
+CoreSimulator session: this sandbox blocks the service and asset compiler's
+runtime lookup. Xcode compiler macro subprocesses also need an unrestricted
+sandbox; the isolated compile/link check uses `-disable-sandbox`.
+Run `scripts/ios-simulator-screenshots.sh` outside the sandbox.
+
+Implementation decisions/deviations:
+- Mobile-specific SwiftUI pieces remain in the app target; no StriaUI target
+  or Mac view changes were needed.
+- iPad uses a flat trailing agent column controlled by the toolbar; iPhone
+  uses a sheet with medium/large detents. Regular/compact size classes adapt
+  navigation to multitasking as well as device size.
+- API keys save/delete immediately; configuration saves explicitly. Folder
+  selection stores its bookmark immediately and resolves it for every pass.
+- Xcode runs from Mobile so its local package path resolves consistently.
+  Dependencies are copied from resolved `.build` checkouts into Mobile/build;
+  `.build` and Package.resolved are unchanged.
+- With CoreSimulator blocked, ios:build attempts a generic simulator build;
+  asset compilation can still fail because it requires simulator runtimes.
+  An ignored validation project excludes the asset catalog and disables the
+  compiler subprocess sandbox to validate the Swift app separately.
+- DEBUG launch routes `-StriaReader`, `-StriaAgent`, `-StriaSettings`, and
+  `-StriaOCRVendors` accompany `-StriaSampleImport` for reproducible captures.
+- The default parallel macOS test run stalled in this environment; the full
+  suite passed with `--no-parallel`. Native iCloud/Keychain and interactive
+  simulator behavior still require device/simulator verification.
 
 ## Goal
 
@@ -89,3 +118,31 @@ Follows the Mac app's structure and flat style, with iOS idioms:
   state, import of a sample PDF (via `simctl` adding it to Files or a debug
   launch argument that imports a bundled sample), the reader, the agent pane,
   and Settings with CLI vendors absent.
+
+### Implementation verification (2026-10-05)
+
+- `swift build --scratch-path Mobile/build/macos --cache-path Mobile/build/swift-cache --disable-sandbox --skip-update --disable-automatic-resolution`: passed.
+- `swift test` with the same scratch/cache options and `--no-parallel`: all
+  215 tests in 56 suites passed. The initial parallel run stalled and was stopped.
+- `swiftlint lint --no-cache`: zero violations across 198 files.
+- SwiftPM `StriaCore` build for `arm64-apple-ios17.0-simulator`: passed.
+- iOS `swiftc -typecheck -disable-sandbox` for the mobile sources: passed.
+- Xcode generic simulator compile/link check with the asset catalog excluded
+  in `Mobile/build/compile.yml`, and `OTHER_SWIFT_FLAGS` adding
+  `-disable-sandbox`: passed. This is validation only, not the shipping project.
+- `mise run ios:build`: blocked by the sandbox's compiler macro subprocess
+  restriction; a retry disabling that subprocess sandbox reaches asset
+  compilation, which fails because CoreSimulator exposes no runtimes.
+- `xcrun simctl list devices available`: blocked by CoreSimulator service
+  access. No devices could be selected, installed, launched or captured here.
+
+The screenshot script will create these files after it runs outside the sandbox
+(they have not been captured in this run):
+
+- `Mobile/build/screenshots/iphone-library.png`
+- `Mobile/build/screenshots/iphone-reader.png`
+- `Mobile/build/screenshots/iphone-agent-chat.png`
+- `Mobile/build/screenshots/iphone-settings.png`
+- `Mobile/build/screenshots/iphone-settings-ocr-vendors.png`
+- `Mobile/build/screenshots/ipad-library.png`
+- `Mobile/build/screenshots/ipad-reader-agent.png`
