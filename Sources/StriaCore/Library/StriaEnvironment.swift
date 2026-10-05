@@ -13,6 +13,8 @@ public final class ConfigBox: @unchecked Sendable {
 }
 
 public struct StriaEnvironment: Sendable {
+  public let platform: StriaPlatform
+  public let credentialStore: any CredentialStore
   public let paths: StriaPaths; public let ocrService: any OCRService
   public let agentService: any AgentService; public let clock: @Sendable () -> Date
   public let onRunLogFailure: (@Sendable (String) -> Void)?
@@ -23,7 +25,9 @@ public struct StriaEnvironment: Sendable {
 
   public init(paths: StriaPaths, config: StriaConfig, ocrService: any OCRService, agentService: any AgentService,
               clock: @escaping @Sendable () -> Date = { Date() }, onRunLogFailure: (@Sendable (String) -> Void)? = nil,
-              ocrRetryDelay: @escaping @Sendable (Int) -> Duration = StriaEnvironment.exponentialBackoff) {
+              ocrRetryDelay: @escaping @Sendable (Int) -> Duration = StriaEnvironment.exponentialBackoff,
+              platform: StriaPlatform = .current, credentialStore: any CredentialStore = KeychainCredentialStore()) {
+    self.platform = platform; self.credentialStore = credentialStore
     self.paths = paths; configBox = ConfigBox(config); self.ocrService = ocrService; self.agentService = agentService
     self.clock = clock; self.onRunLogFailure = onRunLogFailure; self.ocrRetryDelay = ocrRetryDelay
   }

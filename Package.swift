@@ -4,7 +4,7 @@ import PackageDescription
 
 let package = Package(
   name: "stria",
-  platforms: [.macOS(.v14)],
+  platforms: [.macOS(.v14), .iOS(.v17)],
   products: [
     .library(name: "StriaCore", targets: ["StriaCore"]),
     .executable(name: "stria", targets: ["StriaCLI"]),
@@ -13,7 +13,7 @@ let package = Package(
   dependencies: [
     .package(
       url: "https://github.com/tacogips/agent-gateway.git",
-      revision: "c7f269753ec36aca92d429ec13316ba033128967"
+      revision: "c68e1ffa3d7b1a20bbd8e5c8fb09e055b3f925fa"
     )
   ],
   targets: [

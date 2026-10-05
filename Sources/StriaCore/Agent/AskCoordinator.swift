@@ -78,6 +78,12 @@ struct AskCoordinator: Sendable {
   /// Request selection, else the last chat selection stored in SQLite, else
   /// the config's `agent.vendor` / `agent.model`; none means unconfigured.
   func resolveSelection(_ requested: AgentSelection?) async throws -> AgentSelection {
+    let selection = try await configuredSelection(requested)
+    try KnownVendors.requireAvailable(selection.vendor, platform: environment.platform)
+    return selection
+  }
+
+  private func configuredSelection(_ requested: AgentSelection?) async throws -> AgentSelection {
     if let requested { return requested }
     if let stored = try await store.meta(AgentSelection.vendorKey), !stored.isEmpty {
       return AgentSelection(vendor: stored, model: try await store.meta(AgentSelection.modelKey))

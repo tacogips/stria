@@ -138,13 +138,14 @@ struct AgentPaneView: View {
   private var modelSelector: some View {
     VStack(alignment: .leading, spacing: 4) {
       Menu {
-        ForEach(AgentPaneViewModel.vendorOptions, id: \.self) { vendor in
+        ForEach(agent.vendorOptions, id: \.self) { vendor in
           let availability = agent.availability(of: vendor)
           Button {
             Task { await agent.select(vendor: vendor) }
           } label: {
             switch availability {
             case .ready: Text(SettingsViewModel.displayName(for: vendor))
+            case .unavailableOnThisPlatform: Text(KnownVendors.platformUnavailableReason)
             case .needsCredentialName: Text("\(SettingsViewModel.displayName(for: vendor)) (no API key variable in Settings)")
             case .missingKey(let name): Text("\(SettingsViewModel.displayName(for: vendor)) (\(name) not set)")
             }
@@ -196,6 +197,7 @@ struct AgentPaneView: View {
   private func warningText(for availability: VendorAvailability) -> String {
     switch availability {
     case .ready: ""
+    case .unavailableOnThisPlatform: KnownVendors.platformUnavailableReason
     case .needsCredentialName: "This vendor has no API key variable configured."
     case .missingKey(let name): "Environment variable \(name) is not set; relaunch Stria with it or pick another vendor."
     }

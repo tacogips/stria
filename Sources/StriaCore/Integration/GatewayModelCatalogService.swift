@@ -6,7 +6,11 @@ import Foundation
 /// vendors have no listing and are rejected before any request.
 public enum GatewayModelCatalogService {
   public static func models(vendor: String, apiKeyEnvironment: String?,
-                            environment: [String: String] = ProcessInfo.processInfo.environment) async throws -> [String] {
+                            environment: [String: String] = ProcessInfo.processInfo.environment,
+                            platform: StriaPlatform = .current,
+                            credentialStore: any CredentialStore = KeychainCredentialStore()) async throws -> [String] {
+    let environment = try CredentialEnvironment(environment: environment, platform: platform, store: credentialStore)
+      .merged(credentials: apiKeyEnvironment.map { [vendor: $0] } ?? [:])
     guard let gatewayVendor = GatewayVendor(rawValue: vendor), !gatewayVendor.isCLI, gatewayVendor != .cursorAPI else {
       throw ServiceError.unavailable("\(vendor) does not list models; type the model id")
     }

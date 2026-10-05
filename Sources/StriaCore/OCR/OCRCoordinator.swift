@@ -6,6 +6,9 @@ struct OCRCoordinator: Sendable {
 
   func run(documentId: String, selection: OCRSelection,
            onProgress: @Sendable (OCRProgress) -> Void = { _ in }) async throws -> OCRRunSummary {
+    if let vendor = library.environment.config.ocr.vendor {
+      try KnownVendors.requireAvailable(vendor, platform: library.environment.platform)
+    }
     guard let document = try await library.store.document(id: documentId) else {
       throw StriaError.documentNotFound("Document not found: \(documentId)")
     }
@@ -121,6 +124,7 @@ struct OCRCoordinator: Sendable {
   /// growing pause, up to `ocr.formatRetries` times, then the page fails.
   /// The local PDF text layer answers plain text and has no tags.
   private func recognize(_ base: OCRRequest) async throws -> ParsedOCRReply {
+    try KnownVendors.requireAvailable(base.settings.vendor, platform: library.environment.platform)
     guard base.settings.vendor != KnownVendors.pdfTextLayer else {
       let result = try await library.environment.ocrService.recognize(base)
       return ParsedOCRReply(body: OCRTextPostProcessor.clean(result.text), tags: [])

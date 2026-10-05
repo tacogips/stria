@@ -13,6 +13,9 @@ struct PageSummaryCoordinator: Sendable {
 
   func run(documentId: String, request: PageSummaryRequest,
            onProgress: @escaping @Sendable (PageSummaryProgress) -> Void = { _ in }) async throws -> PageSummaryRunResult {
+    if let vendor = library.environment.config.summary.vendor {
+      try KnownVendors.requireAvailable(vendor, platform: library.environment.platform)
+    }
     guard try await library.store.document(id: documentId) != nil else {
       throw StriaError.documentNotFound("Document not found: \(documentId)")
     }

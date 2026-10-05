@@ -47,7 +47,7 @@ struct SettingsView: View {
       }
       Section("OCR") {
         Picker("Vendor", selection: $settings.ocrVendor) {
-          ForEach(SettingsViewModel.ocrVendorOptions, id: \.self) { vendor in
+          ForEach(settings.ocrVendorOptions, id: \.self) { vendor in
             Text(SettingsViewModel.displayName(for: vendor)).tag(vendor)
           }
         }

@@ -9,8 +9,8 @@ import Observation
 public final class SettingsViewModel {
   /// "" stands for "not configured".
   public static let notConfigured = ""
-  public static let ocrVendorOptions = [notConfigured, KnownVendors.pdfTextLayer] + KnownVendors.gateway
-  public static let summaryVendorOptions = [notConfigured] + KnownVendors.gateway
+  public static let ocrVendorOptions = [notConfigured, KnownVendors.pdfTextLayer] + KnownVendors.selectable
+  public static let summaryVendorOptions = [notConfigured] + KnownVendors.selectable
   /// API vendors whose credential variable name is set in Settings.
   public static let credentialVendors = KnownVendors.apiKeyVendors.sorted()
 
@@ -44,26 +44,57 @@ public final class SettingsViewModel {
   /// Value of the model picker that reveals the free-text field.
   public static let customModel = "__custom__"
 
+  public var ocrVendorOptions: [String] { [Self.notConfigured, KnownVendors.pdfTextLayer] + KnownVendors.selectable(on: library.environment.platform) }
+  public var summaryVendorOptions: [String] { [Self.notConfigured] + KnownVendors.selectable(on: library.environment.platform) }
+
+  /// Saves a mobile API key immediately; values never enter the config draft.
+  public func saveCredential(_ value: String, for vendor: String) throws {
+    guard library.environment.platform == .iOS, KnownVendors.apiKeyVendors.contains(vendor) else {
+      throw StriaError.config("API keys are stored in environment variables on the Mac")
+    }
+    try library.environment.credentialStore.write(value, vendor: vendor)
+  }
+
+  public func deleteCredential(for vendor: String) throws {
+    guard library.environment.platform == .iOS else { return }
+    try library.environment.credentialStore.delete(vendor: vendor)
+  }
+
+  public func hasCredential(for vendor: String) -> Bool {
+    guard let name = Self.trimmed(credentials[vendor] ?? "") else { return false }
+    return environmentHasValue(name)
+  }
+
   private let library: StriaLibrary
   private let modelLister: @Sendable (String, String?) async throws -> [String]
   private let processEnvironment: [String: String]
 
   public init(library: StriaLibrary,
               processEnvironment: [String: String] = ProcessInfo.processInfo.environment,
-              modelLister: @escaping @Sendable (String, String?) async throws -> [String] = {
-                try await GatewayModelCatalogService.models(vendor: $0, apiKeyEnvironment: $1)
-              }) {
+              modelLister: (@Sendable (String, String?) async throws -> [String])? = nil) {
     self.library = library
     self.processEnvironment = processEnvironment
-    self.modelLister = modelLister
+    self.modelLister = modelLister ?? { vendor, name in
+      try await GatewayModelCatalogService.models(vendor: vendor, apiKeyEnvironment: name,
+                                                  environment: processEnvironment,
+                                                  platform: library.environment.platform,
+                                                  credentialStore: library.environment.credentialStore)
+    }
     load()
   }
 
-  /// Whether the named variable is set in this app's environment.
+  /// Whether the named variable has a process value or a matching mobile API key.
   public func environmentHasValue(_ name: String) -> Bool {
     let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty, let value = processEnvironment[trimmed] else { return false }
-    return !value.isEmpty
+    guard !trimmed.isEmpty else { return false }
+    if library.environment.platform == .iOS {
+      var vendors = credentials.filter { Self.trimmed($0.value) == trimmed }.map(\.key)
+      if Self.trimmed(ocrAPIKeyEnvironment) == trimmed { vendors.append(ocrVendor) }
+      for vendor in vendors where KnownVendors.apiKeyVendors.contains(vendor) {
+        if let value = try? library.environment.credentialStore.read(vendor: vendor), !value.isEmpty { return true }
+      }
+    }
+    return processEnvironment[trimmed].map { !$0.isEmpty } ?? false
   }
 
   /// Models the picker offers for a vendor: the known catalog plus anything
@@ -215,6 +246,11 @@ public final class SettingsViewModel {
   /// The configuration the draft describes, or the reason it is invalid.
   public func draftConfig() throws(StriaError) -> StriaConfig {
     var config = library.environment.config
+    for vendor in [ocrVendor, summaryVendor, config.agent.vendor].compactMap({ $0 }) {
+      guard KnownVendors.isAvailableOnThisPlatform(vendor, platform: library.environment.platform) else {
+        throw .config(KnownVendors.platformUnavailableReason)
+      }
+    }
     config.ocr.vendor = ocrVendor == Self.notConfigured ? nil : ocrVendor
     config.ocr.model = Self.trimmed(ocrModel)
     config.ocr.apiKeyEnvironment = Self.trimmed(ocrAPIKeyEnvironment)

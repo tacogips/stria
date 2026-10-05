@@ -1,6 +1,24 @@
 import Foundation
 
 public enum KnownVendors {
+  public static let platformUnavailableReason = "Runs a local CLI; only available on the Mac"
+
+  public static func isAvailableOnThisPlatform(_ vendor: String, platform: StriaPlatform = .current) -> Bool {
+    platform == .macOS || !cliVendors.contains(vendor)
+  }
+
+  public static var selectable: [String] { selectable(on: .current) }
+
+  public static func selectable(on platform: StriaPlatform) -> [String] {
+    gateway.filter { isAvailableOnThisPlatform($0, platform: platform) }
+  }
+
+  public static func requireAvailable(_ vendor: String, platform: StriaPlatform = .current) throws(StriaError) {
+    guard isAvailableOnThisPlatform(vendor, platform: platform) else {
+      throw .serviceUnavailable(platformUnavailableReason)
+    }
+  }
+
   public static let gateway = ["claude-code", "codex", "cursor", "cursor-api", "openai", "anthropic", "gemini", "openrouter"]
   public static let pdfTextLayer = "pdf-text-layer"
   public static let apiKeyVendors: Set<String> = ["openai", "anthropic", "gemini", "openrouter", "cursor-api"]

@@ -28,3 +28,6 @@ logs/
 *.log
 
 mise.local.toml
+.build-ios/
+Mobile/*.xcodeproj/
+Mobile/build/

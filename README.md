@@ -148,3 +148,9 @@ The build assembles `Stria.app` (icon from `scripts/make-app-icon.swift`), signs
 ## Design docs
 
 Architecture, storage, agent integration, CLI and app UI designs are in [`design-docs/specs/`](design-docs/specs/).
+
+## Platforms
+
+Stria provides a macOS app and CLI. An iPhone/iPad app is in progress;
+StriaCore supports iOS 17 and later. Local CLI vendors (Claude Code, Codex,
+Cursor) are available only on the Mac; API vendors work on both platforms.

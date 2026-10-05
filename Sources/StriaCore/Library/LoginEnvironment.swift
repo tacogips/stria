@@ -15,6 +15,7 @@ public enum LoginEnvironment {
   /// Runs `$SHELL -l -c 'env -0'` with a timeout and parses the result.
   public static func capture(shell: String? = ProcessInfo.processInfo.environment["SHELL"],
                              timeout: TimeInterval = 5) -> [String: String] {
+    #if os(macOS)
     let shellPath = shell.flatMap { $0.isEmpty ? nil : $0 } ?? "/bin/zsh"
     let process = Process()
     process.executableURL = URL(fileURLWithPath: shellPath)
@@ -29,6 +30,9 @@ public enum LoginEnvironment {
     if process.isRunning { process.terminate(); return [:] }
     let data = output.fileHandleForReading.readDataToEndOfFile()
     return parse(data)
+    #else
+    return [:]
+    #endif
   }
 
   static func parse(_ data: Data) -> [String: String] {
@@ -62,10 +66,12 @@ public enum LoginEnvironment {
 
   /// Captures the login environment and applies it to this process.
   public static func importIfNeeded() {
+    #if os(macOS)
     let current = ProcessInfo.processInfo.environment
     guard isGUILaunch(current) else { return }
     for (key, value) in additions(current: current, login: capture()) {
       setenv(key, value, 1)
     }
+    #endif
   }
 }

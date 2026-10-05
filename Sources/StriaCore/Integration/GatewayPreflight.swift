@@ -7,7 +7,10 @@ struct PreflightResult: Equatable, Sendable {
 }
 
 enum GatewayPreflight {
-  static func check(_ settings: ServiceSettings, environment: [String: String]) throws(ServiceError) -> PreflightResult {
+  static func check(_ settings: ServiceSettings, environment: [String: String], platform: StriaPlatform = .current) throws(ServiceError) -> PreflightResult {
+    guard KnownVendors.isAvailableOnThisPlatform(settings.vendor, platform: platform) else {
+      throw .unavailable(KnownVendors.platformUnavailableReason)
+    }
     guard !settings.vendor.isEmpty else {
       throw .unavailable("vendor is not configured; choose one in Settings or with stria config set")
     }

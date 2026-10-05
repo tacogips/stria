@@ -10,7 +10,7 @@ struct PageSummarySettingsSection: View {
     Section {
       Toggle("Summarize each page after OCR", isOn: $settings.summaryAutoRun)
       Picker("Vendor", selection: $settings.summaryVendor) {
-        ForEach(SettingsViewModel.summaryVendorOptions, id: \.self) { vendor in
+        ForEach(settings.summaryVendorOptions, id: \.self) { vendor in
           Text(SettingsViewModel.displayName(for: vendor)).tag(vendor)
         }
       }

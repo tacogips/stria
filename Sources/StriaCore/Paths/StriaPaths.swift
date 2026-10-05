@@ -32,13 +32,29 @@ public struct StriaPaths: Equatable, Sendable {
         try manager.createDirectory(at: directory, withIntermediateDirectories: true)
         try manager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
       }
+      #if os(iOS)
+      var cacheURL = cache
+      var values = URLResourceValues()
+      values.isExcludedFromBackup = true
+      try cacheURL.setResourceValues(values)
+      #endif
     } catch {
       throw StriaError.io("Could not create data directories: \(error.localizedDescription)")
     }
   }
 
+  /// The data root in the user's home or the mobile app container.
+  public static func defaultRoot(homeDirectory: URL = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true),
+                                 platform: StriaPlatform = .current) -> URL {
+    switch platform {
+    case .macOS: homeDirectory.appendingPathComponent(".local/stria", isDirectory: true)
+    case .iOS: homeDirectory.appendingPathComponent("Library/Application Support/Stria", isDirectory: true)
+    }
+  }
+
   public static func resolve(
-    homeFlag: String?, environment: [String: String], homeDirectory: URL, currentDirectory: URL
+    homeFlag: String?, environment: [String: String], homeDirectory: URL, currentDirectory: URL,
+    platform: StriaPlatform = .current
   ) -> StriaPaths {
     let selected = [homeFlag, environment["STRIA_HOME"]].compactMap { $0 }.first { !$0.isEmpty }
     let candidate: URL
@@ -47,7 +63,7 @@ public struct StriaPaths: Equatable, Sendable {
         ? URL(fileURLWithPath: selected)
         : currentDirectory.appendingPathComponent(selected)
     } else {
-      candidate = homeDirectory.appendingPathComponent(".local/stria", isDirectory: true)
+      candidate = defaultRoot(homeDirectory: homeDirectory, platform: platform)
     }
     return StriaPaths(root: candidate.standardizedFileURL)
   }

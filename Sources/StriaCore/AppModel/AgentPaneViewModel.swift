@@ -18,6 +18,7 @@ public enum HistoryMode: Equatable, Sendable {
 /// Whether a vendor can be used right now.
 public enum VendorAvailability: Equatable, Sendable {
   case ready
+  case unavailableOnThisPlatform
   /// An API vendor whose credential variable name is not configured.
   case needsCredentialName
   /// An API vendor whose variable is configured but not set in this process.
@@ -73,7 +74,8 @@ public final class AgentPaneViewModel {
     selectedModel = library.environment.config.agent.model
   }
 
-  public static let vendorOptions = KnownVendors.gateway
+  public static let vendorOptions = KnownVendors.selectable
+  public var vendorOptions: [String] { KnownVendors.selectable(on: library.environment.platform) }
 
   /// Restores the last selection from SQLite (falling back to config).
   public func loadSelection() async {
@@ -87,9 +89,13 @@ public final class AgentPaneViewModel {
   }
 
   public func availability(of vendor: String) -> VendorAvailability {
+    guard KnownVendors.isAvailableOnThisPlatform(vendor, platform: library.environment.platform) else { return .unavailableOnThisPlatform }
     guard KnownVendors.apiKeyVendors.contains(vendor) else { return .ready }
     guard let name = library.environment.config.agent.credential(for: vendor) else { return .needsCredentialName }
-    guard let value = processEnvironment[name], !value.isEmpty else { return .missingKey(name) }
+    let merged = try? CredentialEnvironment(environment: processEnvironment, platform: library.environment.platform,
+                                            store: library.environment.credentialStore)
+      .merged(credentials: [vendor: name])
+    guard let value = merged?[name], !value.isEmpty else { return .missingKey(name) }
     return .ready
   }
 
@@ -177,6 +183,10 @@ public final class AgentPaneViewModel {
     let question = input.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !question.isEmpty, !inFlight else { return }
     guard let selection, availability(of: selection.vendor).isReady else {
+      if let vendor = selectedVendor, availability(of: vendor) == .unavailableOnThisPlatform {
+        notice = KnownVendors.platformUnavailableReason
+        return
+      }
       notice = selectedVendor == nil ? "Choose a vendor and model first." : "The selected vendor needs an API key; see Settings."
       return
     }
