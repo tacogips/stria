@@ -47,7 +47,7 @@ struct SummaryRunSheet: View {
         case .success(let count):
           Text(count == 0 ? "Nothing to summarize."
                : "Calls \(vendorDescription) for \(count == 1 ? "1 page" : "\(count) pages"), one at a time in page order. "
-               + "Pages that are not OCRed are skipped; existing summaries of the chosen pages are replaced.")
+               + "Pages without OCR text are OCRed first; existing summaries of the chosen pages are replaced.")
         case .failure(let error):
           Label(error.message, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
         }

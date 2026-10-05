@@ -57,6 +57,10 @@ public struct LibraryRow: Identifiable, Equatable, Sendable {
   public var lastOpenedAt: Date?
   /// True while this app process is rendering or OCRing the document.
   public var isBusy: Bool
+  /// Summary coverage (nil until loaded).
+  public var summaries: PageSummaryCounts?
+  /// The running summary run's progress, if any.
+  public var summaryProgress: PageSummaryProgress?
 
   public var ocrState: DocumentOCRState {
     if ocr.failed > 0 { return .hasFailures }
@@ -66,7 +70,8 @@ public struct LibraryRow: Identifiable, Equatable, Sendable {
   }
 
   public init(id: String, title: String, pageCount: Int, importStatus: ImportStatus, rendered: Int,
-              ocr: OCRCounts, unavailableReason: String? = nil, lastOpenedAt: Date? = nil, isBusy: Bool = false) {
+              ocr: OCRCounts, unavailableReason: String? = nil, lastOpenedAt: Date? = nil, isBusy: Bool = false,
+              summaries: PageSummaryCounts? = nil, summaryProgress: PageSummaryProgress? = nil) {
     self.id = id
     self.title = title
     self.pageCount = pageCount
@@ -76,6 +81,8 @@ public struct LibraryRow: Identifiable, Equatable, Sendable {
     self.unavailableReason = unavailableReason
     self.lastOpenedAt = lastOpenedAt
     self.isBusy = isBusy
+    self.summaries = summaries
+    self.summaryProgress = summaryProgress
   }
 }
 
@@ -96,6 +103,14 @@ public final class LibraryViewModel {
   public internal(set) var summaryRevision = 0
   /// Runs per document, chained so they never overlap (page order matters).
   var summaryTasks: [String: (id: UUID, task: Task<Void, Never>)] = [:]
+  /// The outcome of each document's last finished summary run.
+  public internal(set) var summaryReports: [String: PageSummaryRunReport] = [:]
+  /// Runs waiting behind the running one, per document.
+  public internal(set) var queuedSummaryRuns: [String: Int] = [:]
+  /// Bumped by Cancel; queued runs from an older generation do not start.
+  var summaryGenerations: [String: Int] = [:]
+  /// The work of the running summary run per document (cancellable).
+  var runningSummaryWork: [String: Task<PageSummaryRunResult, Error>] = [:]
 
   let library: StriaLibrary
   private var importTasks: [UUID: Task<Void, Never>] = [:]
@@ -110,6 +125,7 @@ public final class LibraryViewModel {
 
   public func refresh() async {
     do {
+      let summaryCounts = (try? await library.pageSummaryCounts()) ?? [:]
       var refreshedRows: [LibraryRow] = []
       for record in try await library.store.listDocuments(order: .recents) {
         let summary = try await library.summary(of: record)
@@ -123,7 +139,9 @@ public final class LibraryViewModel {
           unavailableReason: unavailableReasons[summary.id]
             ?? (summary.ocr.pending > 0 && !library.environment.config.ocr.isConfigured ? "not configured" : nil),
           lastOpenedAt: record.lastOpenedAt,
-          isBusy: busyIDs.contains(summary.id)
+          isBusy: busyIDs.contains(summary.id),
+          summaries: summaryCounts[summary.id],
+          summaryProgress: summaryProgress[summary.id]
         ))
       }
       rows = refreshedRows
@@ -276,7 +294,7 @@ public final class LibraryViewModel {
     update(documentId) { $0.isBusy = busy }
   }
 
-  private func update(_ id: String, mutate: (inout LibraryRow) -> Void) {
+  func update(_ id: String, mutate: (inout LibraryRow) -> Void) {
     guard let index = rows.firstIndex(where: { $0.id == id }) else { return }
     mutate(&rows[index])
   }

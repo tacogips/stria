@@ -43,6 +43,19 @@ default is stored as null so a later default reaches users who never edited it.
 
 ## Request
 
+### OCR first
+
+`PageSummaryRequest.ocrFirst` (default true; false for the app's automatic
+run after OCR) makes the run OCR the chosen pages that have no OCR text yet
+(`pending` or `failed`; for `.missing` every such page) before summarizing,
+through `OCRCoordinator` (JSON reply, retries). Progress reports phase `.ocr`
+with the count of OCRed pages. Without an OCR vendor those pages are reported
+in `skipped` and `ocrUnavailableReason` explains why. The result lists
+`ocred` and `ocrFailures`. (Before this, a page imported while OCR was not
+configured was skipped silently and summaries seemed not to work.)
+
+### Summaries
+
 `PageSummaryCoordinator` runs pages one at a time in ascending order, so page
 N-1's summary (possibly written earlier in the same run) is available for
 page N. Per page:
@@ -87,7 +100,10 @@ page_summaries(
 - A summary is stale when the page's `ocr_updated_at` differs from
   `source_ocr_updated_at` (the page was OCRed again).
 - `pagesNeedingSummary` lists OCRed pages without a current `done` summary
-  (none, failed or stale).
+  (none, failed or stale); the library API adds pages without OCR text,
+  which a run OCRs first.
+- `pageSummaryCounts()` returns per document `done` (current), `failed`,
+  `stale`, `missing` (OCRed, never summarized), `notOCRed` and `total`.
 - Removing a document cascades its summaries.
 
 ## App
@@ -95,15 +111,34 @@ page_summaries(
 - `LibraryViewModel.summarizePages(documentId:range:instruction:language:)`
   maps `OCRRange` (`.remaining` = pages needing a summary, `.all`,
   `.pages("1-3, 8")`) to a run. Runs for one document are queued behind each
-  other (`summaryTasks`) so page order holds; `summaryProgress` and
-  `summaryRevision` drive the Summary tab.
+  other (`summaryTasks`, with `queuedSummaryRuns` counting the waiting ones)
+  so page order holds; `summaryProgress` (also copied to the library row) and
+  `summaryRevision` drive the views.
+- `cancelSummaries(documentId:)` cancels the running run (the current call
+  is cancelled; finished pages keep their summaries) and drops the queued
+  ones (a generation counter per document).
+- Every run's outcome is kept in `summaryReports` (`finished(result)`,
+  `cancelled`, `failed(message)`) with a one-line text such as "1 OCRed
+  first, 3 summarized, 1 failed (p. 4), 2 skipped (no OCR text: p. 5, p. 6)."
 - With `summary.autoRunAfterOCR`, the app starts a background run after every
   OCR run it starts: the processed pages after Run OCR, and every page needing
   a summary after an import with OCR. The CLI never summarizes on its own;
   agents call `stria summarize`.
 - Summary tab (third segment of the agent pane, `doc.plaintext`): "Page N",
-  a stale icon, a spinner with "p. N (k/total)" during a run, and a button
-  that opens the run sheet. The body shows the summary (selectable text), a
+  a stale icon, a spinner during a run, and a button that opens the run
+  sheet. Below: the document's coverage ("This PDF: 3 of 10 pages summarized
+  · 1 failed · 2 out of date · 4 not OCRed"), then either the running run
+  (phase and page, "k of n", a progress bar, Cancel, queued runs) or the last
+  run's report (orange with a warning icon when pages failed or were skipped,
+  or nothing could run).
+- A page without OCR text offers "OCR and Summarize This Page"; a page
+  without a summary offers "Summarize This Page" and "Summarize Pages...".
+- Library rows and cards show a summary badge next to the OCR badge:
+  "Summarizing k/n" or "OCR for summary k/n" while a run is going, otherwise
+  "Summary done/total" (orange when some failed) once anything was
+  summarized. The reader toolbar shows a spinner with "Summary k/n" (or "OCR
+  k/n") during a run; clicking it opens the agent pane on the Summary tab
+  (`AgentPaneViewModel.requestedTab`). The body shows the summary (selectable text), a
   failure notice with the error, the run's instructions, and "language ·
   vendor model · age". Empty states: summaries off (with Open Settings...),
   page not OCRed yet, and "No summary for this page yet." with Summarize
@@ -125,7 +160,9 @@ page_summaries(
   nulls; a page beyond the document is `pageNotFound` (exit 3).
 - `stria summarize <docId> [--pages <list>] [--instruction <text>]
   [--language <name>]`: without `--pages` it summarizes pages needing a
-  summary; prints `{"docId", "summarized", "skipped", "failures"}`. No vendor
+  summary, OCRing pages without text first; prints `{"docId", "ocred",
+  "ocrFailures", "summarized", "skipped", "failures",
+  "ocrUnavailableReason"}`. No vendor
   configured is `serviceUnavailable` (exit 4); a bad page list is a usage
   error (exit 2).
 

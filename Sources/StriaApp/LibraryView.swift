@@ -298,7 +298,7 @@ private struct LibraryRowView: View {
           }
         }
         .lineLimit(1)
-        if row.importStatus == .ready { OCRBadge(row: row) }
+        if row.importStatus == .ready { HStack(spacing: 6) { OCRBadge(row: row); SummaryBadge(row: row) } }
         Text(statusText).font(.caption).foregroundStyle(.secondary).lineLimit(2)
           .help(statusText)
       }
@@ -362,7 +362,7 @@ private struct LibraryCardView: View {
         Spacer()
         if row.isBusy { ProgressView().controlSize(.mini) }
       }
-      if row.importStatus == .ready { OCRBadge(row: row) }
+      if row.importStatus == .ready { HStack(spacing: 6) { OCRBadge(row: row); SummaryBadge(row: row) } }
       Text(statusText).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
     }
     .padding(10)
@@ -426,5 +426,37 @@ struct OCRBadge: View {
 
   private var help: String {
     "\(row.ocr.done) of \(row.pageCount) pages OCRed, \(row.ocr.pending) pending, \(row.ocr.failed) failed. Right-click to run or redo OCR."
+  }
+}
+
+/// Summary coverage, or the running summary's progress; hidden while page
+/// summaries are off and nothing has been summarized.
+struct SummaryBadge: View {
+  let row: LibraryRow
+
+  var body: some View {
+    if let progress = row.summaryProgress {
+      Label(progressText(progress), systemImage: "text.badge.checkmark")
+        .font(.caption.bold())
+        .foregroundStyle(Color.accentColor)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .overlay(Rectangle().stroke(Color.accentColor, lineWidth: 1))
+        .help("Page summaries are being written")
+    } else if let counts = row.summaries, counts.done + counts.failed + counts.stale > 0 {
+      Label("Summary \(counts.done)/\(counts.total)", systemImage: "doc.plaintext")
+        .font(.caption.bold())
+        .foregroundStyle(counts.failed > 0 ? Color.orange : Color.secondary)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .overlay(Rectangle().stroke(counts.failed > 0 ? Color.orange : Flat.border, lineWidth: 1))
+        .help("\(counts.done) summarized, \(counts.failed) failed, \(counts.stale) out of date, \(counts.notOCRed) not OCRed")
+    }
+  }
+
+  private func progressText(_ progress: PageSummaryProgress) -> String {
+    guard progress.total > 0 else { return "Summarizing…" }
+    let done = min(progress.completed, progress.total)
+    return progress.phase == .ocr ? "OCR for summary \(done)/\(progress.total)" : "Summarizing \(done)/\(progress.total)"
   }
 }

@@ -69,3 +69,28 @@ public extension StriaStore {
                              vendor: vendor, model: statement.string(8), isStale: statement.int(10) != 0, updatedAt: updated)
   }
 }
+
+public extension StriaStore {
+  /// Summary coverage of every document, keyed by document id.
+  func pageSummaryCounts() throws -> [String: PageSummaryCounts] {
+    let statement = try database.prepare("""
+      SELECT p.document_id,
+        SUM(p.ocr_status<>'done'),
+        SUM(p.ocr_status='done' AND s.status IS NULL),
+        SUM(p.ocr_status='done' AND s.status='done' AND s.source_ocr_updated_at IS p.ocr_updated_at),
+        SUM(p.ocr_status='done' AND s.status='failed'),
+        SUM(p.ocr_status='done' AND s.status='done' AND s.source_ocr_updated_at IS NOT p.ocr_updated_at),
+        COUNT(*)
+      FROM pages p
+      LEFT JOIN page_summaries s ON s.document_id=p.document_id AND s.page_number=p.page_number
+      GROUP BY p.document_id
+      """)
+    var counts: [String: PageSummaryCounts] = [:]
+    while try statement.step() {
+      guard let id = statement.string(0) else { continue }
+      counts[id] = PageSummaryCounts(done: statement.int(3), failed: statement.int(4), stale: statement.int(5),
+                                     missing: statement.int(2), notOCRed: statement.int(1), total: statement.int(6))
+    }
+    return counts
+  }
+}

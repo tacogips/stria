@@ -149,6 +149,7 @@ struct ReaderView: View {
           PageFieldView(reader: reader)
         }
         ToolbarItemGroup(placement: .primaryAction) {
+          summaryIndicator
           ocrButton
           agentButton
         }
@@ -184,6 +185,26 @@ struct ReaderView: View {
     }
     .accessibilityLabel("Back to the library")
     .help("Back to the library (Esc or Cmd-Shift-L)")
+  }
+
+  /// Shown while this PDF's summaries are being written; opens the Summary tab.
+  @ViewBuilder private var summaryIndicator: some View {
+    if let progress = model.library.summaryProgress[reader.documentId] {
+      Button {
+        revealAgent()
+        agent.requestedTab = .summary
+      } label: {
+        HStack(spacing: 6) {
+          ProgressView().controlSize(.small)
+          if progress.total > 0 {
+            Text("\(progress.phase == .ocr ? "OCR" : "Summary") \(min(progress.completed, progress.total))/\(progress.total)")
+              .font(.caption).monospacedDigit()
+          }
+        }
+      }
+      .help("Page summaries are being written; click to show the Summary tab")
+      .accessibilityLabel("Summarizing pages")
+    }
   }
 
   private var documentRow: LibraryRow? { model.library.rows.first { $0.id == reader.documentId } }

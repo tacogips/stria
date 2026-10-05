@@ -7,6 +7,9 @@ public enum AgentScope: CaseIterable, Equatable, Sendable {
   case document
 }
 
+/// The agent pane's tabs, for requests from outside the pane.
+public enum AgentPaneTab: Hashable, Sendable { case chat, history, summary }
+
 public enum HistoryMode: Equatable, Sendable {
   case page
   case document
@@ -40,6 +43,8 @@ public final class AgentPaneViewModel {
   public private(set) var focusInputRequest = 0
 
   public func requestInputFocus() { focusInputRequest += 1 }
+  /// Set to switch the pane to a tab (the view clears it).
+  public var requestedTab: AgentPaneTab?
   public var notice: String?
   public var historyMode: HistoryMode = .page
   /// Conversations for the History tab (summary + first question).

@@ -11,7 +11,15 @@ public extension StriaLibrary {
     try await store.pageSummary(documentId: documentId, page: page)
   }
 
+  /// OCRed pages without a current summary plus pages without OCR text
+  /// (a summary run OCRs those first).
   func pagesNeedingSummary(documentId: String) async throws -> [Int] {
-    try await store.pagesNeedingSummary(documentId: documentId)
+    let needing = try await store.pagesNeedingSummary(documentId: documentId)
+    let withoutText = try await store.pageNumbers(documentId: documentId, statuses: [.pending, .failed])
+    return Array(Set(needing + withoutText)).sorted()
+  }
+
+  func pageSummaryCounts() async throws -> [String: PageSummaryCounts] {
+    try await store.pageSummaryCounts()
   }
 }

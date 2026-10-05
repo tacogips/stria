@@ -31,6 +31,8 @@ import Testing
       let all = await execute(["summarize", id], home: home, paths: paths, ocr: ocr, agent: agent)
       #expect(all.exitCode == 0)
       #expect(try json(all.stdout)["summarized"]?.arrayValue?.compactMap(\.intValue) == [1, 2])
+      #expect(try json(all.stdout).keySet == Set(["docId", "ocred", "ocrFailures", "summarized", "skipped", "failures",
+                                                  "ocrUnavailableReason"]))
 
       await agent.enqueue(.success("Deux."))
       let redo = await execute(["summarize", id, "--pages", "2", "--instruction", "In French", "--language", "French"],

@@ -19,7 +19,8 @@ enum SummaryCommands {
       let result = try await library.summarizePages(
         documentId: docId, request: PageSummaryRequest(selection: selection, instruction: instruction, language: language))
       if let reason = result.unavailableReason { throw StriaError.serviceUnavailable(reason) }
-      return SummarizeOutput(docId: docId, summarized: result.summarized, skipped: result.skipped, failures: result.failures)
+      return SummarizeOutput(docId: docId, ocred: result.ocred, ocrFailures: result.ocrFailures, summarized: result.summarized,
+                             skipped: result.skipped, failures: result.failures, ocrUnavailableReason: result.ocrUnavailableReason)
     default:
       throw StriaError.usage("Not a summary command")
     }
@@ -50,10 +51,26 @@ public struct PageSummaryOutput: Encodable {
   }
 }
 
-/// `stria summarize`: which pages were summarized, skipped (not OCRed) or failed.
+/// `stria summarize`: pages OCRed first, summarized, skipped (no OCR text) or failed.
 public struct SummarizeOutput: Encodable {
   public let docId: String
+  public let ocred: [Int]
+  public let ocrFailures: [OCRFailure]
   public let summarized: [Int]
   public let skipped: [Int]
   public let failures: [OCRFailure]
+  public let ocrUnavailableReason: String?
+
+  enum CodingKeys: String, CodingKey { case docId, ocred, ocrFailures, summarized, skipped, failures, ocrUnavailableReason }
+
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(docId, forKey: .docId)
+    try container.encode(ocred, forKey: .ocred)
+    try container.encode(ocrFailures, forKey: .ocrFailures)
+    try container.encode(summarized, forKey: .summarized)
+    try container.encode(skipped, forKey: .skipped)
+    try container.encode(failures, forKey: .failures)
+    try container.encode(ocrUnavailableReason, forKey: .ocrUnavailableReason)
+  }
 }

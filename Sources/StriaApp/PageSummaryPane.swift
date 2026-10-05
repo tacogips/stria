@@ -20,6 +20,8 @@ struct PageSummaryPane: View {
   private var page: Int { reader.currentPage }
   private var row: LibraryRow? { library.rows.first { $0.id == reader.documentId } }
   private var progress: PageSummaryProgress? { library.summaryProgress[reader.documentId] }
+  private var report: PageSummaryRunReport? { library.summaryReports[reader.documentId] }
+  private var queued: Int { library.queuedSummaryRuns[reader.documentId] ?? 0 }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
@@ -27,6 +29,7 @@ struct PageSummaryPane: View {
       Divider()
       ScrollView {
         VStack(alignment: .leading, spacing: 14) {
+          if library.summaryConfigured { runStatus }
           if !tags.isEmpty { tagList }
           content
         }
@@ -57,10 +60,7 @@ struct PageSummaryPane: View {
           .help("The page was OCRed again after this summary; summarize it again to refresh it")
       }
       Spacer()
-      if let progress {
-        ProgressView().controlSize(.small)
-        Text(progressText(progress)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-      }
+      if progress != nil { ProgressView().controlSize(.small) }
       Button { openSheet() } label: {
         Image(systemName: record == nil ? "text.badge.plus" : "arrow.clockwise")
       }
@@ -71,6 +71,59 @@ struct PageSummaryPane: View {
     }
     .padding(.horizontal)
     .padding(.vertical, 8)
+  }
+
+  /// The document's coverage, the run in progress (with Cancel) and how
+  /// the last run ended.
+  @ViewBuilder private var runStatus: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      if let counts = row?.summaries { Text(coverageText(counts)).font(.caption).foregroundStyle(.secondary) }
+      if let progress {
+        VStack(alignment: .leading, spacing: 4) {
+          HStack {
+            Text(progressTitle(progress)).font(.callout)
+            Spacer()
+            Button("Cancel") { library.cancelSummaries(documentId: reader.documentId) }
+              .controlSize(.small)
+              .help("Stop summarizing this PDF; finished pages keep their summaries")
+          }
+          if progress.total > 0 {
+            ProgressView(value: Double(progress.completed), total: Double(progress.total))
+          } else {
+            ProgressView().progressViewStyle(.linear)
+          }
+          if queued > 0 {
+            Text(queued == 1 ? "1 more run queued" : "\(queued) more runs queued").font(.caption).foregroundStyle(.secondary)
+          }
+        }
+        .padding(8)
+        .overlay(Rectangle().stroke(Flat.border, lineWidth: 1))
+      } else if let report {
+        Label("Last run \(RelativeAge.string(from: report.finishedAt)): \(report.text)",
+              systemImage: report.isProblem ? "exclamationmark.triangle" : "checkmark.circle")
+          .font(.caption)
+          .foregroundStyle(report.isProblem ? Color.orange : Color.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+    }
+  }
+
+  private func coverageText(_ counts: PageSummaryCounts) -> String {
+    var parts = ["\(counts.done) of \(counts.total) pages summarized"]
+    if counts.failed > 0 { parts.append("\(counts.failed) failed") }
+    if counts.stale > 0 { parts.append("\(counts.stale) out of date") }
+    if counts.notOCRed > 0 { parts.append("\(counts.notOCRed) not OCRed") }
+    return "This PDF: " + parts.joined(separator: " · ")
+  }
+
+  private func progressTitle(_ progress: PageSummaryProgress) -> String {
+    let count = progress.total > 0 ? " \(min(progress.completed + (progress.currentPage == nil ? 0 : 1), progress.total)) of \(progress.total)" : ""
+    switch progress.phase {
+    case .ocr: return "OCR before summarizing:" + count
+    case .summary:
+      if let page = progress.currentPage { return "Summarizing p. \(page):" + count }
+      return progress.total > 0 ? "Summarizing:" + count : "Starting…"
+    }
   }
 
   private var tagList: some View {
@@ -107,14 +160,22 @@ struct PageSummaryPane: View {
     } else if !loaded {
       EmptyView()
     } else if ocrStatus != .done {
-      Text("This page is not OCRed yet. Run OCR first; its summary follows when \"Summarize each page after OCR\" is on.")
-        .font(.callout).foregroundStyle(.secondary)
+      VStack(alignment: .leading, spacing: 8) {
+        Text("This page has no OCR text yet.").font(.callout).foregroundStyle(.secondary)
+        if progress == nil {
+          Button("OCR and Summarize This Page") { summarizeThisPage() }
+            .help("Runs OCR on this page, then summarizes it")
+        }
+      }
     } else if progress != nil {
       Text("Waiting for the summary…").font(.callout).foregroundStyle(.secondary)
     } else {
       VStack(alignment: .leading, spacing: 8) {
         Text("No summary for this page yet.").font(.callout).foregroundStyle(.secondary)
-        Button("Summarize Pages…") { openSheet() }
+        HStack {
+          Button("Summarize This Page") { summarizeThisPage() }
+          Button("Summarize Pages…") { openSheet() }
+        }
       }
     }
   }
@@ -145,9 +206,10 @@ struct PageSummaryPane: View {
       + RelativeAge.string(from: record.updatedAt)
   }
 
-  private func progressText(_ progress: PageSummaryProgress) -> String {
-    guard let current = progress.currentPage else { return "Summarizing…" }
-    return "p. \(current) (\(progress.completed + 1)/\(progress.total))"
+  private func summarizeThisPage() {
+    let documentId = reader.documentId
+    let page = page
+    Task { await library.summarizePages(documentId: documentId, range: .pages(String(page))) }
   }
 
   private func openSheet() {

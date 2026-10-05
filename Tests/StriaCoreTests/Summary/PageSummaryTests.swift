@@ -97,9 +97,11 @@ private func summaryConfig(language: String = "Japanese", prompt: String? = nil,
       let id = try await library.importDocument(at: source, runOCR: false).document.id
       await ocr.script(docId: id, page: 2, .success(""))
       _ = try await library.runOCR(documentId: id, selection: .pages([1, 2]))
-      let result = try await library.summarizePages(documentId: id, request: PageSummaryRequest(selection: .pages([1, 2, 3])))
+      let result = try await library.summarizePages(
+        documentId: id, request: PageSummaryRequest(selection: .pages([1, 2, 3]), ocrFirst: false))
       #expect(result.summarized == [1, 2])
       #expect(result.skipped == [3])
+      #expect(result.ocred.isEmpty)
       let requests = await agent.requests
       #expect(requests.count == 1)
       #expect(requests.first?.systemPrompt == "Summarize in the same language as the target page's text.")
@@ -188,4 +190,92 @@ private func summaryConfig(language: String = "Japanese", prompt: String? = nil,
     #expect(roundTrip.summary == config.summary)
     #expect(PageSummaryDefaults.prompt.contains(PageSummaryDefaults.placeholder))
   }
+
+  @Test func pagesWithoutOCRTextAreOCRedFirst() async throws {
+    try await withAppModelDataRoot { paths in
+      let agent = FakeAgentService()
+      let ocr = FakeOCRService()
+      var config = summaryConfig()
+      config.ocr.autoRunOnImport = false
+      let (library, source) = try makeAppModelFixture(paths: paths, pageTexts: ["one", "two"], ocr: ocr, agent: agent, config: config)
+      let id = try await library.importDocument(at: source, runOCR: false).document.id
+      #expect(try await library.pagesNeedingSummary(documentId: id) == [1, 2])
+      #expect(try await library.pageSummaryCounts()[id] == PageSummaryCounts(notOCRed: 2, total: 2))
+      let phases = PhaseRecorder()
+      let result = try await library.summarizePages(documentId: id, request: PageSummaryRequest(selection: .missing)) {
+        phases.record($0.phase)
+      }
+      #expect(result.ocred == [1, 2])
+      #expect(result.summarized == [1, 2])
+      #expect(result.skipped.isEmpty)
+      #expect(phases.values.first == .ocr)
+      #expect(phases.values.last == .summary)
+      #expect(await ocr.requests.count == 2)
+      #expect(try await library.pageSummaryCounts()[id] == PageSummaryCounts(done: 2, total: 2))
+    }
+  }
+
+  @Test func withoutAnOCRVendorPagesWithoutTextAreReportedSkipped() async throws {
+    try await withAppModelDataRoot { paths in
+      let agent = FakeAgentService()
+      var config = summaryConfig()
+      config.ocr.vendor = nil
+      config.ocr.autoRunOnImport = false
+      let (library, source) = try makeAppModelFixture(paths: paths, pageTexts: ["one"], agent: agent, config: config)
+      let id = try await library.importDocument(at: source, runOCR: false).document.id
+      let result = try await library.summarizePages(documentId: id, request: PageSummaryRequest(selection: .pages([1])))
+      #expect(result.skipped == [1])
+      #expect(result.ocrUnavailableReason == OCRCoordinator.notConfiguredReason)
+      let report = PageSummaryRunReport(outcome: .finished(result), finishedAt: Date())
+      #expect(report.isProblem)
+      #expect(report.text.hasPrefix("0 summarized, 1 skipped (no OCR text: p. 1)."))
+      #expect(report.text.contains("OCR vendor is not configured"))
+      #expect(await agent.requests.isEmpty)
+    }
+  }
+
+  @Test func runsCanBeCancelledAndQueuedRunsDropped() async throws {
+    try await withAppModelDataRoot { paths in
+      let agent = FakeAgentService()
+      let (library, source) = try makeAppModelFixture(paths: paths, pageTexts: ["one", "two", "three"], agent: agent,
+                                                      config: summaryConfig())
+      let model = LibraryViewModel(library: library)
+      model.importFiles([source])
+      await model.waitForImports()
+      let id = try #require(model.rows.first?.id)
+      await agent.setDelay(.milliseconds(300))
+      let first = Task { await model.summarizePages(documentId: id, range: .all) }
+      let second = Task { await model.summarizePages(documentId: id, range: .pages("1")) }
+      for _ in 0..<100 where model.summaryProgress[id]?.currentPage == nil { try await Task.sleep(for: .milliseconds(10)) }
+      #expect(model.isSummarizing(id))
+      #expect(model.rows.first?.summaryProgress != nil)
+      #expect(model.queuedSummaryRuns[id] == 1)
+      model.cancelSummaries(documentId: id)
+      await first.value
+      await second.value
+      await model.waitForSummaries()
+      #expect(!model.isSummarizing(id))
+      #expect(model.summaryReports[id]?.outcome == .cancelled)
+      #expect(model.queuedSummaryRuns[id] == nil)
+      #expect(await agent.requests.count == 1)
+      #expect(model.rows.first?.summaryProgress == nil)
+
+      await agent.setDelay(.zero)
+      await model.summarizePages(documentId: id, range: .remaining)
+      guard case .finished(let result)? = model.summaryReports[id]?.outcome else {
+        Issue.record("Expected a finished run")
+        return
+      }
+      #expect(result.summarized == [1, 2, 3])
+      #expect(model.summaryReports[id]?.text == "3 summarized.")
+      #expect(model.rows.first?.summaries?.done == 3)
+    }
+  }
+}
+
+final class PhaseRecorder: @unchecked Sendable {
+  private let lock = NSLock()
+  private var recorded: [PageSummaryPhase] = []
+  var values: [PageSummaryPhase] { lock.lock(); defer { lock.unlock() }; return recorded }
+  func record(_ phase: PageSummaryPhase) { lock.lock(); recorded.append(phase); lock.unlock() }
 }

@@ -56,6 +56,15 @@ struct AgentPaneView: View {
     }
     .onAppear { sendKey.install { inputFocused && !sendDisabled ? (agent.submit(), true).1 : false } }
     .onDisappear { sendKey.remove() }
+    .onChange(of: agent.requestedTab) { _, requested in
+      guard let requested else { return }
+      switch requested {
+      case .chat: tab = .chat
+      case .history: tab = .history
+      case .summary: tab = .summary
+      }
+      agent.requestedTab = nil
+    }
     .onChange(of: agent.focusInputRequest) { _, _ in
       tab = .chat
       inputFocused = true
