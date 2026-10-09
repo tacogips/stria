@@ -15,6 +15,7 @@ struct AgentPaneView: View {
   @State private var tab: Tab = .chat
   @FocusState private var inputFocused: Bool
   @State private var sendKey = ControlMSendMonitor()
+  @Environment(\.scenePhase) private var scenePhase
 
   enum Tab: Hashable { case chat, history, summary }
 
@@ -56,6 +57,7 @@ struct AgentPaneView: View {
     }
     .onAppear { sendKey.install { inputFocused && !sendDisabled ? (agent.submit(), true).1 : false } }
     .onDisappear { sendKey.remove() }
+    .onChange(of: scenePhase) { _, phase in if phase == .active { agent.refreshCredentialStatus() } }
     .onChange(of: agent.requestedTab) { _, requested in
       guard let requested else { return }
       switch requested {
@@ -87,6 +89,7 @@ struct AgentPaneView: View {
             .padding(.vertical, 8)
         }
         transcript
+          .frame(height: agent.isNewChat ? 32 : nil)
         composer
       case .history:
         history
@@ -177,29 +180,15 @@ struct AgentPaneView: View {
 
   /// Shown above the composer when the selection cannot be used.
   @ViewBuilder private var selectionWarning: some View {
-    if let vendor = agent.selectedVendor, !agent.availability(of: vendor).isReady {
+    if let warning = agent.configurationWarning {
       VStack(alignment: .leading, spacing: 6) {
-        Label(warningText(for: agent.availability(of: vendor)), systemImage: "exclamationmark.triangle")
+        Label(warning, systemImage: "exclamationmark.triangle")
           .foregroundStyle(.orange)
         SettingsLink { Text("Open Settings…") }
       }
       .font(.callout)
       .padding(.horizontal)
       .padding(.top, 6)
-    } else if agent.selectedVendor == nil {
-      Text("Choose a vendor and model below.")
-        .font(.caption).foregroundStyle(.secondary)
-        .padding(.horizontal)
-        .padding(.top, 6)
-    }
-  }
-
-  private func warningText(for availability: VendorAvailability) -> String {
-    switch availability {
-    case .ready: ""
-    case .unavailableOnThisPlatform: KnownVendors.platformUnavailableReason
-    case .needsCredentialName: "This vendor has no API key variable configured."
-    case .missingKey(let name): "Environment variable \(name) is not set; relaunch Stria with it or pick another vendor."
     }
   }
 
@@ -263,10 +252,12 @@ struct AgentPaneView: View {
             .font(.body)
             .scrollContentBackground(.hidden)
             .focused($inputFocused)
-            .frame(height: 96)
+            .frame(minHeight: agent.isNewChat ? 160 : 120,
+                   idealHeight: agent.isNewChat ? 280 : 160,
+                   maxHeight: agent.isNewChat ? .infinity : 200)
             .accessibilityLabel("Question")
           if agent.input.isEmpty {
-            Text("Ask about this PDF…")
+            Text("Question")
               .foregroundStyle(.tertiary)
               .padding(.top, 1)
               .padding(.leading, 5)

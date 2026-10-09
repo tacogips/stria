@@ -19,21 +19,16 @@ struct ReaderView: View {
   @AppStorage(Appearance.storageKey) private var appearance = Appearance.default
   /// The side panes' last widths, restored the next time a reader opens.
   @AppStorage("readerLeftPaneWidth") private var leftPaneWidth = 240.0
-  @AppStorage("readerAgentPaneWidth") private var agentPaneWidth = 360.0
+  @AppStorage("readerAgentPaneWidth") private var agentPaneWidth = 520.0
 
   var body: some View {
     GeometryReader { geometry in
-      readerContent
+      readerContent(height: geometry.size.height)
         .onAppear { availableWidth = geometry.size.width }
         .onChange(of: geometry.size.width) { _, width in availableWidth = width }
         .sheet(isPresented: $compactSidebar) {
           compactPane(title: "Contents", geometry: geometry) {
             LeftPaneView(reader: reader)
-          }
-        }
-        .sheet(isPresented: $compactAgent) {
-          compactPane(title: "Agent", geometry: geometry, scrollsWhenShort: true) {
-            agentPane()
           }
         }
     }
@@ -56,7 +51,6 @@ struct ReaderView: View {
   private func compactPane<Content: View>(
     title: String,
     geometry: GeometryProxy,
-    scrollsWhenShort: Bool = false,
     @ViewBuilder content: () -> Content
   ) -> some View {
     VStack(spacing: 0) {
@@ -68,17 +62,13 @@ struct ReaderView: View {
       }
       .padding(12)
       Divider()
-      if scrollsWhenShort, geometry.size.height < 480 {
-        ScrollView { content().frame(height: 420) }
-      } else {
-        content()
-      }
+      content()
     }
     .frame(width: min(400, max(280, geometry.size.width - 32)),
            height: max(180, geometry.size.height - 32))
   }
 
-  private var readerContent: some View {
+  private func readerContent(height: CGFloat) -> some View {
     HSplitView {
       if sidebarVisible {
         LeftPaneView(reader: reader)
@@ -86,7 +76,24 @@ struct ReaderView: View {
           .background(Flat.panel)
 
       }
-      PDFKitView(reader: reader)
+      VStack(spacing: 0) {
+        PDFKitView(reader: reader)
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+        if availableWidth < 1000 && compactAgent {
+          Divider()
+          VStack(spacing: 0) {
+            HStack {
+              Text("Agent").font(.headline)
+              Text("Page \(reader.currentPage) of \(reader.pageCount)")
+                .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+              Spacer()
+              Button("Done") { compactAgent = false }
+            }.padding(8)
+            ScrollView { agentPane().frame(height: 420) }
+          }
+          .frame(height: height / 2)
+        }
+      }
         .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity)
         .background(Flat.panel)
         .background(SplitWidthKeeper(leftVisible: sidebarVisible, agentVisible: agentVisible,
@@ -98,7 +105,7 @@ struct ReaderView: View {
         }
       if agentVisible {
         agentPane()
-          .frame(minWidth: 300, idealWidth: agentPaneWidth, maxWidth: 600)
+          .frame(minWidth: 480, idealWidth: max(480, agentPaneWidth), maxWidth: 800)
           .background(Flat.panel)
 
       }
@@ -324,7 +331,7 @@ private struct SplitWidthKeeper: NSViewRepresentable {
     coordinator.saveLeft = { leftWidth = $0 }
     coordinator.saveAgent = { agentWidth = $0 }
     coordinator.savedLeft = leftWidth
-    coordinator.savedAgent = agentWidth
+    coordinator.savedAgent = max(480, agentWidth)
     coordinator.applySavedWidths()
   }
 

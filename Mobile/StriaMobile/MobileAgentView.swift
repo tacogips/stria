@@ -5,10 +5,12 @@ struct MobileAgentView: View {
   let model: MobileModel
   let reader: ReaderViewModel
   @Bindable var agent: AgentPaneViewModel
+  var compact = false
   @FocusState private var inputFocused: Bool
   @State private var tab: AgentPaneTab = .chat
   @State private var settingsPresented = false
   @Environment(\.horizontalSizeClass) private var sizeClass
+  @Environment(\.scenePhase) private var scenePhase
 
   var body: some View {
     VStack(spacing: 0) {
@@ -16,7 +18,7 @@ struct MobileAgentView: View {
         Text("Chat").tag(AgentPaneTab.chat)
         Text("History").tag(AgentPaneTab.history)
         Text("Summary").tag(AgentPaneTab.summary)
-      }.pickerStyle(.segmented).padding(12)
+      }.pickerStyle(.segmented).padding(.horizontal, 12).padding(.vertical, 8)
       Divider()
       switch tab {
       case .chat: chat
@@ -25,7 +27,7 @@ struct MobileAgentView: View {
       }
     }
     .background(Flat.panel)
-    .sheet(isPresented: $settingsPresented) {
+    .sheet(isPresented: $settingsPresented, onDismiss: agent.refreshCredentialStatus) {
       MobileSettingsView(settings: model.settings, sync: model.sync)
     }
     .sheet(isPresented: Binding(get: { sizeClass != .regular && model.search.isShowingResults },
@@ -35,6 +37,7 @@ struct MobileAgentView: View {
     .task { await agent.reloadHistory() }
     .onChange(of: agent.focusInputRequest) { _, _ in tab = .chat; inputFocused = true }
     .onChange(of: agent.historyMode) { _, _ in Task { await agent.reloadHistory() } }
+    .onChange(of: scenePhase) { _, phase in if phase == .active { agent.refreshCredentialStatus() } }
   }
 
   private var chat: some View {
@@ -46,16 +49,12 @@ struct MobileAgentView: View {
         Button { Task { await agent.retitle() } } label: { Image(systemName: "arrow.clockwise") }
           .disabled(agent.threadId == nil || agent.isTitlingCurrentChat)
           .accessibilityLabel("Regenerate chat title")
-        Button { agent.newChat() } label: { Image(systemName: "square.and.pencil") }
+        Button { agent.newChat(); inputFocused = true } label: { Image(systemName: "square.and.pencil") }
           .disabled(agent.inFlight).accessibilityLabel("New chat")
       }.padding(12)
       ScrollViewReader { proxy in
         ScrollView {
           LazyVStack(alignment: .leading, spacing: 12) {
-            if agent.transcript.isEmpty {
-              Text("Ask about this PDF. Add an API key in Settings to get started.")
-                .foregroundStyle(.secondary).padding(.vertical)
-            }
             ForEach(agent.transcript, id: \.id) { message in
               VStack(alignment: .leading, spacing: 8) {
                 Text(message.role == .user ? "You" : "Stria").font(.caption.bold())
@@ -78,9 +77,16 @@ struct MobileAgentView: View {
         .onChange(of: agent.transcript.count) { _, _ in proxy.scrollTo("end", anchor: .bottom) }
         .onChange(of: agent.streamingAnswer) { _, _ in proxy.scrollTo("end", anchor: .bottom) }
       }
+      .frame(maxHeight: agent.isNewChat ? 32 : .infinity)
       Divider()
-      composer
+      if compact {
+        ScrollView { composer }
+          .frame(maxHeight: agent.isNewChat ? .infinity : 220)
+      } else {
+        composer
+      }
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 
   private var composer: some View {
@@ -103,8 +109,14 @@ struct MobileAgentView: View {
         Button { model.settings.load(); settingsPresented = true } label: { Image(systemName: "gearshape") }
           .accessibilityLabel("Agent settings")
       }
-      if let vendor = agent.selectedVendor, !KnownVendors.isAvailableOnThisPlatform(vendor, platform: .iOS) {
-        Text(KnownVendors.platformUnavailableReason).font(.caption).foregroundStyle(.orange)
+      if let warning = agent.configurationWarning {
+        Button { model.settings.load(); settingsPresented = true } label: {
+          Label(warning, systemImage: "exclamationmark.triangle")
+            .font(.callout).foregroundStyle(.orange)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Opens API settings")
       }
       Picker("Context", selection: $agent.scope) {
         Text("Page").tag(AgentScope.page)
@@ -113,9 +125,14 @@ struct MobileAgentView: View {
       }.pickerStyle(.segmented)
       Text(agent.scopeDescription).font(.caption).foregroundStyle(.secondary)
       HStack(alignment: .bottom) {
-        TextField("Ask a question", text: $agent.input, axis: .vertical)
+        TextEditor(text: $agent.input)
           .focused($inputFocused)
-          .lineLimit(1...5).padding(8).overlay(Rectangle().stroke(Flat.border))
+          .scrollContentBackground(.hidden)
+          .frame(minHeight: compact ? 60 : (agent.isNewChat ? 120 : 96),
+                 idealHeight: compact ? 80 : (agent.isNewChat ? 240 : 140),
+                 maxHeight: compact ? 100 : (agent.isNewChat ? .infinity : 180))
+          .padding(8).overlay(Rectangle().stroke(Flat.border))
+          .accessibilityLabel("Question")
         VoiceInputButton(agent: agent)
         if agent.inFlight {
           Button("Cancel") { agent.cancel() }

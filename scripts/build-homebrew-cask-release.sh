@@ -22,6 +22,7 @@ Required environment for real builds:
   APPLE_ID                Apple ID email for notarization.
   APPLE_PASSWORD          Apple app-specific password for notarization.
   APPLE_TEAM_ID           Apple Developer Team ID for notarization.
+  Stria Mac Developer ID provisioning profile at .build/macos-signing/StriaDeveloperID.provisionprofile.
 
 Optional environment:
   RELEASE_VERSION       Override archive version used in archive names.
@@ -31,6 +32,7 @@ Optional environment:
   SWIFT_SDKROOT         Defaults to Xcode's macOS SDK path.
   NOTARYTOOL            Defaults to Xcode's notarytool.
   STAPLER               Defaults to Xcode's stapler.
+  STRIA_MAC_PROFILE_PATH Override the Mac provisioning profile path.
 
 Examples:
   scripts/build-homebrew-cask-release.sh --dry-run darwin-arm64 darwin-x64
@@ -256,6 +258,7 @@ write_info_plist() {
   <key>CFBundleExecutable</key><string>$app_product</string>
   <key>CFBundleIconFile</key><string>$app_name</string>
   <key>CFBundleIdentifier</key><string>$bundle_id</string>
+  <key>StriaSharedKeychainAccessGroup</key><string>${APPLE_TEAM_ID}.me.tacogips.stria.mobile</string>
   <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
   <key>CFBundleName</key><string>$app_name</string>
   <key>CFBundlePackageType</key><string>APPL</string>
@@ -330,22 +333,48 @@ build_target() {
   test -x "$notarytool"
   test -x "$stapler"
   test -f "$repo_root/Resources/$app_name.icns"
+  local mac_profile signing_entitlements
+  mac_profile="${STRIA_MAC_PROFILE_PATH:-$repo_root/.build/macos-signing/StriaDeveloperID.provisionprofile}"
+  signing_entitlements="$work_dir/Stria-signing.entitlements"
+  if [[ ! -f "$mac_profile" ]]; then
+    printf 'missing Mac Developer ID provisioning profile: %s\n' "$mac_profile" >&2
+    return 1
+  fi
   assert_codesigning_identity "$APPLE_SIGNING_IDENTITY"
 
   rm -rf "$work_dir" "$dmg_path" "$dmg_path.sha256" "$app_zip"
   mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources"
+  /usr/bin/python3 - "$mac_profile" "$repo_root/Resources/Stria.entitlements" "$signing_entitlements" <<'PY'
+import os, plistlib, subprocess, sys
+profile = plistlib.loads(subprocess.run(['security', 'cms', '-D', '-i', sys.argv[1]],
+                                  capture_output=True, check=True).stdout)
+team = os.environ['APPLE_TEAM_ID']
+assert profile['Entitlements']['com.apple.application-identifier'] == team + '.me.tacogips.stria'
+assert team + '.*' in profile['Entitlements'].get('keychain-access-groups', [])
+for name in ['com.apple.developer.icloud-container-identifiers', 'com.apple.developer.ubiquity-container-identifiers']:
+    assert 'iCloud.me.tacogips.stria' in profile['Entitlements'].get(name, []), 'Profile lacks Stria iCloud container'
+services = profile['Entitlements'].get('com.apple.developer.icloud-services', [])
+assert 'CloudDocuments' in services or '*' in services, 'Profile lacks iCloud document service'
+entitlements = plistlib.load(open(sys.argv[2], 'rb'))
+entitlements['com.apple.application-identifier'] = team + '.me.tacogips.stria'
+entitlements['com.apple.developer.team-identifier'] = team
+entitlements['keychain-access-groups'] = [team + '.me.tacogips.stria.mobile']
+with open(sys.argv[3], 'wb') as stream:
+    plistlib.dump(entitlements, stream)
+PY
 
   bin_path="$(swift_release_bin_path "$target" | tail -n 1)"
   cp "$bin_path/$app_product" "$app_dir/Contents/MacOS/$app_product"
   cp "$bin_path/$product" "$app_dir/Contents/MacOS/$product"
   chmod 0755 "$app_dir/Contents/MacOS/$app_product" "$app_dir/Contents/MacOS/$product"
   cp "$repo_root/Resources/$app_name.icns" "$app_dir/Contents/Resources/$app_name.icns"
+  cp "$mac_profile" "$app_dir/Contents/embedded.provisionprofile"
   printf 'APPL????' > "$app_dir/Contents/PkgInfo"
   write_info_plist "$app_dir/Contents/Info.plist" "$version"
 
   # Nested code first, then the bundle (no --deep).
   codesign --force --options runtime --timestamp --sign "$APPLE_SIGNING_IDENTITY" "$app_dir/Contents/MacOS/$product"
-  codesign --force --options runtime --timestamp --entitlements "$repo_root/Resources/Stria.entitlements" --sign "$APPLE_SIGNING_IDENTITY" "$app_dir"
+  codesign --force --options runtime --timestamp --entitlements "$signing_entitlements" --sign "$APPLE_SIGNING_IDENTITY" "$app_dir"
   codesign --verify --strict --deep --verbose=2 "$app_dir"
 
   ditto -c -k --keepParent "$app_dir" "$app_zip"

@@ -58,7 +58,9 @@ final class InMemoryCredentialStore: CredentialStore, @unchecked Sendable {
     store.delete(vendor: "openai")
     #expect(try mobile.merged(credentials: names)["CUSTOM_KEY"] == "process")
     let mac = CredentialEnvironment(environment: [:], platform: .macOS, store: store)
-    #expect(try mac.merged(credentials: names).isEmpty)
+    #expect(try mac.merged(credentials: names)["OTHER_KEY"] == "other")
+    let macWithEnvironment = CredentialEnvironment(environment: ["OTHER_KEY": "from process"], platform: .macOS, store: store)
+    #expect(try macWithEnvironment.merged(credentials: names)["OTHER_KEY"] == "from process")
   }
 
   @Test @MainActor func mobilePickersAvailabilityAndSettingsValidation() async throws {

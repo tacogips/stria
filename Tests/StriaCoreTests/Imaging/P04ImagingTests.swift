@@ -99,6 +99,15 @@ struct RenderCodecTests {
     }
   }
 
+  @Test func thumbnailsDownsampleEncodedImagesAndRejectInvalidInput() throws {
+    let encoded = try ImageCodec.encode(sampleImage(width: 2400, height: 1600), preferred: .jpeg, quality: 0.75)
+    let thumbnail = try ImageCodec.thumbnail(data: encoded.data, maxPixel: 240)
+    #expect(thumbnail.width == 240)
+    #expect(thumbnail.height == 160)
+    #expect(throws: StriaError.self) { try ImageCodec.thumbnail(data: encoded.data, maxPixel: 0) }
+    #expect(throws: StriaError.self) { try ImageCodec.thumbnail(data: Data("invalid".utf8), maxPixel: 240) }
+  }
+
   @Test func imageFormatsRoundTripAndPNGHasSignature() throws {
     let image = try sampleImage(width: 12, height: 8)
     let preferredHEIC = try ImageCodec.encode(image, preferred: .heic, quality: 0.75)

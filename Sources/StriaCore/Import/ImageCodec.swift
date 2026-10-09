@@ -23,6 +23,25 @@ public enum ImageCodec {
     return image
   }
 
+  /// Downsample directly from encoded bytes without first allocating a full-size bitmap.
+  public static func thumbnail(data: Data, maxPixel: Int) throws -> CGImage {
+    guard maxPixel > 0 else { throw StriaError.io("Thumbnail size must be positive") }
+    return try autoreleasepool {
+      let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+      let options: [CFString: Any] = [
+        kCGImageSourceCreateThumbnailFromImageAlways: true,
+        kCGImageSourceThumbnailMaxPixelSize: maxPixel,
+        kCGImageSourceCreateThumbnailWithTransform: true,
+        kCGImageSourceShouldCacheImmediately: true
+      ]
+      guard let source = CGImageSourceCreateWithData(data as CFData, sourceOptions),
+            let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+        throw StriaError.io("ImageIO could not decode the page thumbnail")
+      }
+      return image
+    }
+  }
+
   /// A downscaled copy whose longest side is at most `maxPixel` (the image
   /// itself when it is already small enough).
   public static func thumbnail(of image: CGImage, maxPixel: Int) -> CGImage {

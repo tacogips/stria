@@ -11,6 +11,7 @@ import Testing
     let reader = ReaderViewModel(library: library, documentId: imported.document.id)
     try await reader.open()
     let pane = AgentPaneViewModel(library: library, reader: reader)
+    #expect(pane.isNewChat)
     reader.pageDidChange(to: 2)
     #expect(pane.scopeDescription == "Sees page 2")
     pane.scope = .nearby
@@ -29,6 +30,10 @@ import Testing
     #expect(pane.threads.first?.firstQuestion == "What is here?")
     #expect(pane.threads.first?.messageCount == 2)
     #expect(pane.input.isEmpty)
+    #expect(!pane.isNewChat)
+    pane.newChat()
+    #expect(pane.isNewChat)
+    #expect(pane.threads.count == 1)
     await reader.close()
   }
 }
@@ -100,15 +105,19 @@ import Testing
 
     pane.input = "second"
     pane.submit()
-    try await Task.sleep(for: .milliseconds(50))
-    await pane.send()
+    // Image preparation is lazy and may take longer under a parallel test run.
+    for _ in 0..<500 where pane.transcript.last?.role != .assistant {
+      try await Task.sleep(for: .milliseconds(10))
+    }
     #expect(pane.transcript.map(\.role) == [.user, .assistant])
     #expect(pane.transcript.allSatisfy { $0.id != AgentPaneViewModel.pendingMessageID })
 
     pane.historyMode = .page
     pane.scheduleHistoryReload()
     pane.scheduleHistoryReload()
-    try await Task.sleep(for: .milliseconds(100))
+    for _ in 0..<500 where pane.threads.isEmpty {
+      try await Task.sleep(for: .milliseconds(10))
+    }
     #expect(pane.threads.count == 1)
     await reader.close()
   }

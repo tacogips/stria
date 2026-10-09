@@ -20,6 +20,8 @@ fi
 swift = "6.3.3"
 swiftlint = "latest"
 xcodegen = "2.46.0"
+"gem:fastlane" = "latest"
+ruby = "3.4"
 gitleaks = "latest"
 pre-commit = "latest"
 
@@ -122,3 +124,19 @@ run = "xcodegen generate --spec Mobile/project.yml"
 description = "Build Stria for iPhone and iPad simulators"
 depends = ["ios:generate"]
 run = "scripts/ios-build.sh"
+
+[tasks."ios:archive"]
+description = "Archive the iPhone/iPad app with its local distribution profile"
+run = "python3 scripts/ios-release.py archive"
+
+[tasks."ios:export"]
+description = "Export an App Store Connect IPA"
+run = "python3 scripts/ios-release.py export"
+
+[tasks."ios:check-ipa"]
+description = "Verify the signed universal iOS IPA"
+run = "python3 scripts/ios-release.py check"
+
+[tasks."ios:upload"]
+description = "Upload the exported IPA to TestFlight with project Kinko credentials"
+run = "kinko exec --env APPLE_ID,APPLE_PASSWORD,APP_STORE_CONNECT_API_KEY_ID,APP_STORE_CONNECT_API_PRIVATE_KEY,APP_STORE_CONNECT_API_KEY_TYPE -- python3 scripts/ios-upload.py"

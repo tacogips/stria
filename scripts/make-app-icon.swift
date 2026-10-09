@@ -1,8 +1,13 @@
-// Renders Resources/Stria.icns: a white page with text lines, one of them
-// highlighted (an OCR search hit), on a solid blue tile.
+// Wraps the shared Stria paper icon in a transparent macOS icon canvas.
 // Usage: swiftc -O scripts/make-app-icon.swift -o /tmp/make-icon && /tmp/make-icon <output.icns>
 import AppKit
 import Foundation
+
+let artwork = URL(fileURLWithPath: "Mobile/StriaMobile/Assets.xcassets/AppIcon.appiconset/Stria-Paper.png")
+guard let source = NSImage(contentsOf: artwork),
+      let sourceImage = source.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+  fatalError("Could not load Stria icon artwork")
+}
 
 func renderPNG(size: Int) -> Data {
   let scale = CGFloat(size) / 1024
@@ -11,34 +16,11 @@ func renderPNG(size: Int) -> Data {
   guard let context = NSGraphicsContext.current?.cgContext else { fatalError("no context") }
   context.scaleBy(x: scale, y: scale)
 
-  // macOS icon grid: 824 pt tile centred on the 1024 canvas.
+  // macOS icon grid: 824 pt rounded tile centred on a transparent canvas.
   let tile = CGRect(x: 100, y: 100, width: 824, height: 824)
-  context.setFillColor(NSColor(srgbRed: 0.10, green: 0.42, blue: 0.95, alpha: 1).cgColor)
   context.addPath(CGPath(roundedRect: tile, cornerWidth: 185, cornerHeight: 185, transform: nil))
-  context.fillPath()
-
-  // The page.
-  let page = CGRect(x: 292, y: 210, width: 440, height: 600)
-  context.setFillColor(NSColor.white.cgColor)
-  context.addPath(CGPath(roundedRect: page, cornerWidth: 28, cornerHeight: 28, transform: nil))
-  context.fillPath()
-
-  // Text lines; the fourth is highlighted.
-  let lineHeight: CGFloat = 26
-  let widths: [CGFloat] = [340, 300, 340, 250, 330, 280, 320]
-  for (index, width) in widths.enumerated() {
-    let y = page.maxY - 110 - CGFloat(index) * 66
-    if index == 3 {
-      context.setFillColor(NSColor(srgbRed: 1.0, green: 0.78, blue: 0.10, alpha: 1).cgColor)
-      context.fill(CGRect(x: page.minX + 44, y: y - 14, width: width + 24, height: lineHeight + 28))
-      context.setFillColor(NSColor(srgbRed: 0.12, green: 0.12, blue: 0.14, alpha: 1).cgColor)
-    } else {
-      context.setFillColor(NSColor(srgbRed: 0.72, green: 0.75, blue: 0.80, alpha: 1).cgColor)
-    }
-    context.addPath(CGPath(roundedRect: CGRect(x: page.minX + 56, y: y, width: width, height: lineHeight),
-                           cornerWidth: 13, cornerHeight: 13, transform: nil))
-    context.fillPath()
-  }
+  context.clip()
+  context.draw(sourceImage, in: tile)
   image.unlockFocus()
   guard let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
         let png = rep.representation(using: .png, properties: [:]) else { fatalError("png") }

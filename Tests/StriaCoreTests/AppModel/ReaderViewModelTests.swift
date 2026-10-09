@@ -3,6 +3,26 @@ import Foundation
 import Testing
 
 @Suite @MainActor struct ReaderViewModelTests {
+@Test func readerLoadsThumbnailsWithoutExpandingPages() async throws {
+  try await withAppModelDataRoot { paths in
+    let (library, source) = try makeAppModelFixture(paths: paths, pageTexts: ["1", "2", "3"])
+    let imported = try await library.importDocument(at: source, runOCR: false)
+    let reader = ReaderViewModel(library: library, documentId: imported.document.id)
+    try await reader.open()
+    let thumbnail = try #require(try await reader.thumbnail(page: 2))
+    #expect(max(thumbnail.width, thumbnail.height) <= 240)
+    await reader.close()
+    #expect(reader.pdfDocument == nil)
+    for page in 1...3 {
+      #expect(!FileManager.default.fileExists(atPath: paths.cachedPage(docId: imported.document.id, page: page).path))
+    }
+    // Explicit consumers still expand exactly the page they need.
+    _ = try await library.pageImage(documentId: imported.document.id, page: 2)
+    #expect(FileManager.default.fileExists(atPath: paths.cachedPage(docId: imported.document.id, page: 2).path))
+    #expect(!FileManager.default.fileExists(atPath: paths.cachedPage(docId: imported.document.id, page: 1).path))
+  }
+}
+
 @Test func readerPageFieldClampsAndRejectsNonNumericInput() async throws {
   try await withAppModelDataRoot { paths in
     let (library, source) = try makeAppModelFixture(paths: paths, pageTexts: ["1", "2", "3", "4", "5"])
@@ -91,7 +111,6 @@ import Testing
     #expect(search.resultsScope == .allDocuments)
     search.close()
     #expect(!search.isShowingResults)
-    await reader.waitForExpansion()
     #expect(FileManager.default.fileExists(atPath: library.paths.cachedPage(docId: imported.document.id, page: 1).path))
     await reader.close()
 

@@ -120,11 +120,12 @@ struct SettingsView: View {
         Text("Agent API Keys")
       } footer: {
         Text("""
-          The name of the environment variable holding each API vendor's key; values are read from the environment \
-          Stria was launched from and never stored. The vendor and model for a question are chosen in the chat pane; \
+          The name of the environment variable used by each API vendor. Values can come from a saved Keychain key or \
+          from the environment Stria was launched from. The vendor and model for a question are chosen in the chat pane; \
           CLI vendors (Claude Code, Codex, Cursor) use their own login.
           """)
       }
+      APIKeySettingsSection(settings: settings)
       Section {
         TextEditor(text: $settings.agentSystemPrompt)
           .font(.system(.body, design: .monospaced))

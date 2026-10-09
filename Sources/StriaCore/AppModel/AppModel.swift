@@ -41,6 +41,7 @@ public final class AppModel {
       sync.configurationChanged()
       Task { await self.library.refresh() }
     }
+    settings.onCredentialsChanged = { [weak self] in self?.agent?.refreshCredentialStatus() }
   }
 
   /// Opens a document, optionally at a page (a library search hit).

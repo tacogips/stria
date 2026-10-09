@@ -4,6 +4,20 @@ import StriaCore
 import Testing
 
 @Suite("ImportTests") struct ImportTests {
+  @Test func importsAcrossRenderingBatches() async throws {
+    try await withTestDataRoot { paths in
+      let pages = (1...18).map { "Page \($0)" }
+      let (library, source) = try await makeImportFixture(paths: paths, pageTexts: pages)
+      let result = try await library.importDocument(at: source, runOCR: false)
+      #expect(result.document.importStatus == .ready)
+      #expect(try await library.store.pageNumbers(documentId: result.document.id) == Array(1...18))
+      for page in [1, 16, 17, 18] {
+        let image = try #require(try await library.store.pageImage(documentId: result.document.id, page: page))
+        #expect(image.width > 0 && image.height > 0)
+      }
+    }
+  }
+
   @Test func emitsCopiedOnlyAfterRowAndRendersPagesInOrder() async throws {
     try await withTestDataRoot { paths in
       let (library, source) = try await makeImportFixture(paths: paths, pageTexts: ["one", "two", "three"])

@@ -7,6 +7,7 @@ import Observation
 @MainActor
 @Observable
 public final class SettingsViewModel {
+  public var onCredentialsChanged: (() -> Void)?
   /// "" stands for "not configured".
   public static let notConfigured = ""
   public static let ocrVendorOptions = [notConfigured, KnownVendors.pdfTextLayer] + KnownVendors.selectable
@@ -63,20 +64,35 @@ public final class SettingsViewModel {
   public var ocrVendorOptions: [String] { [Self.notConfigured, KnownVendors.pdfTextLayer] + KnownVendors.selectable(on: library.environment.platform) }
   public var summaryVendorOptions: [String] { [Self.notConfigured] + KnownVendors.selectable(on: library.environment.platform) }
 
-  /// Saves a mobile API key immediately; values never enter the config draft.
-  public func saveCredential(_ value: String, for vendor: String) throws {
-    guard library.environment.platform == .iOS, KnownVendors.apiKeyVendors.contains(vendor) else {
-      throw StriaError.config("API keys are stored in environment variables on the Mac")
+  /// Saves an API key immediately; values never enter the config draft.
+  public var supportsCredentialSync: Bool { library.environment.credentialStore is any CredentialSynchronizationStore }
+  public var credentialSyncEnabled: Bool {
+    (library.environment.credentialStore as? any CredentialSynchronizationStore)?.isSynchronizationEnabled ?? false
+  }
+
+  public func setCredentialSyncEnabled(_ enabled: Bool) throws {
+    guard let store = library.environment.credentialStore as? any CredentialSynchronizationStore else {
+      throw StriaError.config("API key synchronization is unavailable")
     }
+    try store.setSynchronizationEnabled(enabled)
+    onCredentialsChanged?()
+  }
+
+  public func saveCredential(_ value: String, for vendor: String) throws {
+    guard KnownVendors.apiKeyVendors.contains(vendor) else { throw StriaError.config("Unsupported API vendor") }
+    guard let value = Self.trimmed(value) else { throw StriaError.config("Enter an API key before saving") }
     try library.environment.credentialStore.write(value, vendor: vendor)
+    onCredentialsChanged?()
   }
 
   public func deleteCredential(for vendor: String) throws {
-    guard library.environment.platform == .iOS else { return }
+    guard KnownVendors.apiKeyVendors.contains(vendor) else { throw StriaError.config("Unsupported API vendor") }
     try library.environment.credentialStore.delete(vendor: vendor)
+    onCredentialsChanged?()
   }
 
   public func hasCredential(for vendor: String) -> Bool {
+    if (try? library.environment.credentialStore.read(vendor: vendor)).map({ !$0.isEmpty }) == true { return true }
     guard let name = Self.trimmed(credentials[vendor] ?? "") else { return false }
     return environmentHasValue(name)
   }
@@ -103,12 +119,10 @@ public final class SettingsViewModel {
   public func environmentHasValue(_ name: String) -> Bool {
     let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return false }
-    if library.environment.platform == .iOS {
-      var vendors = credentials.filter { Self.trimmed($0.value) == trimmed }.map(\.key)
-      if Self.trimmed(ocrAPIKeyEnvironment) == trimmed { vendors.append(ocrVendor) }
-      for vendor in vendors where KnownVendors.apiKeyVendors.contains(vendor) {
-        if let value = try? library.environment.credentialStore.read(vendor: vendor), !value.isEmpty { return true }
-      }
+    var vendors = credentials.filter { Self.trimmed($0.value) == trimmed }.map(\.key)
+    if Self.trimmed(ocrAPIKeyEnvironment) == trimmed { vendors.append(ocrVendor) }
+    for vendor in vendors where KnownVendors.apiKeyVendors.contains(vendor) {
+      if let value = try? library.environment.credentialStore.read(vendor: vendor), !value.isEmpty { return true }
     }
     return processEnvironment[trimmed].map { !$0.isEmpty } ?? false
   }
@@ -175,7 +189,9 @@ public final class SettingsViewModel {
     summaryLanguage = config.summary.language
     summaryPrompt = config.summary.prompt ?? PageSummaryDefaults.prompt
     credentials = config.agent.credentials
-    for vendor in Self.credentialVendors where credentials[vendor] == nil { credentials[vendor] = "" }
+    for vendor in Self.credentialVendors where Self.trimmed(credentials[vendor] ?? "") == nil {
+      credentials[vendor] = Self.suggestedAPIKeyEnvironment(for: vendor)
+    }
     agentSystemPrompt = config.agent.systemPrompt ?? AgentDefaults.systemPrompt
     agentAutoSummarize = config.agent.autoSummarize
     error = nil

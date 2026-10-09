@@ -11,7 +11,7 @@ settings:
     TARGETED_DEVICE_FAMILY: "1,2"
     CODE_SIGN_STYLE: Automatic
     MARKETING_VERSION: "0.1.1"
-    CURRENT_PROJECT_VERSION: "1"
+    CURRENT_PROJECT_VERSION: "5"
 targets:
   StriaMobile:
     type: application
@@ -20,6 +20,12 @@ targets:
     dependencies:
       - package: Stria
         product: StriaCore
+    entitlements:
+      path: StriaMobile/StriaMobile.entitlements
+      properties:
+        com.apple.developer.icloud-container-identifiers: [iCloud.me.tacogips.stria]
+        com.apple.developer.ubiquity-container-identifiers: [iCloud.me.tacogips.stria]
+        com.apple.developer.icloud-services: [CloudDocuments]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: me.tacogips.stria.mobile
@@ -28,6 +34,14 @@ targets:
       path: build/Info.plist
       properties:
         CFBundleDisplayName: Stria
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        ITSAppUsesNonExemptEncryption: false
+        NSUbiquitousContainers:
+          iCloud.me.tacogips.stria:
+            NSUbiquitousContainerIsDocumentScopePublic: true
+            NSUbiquitousContainerName: Stria
+            NSUbiquitousContainerSupportedFolderLevels: Any
         NSMicrophoneUsageDescription: "Stria records your voice to turn it into a chat message."
         NSSpeechRecognitionUsageDescription: "Stria turns your speech into text for the agent chat."
         UILaunchScreen: {}

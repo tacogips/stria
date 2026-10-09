@@ -28,8 +28,10 @@ public struct PageImageCache: Sendable {
   public func write(image: StoredPageImage, to url: URL) throws {
     do {
       try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-      let png = try ImageCodec.pngData(ImageCodec.decode(image.data))
-      try png.write(to: url, options: .atomic)
+      try autoreleasepool {
+        let png = try ImageCodec.pngData(ImageCodec.decode(image.data))
+        try png.write(to: url, options: .atomic)
+      }
     } catch let error as StriaError {
       throw error
     } catch {

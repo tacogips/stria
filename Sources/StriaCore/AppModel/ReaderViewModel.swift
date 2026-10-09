@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import Observation
 import PDFKit
@@ -72,7 +73,6 @@ public final class ReaderViewModel {
 
   private let library: StriaLibrary
   private let debounce: Duration
-  private var expansionTask: Task<Void, Never>?
   private var readingSaveTask: Task<Void, Never>?
 
   public init(library: StriaLibrary, documentId: String, debounce: Duration = .seconds(1)) {
@@ -100,14 +100,9 @@ public final class ReaderViewModel {
     outlineRows = OutlineRow.make(outline)
     navigation = PageNavigation(id: UUID(), page: min(max(record.lastReadPage ?? 1, 1), max(pageCount, 1)))
     updateOutlineSelection()
-    expansionTask = Task { [library, documentId] in
-      _ = try? await library.expandAllPages(documentId: documentId, concurrency: 2)
-    }
   }
 
   public func close() async {
-    expansionTask?.cancel()
-    expansionTask = nil
     await flushReadingPosition()
     pdfDocument = nil
   }
@@ -174,8 +169,27 @@ public final class ReaderViewModel {
     do { try await library.setLastReadPage(documentId: documentId, page: currentPage) } catch { }
   }
 
-  func waitForExpansion() async {
-    await expansionTask?.value
+  /// Read only the requested stored image; opening a reader never expands pages.
+  public func thumbnail(page: Int) async throws -> CGImage? {
+    try Task.checkCancellation()
+    if let image = try await library.pageThumbnail(documentId: documentId, page: page, maxPixel: 240) {
+      return image
+    }
+    // An import may not have stored this page yet. Use a short-lived document
+    // rather than sharing the reader's PDFKit objects with a background task.
+    let url = library.originalURL(documentId: documentId)
+    let task = Task.detached(priority: .utility) {
+      try Task.checkCancellation()
+      return try autoreleasepool { () throws -> CGImage? in
+        guard let document = PDFDocument(url: url), let pdfPage = document.page(at: page - 1) else { return nil }
+        return try PageRenderer.render(page: pdfPage, dpi: 72, maxPixelDimension: 240)
+      }
+    }
+    return try await withTaskCancellationHandler {
+      try await task.value
+    } onCancel: {
+      task.cancel()
+    }
   }
 
   private func updateOutlineSelection() {

@@ -122,7 +122,8 @@ public extension StriaLibrary {
   /// A stored page decoded and downscaled, without writing the PNG cache.
   func pageThumbnail(documentId: String, page: Int, maxPixel: Int) async throws -> CGImage? {
     guard let image = try await store.pageImage(documentId: documentId, page: page) else { return nil }
-    return ImageCodec.thumbnail(of: try ImageCodec.decode(image.data), maxPixel: maxPixel)
+    try Task.checkCancellation()
+    return try ImageCodec.thumbnail(data: image.data, maxPixel: maxPixel)
   }
 
   func markOpened(documentId: String) async throws {

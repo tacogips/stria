@@ -18,11 +18,7 @@ struct MobileSettingsView: View {
         ocrSection
         summarySection
         VoiceInputSettingsSection(settings: settings)
-        Section("API Keys") {
-          ForEach(KnownVendors.selectable(on: .iOS), id: \.self) { vendor in
-            MobileCredentialRow(settings: settings, vendor: vendor)
-          }
-        }
+        MobileAPIKeySection(settings: settings)
         Section("System Prompt") {
           TextEditor(text: $settings.agentSystemPrompt).frame(minHeight: 160).accessibilityLabel("System prompt")
           Button("Reset System Prompt") { settings.resetSystemPrompt() }
@@ -116,7 +112,13 @@ struct MobileSettingsView: View {
       }.disabled(!settings.syncEnabled)
       Text(folderName).font(.caption).foregroundStyle(.secondary)
       Button("Choose iCloud Drive Folder…") { choosingFolder = true }
-      Text("Pick or create iCloud Drive/Stria on each device.").font(.caption).foregroundStyle(.secondary)
+      Button("Use Default iCloud Folder") {
+        UserDefaults.standard.removeObject(forKey: MobileSyncFolder.bookmarkKey)
+        folderError = nil
+        sync.configurationChanged()
+      }
+      Text("Stria uses its own iCloud folder automatically. Choosing a different folder is optional.")
+        .font(.caption).foregroundStyle(.secondary)
       if sync.isSyncing { ProgressView("Syncing…") }
       if let date = sync.lastSyncAt { Text("Last synced \(RelativeAge.string(from: date))").font(.caption) }
       if let report = sync.lastReport {
@@ -132,7 +134,7 @@ struct MobileSettingsView: View {
 
   private var folderName: String {
     if let location = try? MobileSyncFolder.resolve() { return location.url.lastPathComponent }
-    return "Choose an iCloud Drive folder to enable sync."
+    return "Default: Stria in iCloud Drive"
   }
 
   private func reportText(_ report: SyncReport) -> String {
@@ -175,48 +177,5 @@ struct ModelField: View {
         }
       }
     }
-  }
-}
-
-/// Keys are never reloaded into fields or copied into the config draft.
-struct MobileCredentialRow: View {
-  let settings: SettingsViewModel
-  let vendor: String
-  @State private var value = ""
-  @State private var saved = false
-  @State private var error: String?
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      HStack {
-        Text(SettingsViewModel.displayName(for: vendor)).font(.headline)
-        Spacer()
-        Text(saved ? "Saved" : "Not set").font(.caption).foregroundStyle(.secondary)
-      }
-      SecureField("API key", text: $value)
-        .textInputAutocapitalization(.never).autocorrectionDisabled()
-        .accessibilityLabel("\(SettingsViewModel.displayName(for: vendor)) API key")
-      HStack {
-        Button("Save Key") {
-          do {
-            try settings.saveCredential(value, for: vendor)
-            settings.credentials[vendor] = SettingsViewModel.suggestedAPIKeyEnvironment(for: vendor)
-            value = ""
-            saved = settings.hasCredential(for: vendor)
-            error = nil
-          } catch { self.error = error.localizedDescription }
-        }.disabled(value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        Button("Delete Key", role: .destructive) {
-          do {
-            try settings.deleteCredential(for: vendor)
-            saved = false
-            value = ""
-            error = nil
-          } catch { self.error = error.localizedDescription }
-        }.disabled(!saved)
-      }.buttonStyle(.borderless)
-      if let error { Text(error).font(.caption).foregroundStyle(.red) }
-    }
-    .onAppear { saved = settings.hasCredential(for: vendor) }
   }
 }

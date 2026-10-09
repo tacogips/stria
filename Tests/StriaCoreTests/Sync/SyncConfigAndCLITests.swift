@@ -24,7 +24,7 @@ import Testing
     try await withTestDataRoot { paths in
       let home = paths.root
       let cloud = home.appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs")
-      let defaultFolder = SyncFolder(environment: [:], homeDirectory: home, platform: .macOS)
+      let defaultFolder = SyncFolder(environment: [:], homeDirectory: home, platform: .macOS, ubiquityContainer: { nil })
       #expect(throws: StriaError.self) { try defaultFolder.resolve(options: .init()) }
       try FileManager.default.createDirectory(at: cloud, withIntermediateDirectories: true)
       #expect(try defaultFolder.resolve(options: .init()).url == cloud.appendingPathComponent("Stria", isDirectory: true))
@@ -35,6 +35,23 @@ import Testing
       #expect(try mobile.resolve(options: .init(folder: "/tmp/ignored")).securityScoped)
       #expect(try mobile.resolve(options: .init()).url == cloud)
     }
+  }
+
+  @Test func defaultContainerNeedsNoSelectedFolderAndPreservesOverrides() throws {
+    let container = URL(fileURLWithPath: "/tmp/stria-container", isDirectory: true)
+    for platform in [StriaPlatform.iOS, .macOS] {
+      let folder = SyncFolder(environment: [:], platform: platform, ubiquityContainer: { container })
+      let location = try folder.resolve(options: .init())
+      #expect(location.url == container.appendingPathComponent("Documents", isDirectory: true))
+      #expect(!location.securityScoped)
+      let selected = SyncFolder(environment: [:], platform: platform,
+                                provider: { .init(url: URL(fileURLWithPath: "/tmp/selected"), securityScoped: true) },
+                                ubiquityContainer: { container })
+      #expect(try selected.resolve(options: .init()).url.path == "/tmp/selected")
+      #expect(try selected.resolve(options: .init()).securityScoped)
+    }
+    let unavailable = SyncFolder(environment: [:], platform: .iOS, ubiquityContainer: { nil })
+    #expect(throws: StriaError.self) { try unavailable.resolve(options: .init()) }
   }
 
   @Test func cliReportKeysAndUnavailableExitCode() async throws {

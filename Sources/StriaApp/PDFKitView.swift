@@ -30,6 +30,8 @@ struct PDFKitView: NSViewRepresentable {
 
   static func dismantleNSView(_ pdfView: PDFView, coordinator: Coordinator) {
     coordinator.stopObserving()
+    coordinator.pdfView = nil
+    pdfView.document = nil
   }
 
   /// Applies navigation and zoom requests once per request id. Requests are

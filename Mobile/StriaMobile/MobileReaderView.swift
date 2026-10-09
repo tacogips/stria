@@ -58,36 +58,65 @@ struct MobileReaderView: View {
   @Bindable var model: MobileModel
   @Bindable var reader: ReaderViewModel
   let agent: AgentPaneViewModel
-  @Environment(\.horizontalSizeClass) private var sizeClass
-  @State private var contents = false
+  @State private var availableWidth: CGFloat = 0
+  @State private var contentsVisible = true
+  @State private var contentsSheet = false
   @State private var goToPage = false
   @State private var ocr = false
 
   var body: some View {
-    HStack(spacing: 0) {
-      VStack(spacing: 0) {
-        MobilePDFView(reader: reader)
-        Divider()
-        Button("\(reader.currentPage) / \(reader.pageCount)") { goToPage = true }
-          .monospacedDigit().padding(10).accessibilityLabel("Go to page, \(reader.currentPage) of \(reader.pageCount)")
+    GeometryReader { geometry in
+      HStack(spacing: 0) {
+        if showsContentsInline {
+          MobileContentsPane(reader: reader, dismissOnSelection: false)
+            .frame(width: 240)
+          Divider()
+        }
+        VStack(spacing: 0) {
+          VStack(spacing: 0) {
+            MobilePDFView(reader: reader)
+            Divider()
+            Button("\(reader.currentPage) / \(reader.pageCount)") { goToPage = true }
+              .monospacedDigit().padding(10).accessibilityLabel("Go to page, \(reader.currentPage) of \(reader.pageCount)")
+          }
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+          if showsAgentBelow {
+            Divider()
+            VStack(spacing: 0) {
+              HStack {
+                Text("Agent").font(.headline)
+                Text("Page \(reader.currentPage) of \(reader.pageCount)")
+                  .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                Spacer()
+                Button("Done") { model.showingAgent = false }
+              }.padding(.horizontal, 12).padding(.vertical, 8)
+              MobileAgentView(model: model, reader: reader, agent: agent, compact: true)
+            }
+            .frame(height: geometry.size.height / 2)
+          }
+        }
+        if showsAgentInline {
+          Divider()
+          MobileAgentView(model: model, reader: reader, agent: agent)
+            .frame(width: min(520, max(420, availableWidth * 0.42)))
+        }
       }
-      if sizeClass == .regular, model.showingAgent {
-        Divider()
-        MobileAgentView(model: model, reader: reader, agent: agent)
-          .frame(width: 340)
-      }
+      .onAppear { availableWidth = geometry.size.width }
+      .onChange(of: geometry.size.width) { _, width in availableWidth = width }
     }
     .background(Flat.panel)
     .navigationTitle(reader.title)
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
       ToolbarItemGroup(placement: .topBarTrailing) {
-        Button { contents = true } label: { Image(systemName: "list.bullet") }.accessibilityLabel("Contents")
+        Button {
+          if isPad && availableWidth >= 760 { contentsVisible.toggle() } else { contentsSheet = true }
+        } label: { Image(systemName: "list.bullet") }.accessibilityLabel("Contents")
         Button { ocr = true } label: { Image(systemName: "text.viewfinder") }.accessibilityLabel("Run OCR")
         Button { model.showingAgent.toggle() } label: { Image(systemName: "bubble.left.and.bubble.right") }.accessibilityLabel("Show or hide agent")
       }
     }
-    .sheet(isPresented: $contents) { MobileContentsView(reader: reader) }
+    .sheet(isPresented: $contentsSheet) { MobileContentsView(reader: reader) }
     .sheet(isPresented: $goToPage) {
       NavigationStack {
         Form {
@@ -104,64 +133,89 @@ struct MobileReaderView: View {
         MobileRunSheet(row: row, currentPage: reader.currentPage, settings: model.settings, library: model.library, summary: false)
       }
     }
-    .sheet(isPresented: Binding(get: { sizeClass != .regular && model.showingAgent }, set: { model.showingAgent = $0 })) {
-      NavigationStack {
-        MobileAgentView(model: model, reader: reader, agent: agent)
-          .navigationTitle("Agent").navigationBarTitleDisplayMode(.inline)
-          .toolbar { Button("Done") { model.showingAgent = false } }
-      }
-      .presentationDetents([.medium, .large])
-      .presentationDragIndicator(.visible)
-    }
     .onDisappear { agent.cancelDictation() }
     .onChange(of: reader.currentPage) { _, _ in agent.scheduleHistoryReload() }
   }
+
+  private var isPad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
+  private var showsContentsInline: Bool { isPad && availableWidth >= 760 && contentsVisible }
+  private var showsAgentBelow: Bool { model.showingAgent && !showsAgentInline }
+  private var showsAgentInline: Bool { isPad && availableWidth >= 1000 && model.showingAgent }
 }
 
 struct MobileContentsView: View {
   let reader: ReaderViewModel
   @Environment(\.dismiss) private var dismiss
-  @State private var thumbnails = false
 
   var body: some View {
     NavigationStack {
-      VStack {
-        Picker("Contents", selection: $thumbnails) {
-          Text("Outline").tag(false)
-          Text("Pages").tag(true)
-        }.pickerStyle(.segmented).padding(.horizontal)
-        if thumbnails {
-          ScrollView {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 100))]) {
-              ForEach(1...max(reader.pageCount, 1), id: \.self) { page in
-                Button { navigate(page) } label: {
-                  VStack {
-                    if let image = reader.pdfDocument?.page(at: page - 1)?.thumbnail(of: CGSize(width: 100, height: 140), for: .cropBox) {
-                      Image(uiImage: image).resizable().scaledToFit().frame(height: 140)
-                    }
-                    Text("Page \(page)")
-                  }
-                }
-                .accessibilityLabel("Open page \(page)")
-              }
-            }.padding()
-          }
-        } else if reader.outlineRows.isEmpty {
-          ContentUnavailableView("No Outline", systemImage: "list.bullet", description: Text("Use Pages to browse thumbnails."))
-        } else {
-          List {
-            OutlineGroup(reader.outlineRows, children: \.optionalChildren) { row in
-              Button { if let page = row.page { navigate(page) } } label: {
-                HStack { Text(row.title); Spacer(); if let page = row.page { Text("\(page)").foregroundStyle(.secondary) } }
-              }.disabled(row.page == nil)
-            }
-          }.listStyle(.plain)
-        }
-      }
+      MobileContentsPane(reader: reader, dismissOnSelection: true)
       .navigationTitle("Contents")
       .toolbar { Button("Done") { dismiss() } }
     }
   }
+}
 
-  private func navigate(_ page: Int) { reader.goToPage(page); dismiss() }
+struct MobileContentsPane: View {
+  let reader: ReaderViewModel
+  let dismissOnSelection: Bool
+  @Environment(\.dismiss) private var dismiss
+  @State private var thumbnails = false
+
+  var body: some View {
+    VStack {
+      Picker("Contents", selection: $thumbnails) {
+        Text("Outline").tag(false)
+        Text("Pages").tag(true)
+      }.pickerStyle(.segmented).padding(.horizontal)
+      if thumbnails {
+        ScrollView {
+          LazyVStack {
+            ForEach(1...max(reader.pageCount, 1), id: \.self) { page in
+              MobilePageThumbnail(reader: reader, page: page) { navigate(page) }
+            }
+          }.padding()
+        }
+      } else if reader.outlineRows.isEmpty {
+        ContentUnavailableView("No Outline", systemImage: "list.bullet", description: Text("Use Pages to browse thumbnails."))
+      } else {
+        List {
+          OutlineGroup(reader.outlineRows, children: \.optionalChildren) { row in
+            Button { if let page = row.page { navigate(page) } } label: {
+              HStack { Text(row.title); Spacer(); if let page = row.page { Text("\(page)").foregroundStyle(.secondary) } }
+            }.disabled(row.page == nil)
+          }
+        }.listStyle(.plain)
+      }
+    }
+    .background(Flat.panel)
+  }
+
+  private func navigate(_ page: Int) {
+    reader.goToPage(page)
+    if dismissOnSelection { dismiss() }
+  }
+}
+
+private struct MobilePageThumbnail: View {
+  let reader: ReaderViewModel
+  let page: Int
+  let navigate: () -> Void
+  @State private var image: CGImage?
+
+  var body: some View {
+    Button(action: navigate) {
+      VStack {
+        if let image {
+          Image(decorative: image, scale: 1).resizable().scaledToFit().frame(height: 140)
+        } else {
+          Image(systemName: "doc.richtext").frame(height: 140)
+        }
+        Text("Page \(page)")
+      }
+    }
+    .accessibilityLabel("Open page \(page)")
+    .task(id: page) { image = try? await reader.thumbnail(page: page) }
+    .onDisappear { image = nil }
+  }
 }

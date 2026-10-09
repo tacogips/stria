@@ -114,6 +114,7 @@ public final class LibraryViewModel {
   var runningSummaryWork: [String: Task<PageSummaryRunResult, Error>] = [:]
 
   let library: StriaLibrary
+  private var importTail: Task<Void, Never>?
   private var importTasks: [UUID: Task<Void, Never>] = [:]
   private var unavailableReasons: [String: String] = [:]
   private var renderedPages: [String: Int] = [:]
@@ -154,13 +155,17 @@ public final class LibraryViewModel {
   public func importFiles(_ urls: [URL]) {
     for url in urls {
       let taskID = UUID()
+      let previous = importTail
       let task = Task { [weak self] in
-        guard let self else { return }
+        await previous?.value
+        guard !Task.isCancelled, let self else { return }
         await self.consumeImport(at: url)
         self.importTasks[taskID] = nil
         self.isImporting = !self.importTasks.isEmpty
+        if self.importTasks.isEmpty { self.importTail = nil }
       }
       importTasks[taskID] = task
+      importTail = task
     }
     isImporting = !importTasks.isEmpty
   }

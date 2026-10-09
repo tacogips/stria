@@ -29,7 +29,11 @@ final class MobileModel {
     let folder = SyncFolder(environment: [:], platform: .iOS, provider: MobileSyncFolder.resolve)
     sync = SyncController(
       options: { store.environment.config.sync },
-      folder: { try folder.resolve(options: store.environment.config.sync) },
+      folder: {
+        try await Task.detached(priority: .utility) {
+          try folder.resolve(options: store.environment.config.sync)
+        }.value
+      },
       run: { try await SyncEngine(library: store).sync(location: $0, options: $1) }
     )
     library.onLocalChange = { [weak sync] in sync?.scheduleSoon() }
@@ -42,6 +46,7 @@ final class MobileModel {
       self?.sync.configurationChanged()
       Task { await self?.library.refresh() }
     }
+    settings.onCredentialsChanged = { [weak self] in self?.agent?.refreshCredentialStatus() }
   }
 
   func open(documentId: String, page: Int? = nil) async {
@@ -164,7 +169,7 @@ private enum SamplePDF {
                                  withAttributes: [.font: UIFont.boldSystemFont(ofSize: 30)])
         let text = "Your library, wherever you read.\n\n"
           + "Import PDFs, navigate their pages, search OCR text, and ask questions with page citations.\n\n"
-          + "Choose an API vendor in Settings and save its key in the Keychain. To sync devices, select the same Stria folder in iCloud Drive."
+          + "Choose an API vendor in Settings and save its key in the Keychain. Stria uses its default iCloud folder automatically."
         (text as NSString).draw(in: CGRect(x: 48, y: 220, width: 516, height: 450),
                                 withAttributes: [.font: UIFont.systemFont(ofSize: 20)])
       }

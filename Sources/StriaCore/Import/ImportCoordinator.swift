@@ -105,7 +105,11 @@ struct ImportCoordinator: Sendable {
 
   private func renderMissingPages(url: URL, document: DocumentRecord,
                                   continuation: AsyncStream<ImportEvent>.Continuation) async throws {
-    guard let pdf = PDFDocument(url: url) else { throw StriaError.invalidPDF("Could not open original PDF") }
+    // PDFKit may retain decoded source images for the lifetime of its document.
+    // Reopen after a small batch so a long scanned PDF cannot retain every
+    // rendered page's resources until the entire import finishes.
+    var pdf: PDFDocument?
+    var pagesInBatch = 0
     let existing = Set(try await library.store.pageNumbers(documentId: document.id))
     // A resumed import renders with the DPI and format recorded on the row,
     // not the current config, so every page of a document matches its row.
@@ -113,15 +117,24 @@ struct ImportCoordinator: Sendable {
     for pageNumber in 1...document.pageCount {
       try Task.checkCancellation()
       guard !existing.contains(pageNumber) else { continue }
-      guard let page = pdf.page(at: pageNumber - 1) else { throw StriaError.invalidPDF("PDF page \(pageNumber) is unavailable") }
       let stored = try autoreleasepool {
+        if pagesInBatch == 16 { pdf = nil; pagesInBatch = 0 }
+        if pdf == nil { pdf = PDFDocument(url: url) }
+        guard let page = pdf?.page(at: pageNumber - 1) else {
+          throw StriaError.invalidPDF("PDF page \(pageNumber) is unavailable")
+        }
+        pagesInBatch += 1
         let image = try PageRenderer.render(page: page, dpi: document.renderDPI, maxPixelDimension: config.maxPixelDimension)
         return try ImageCodec.encode(image, preferred: document.imageFormat, quality: config.quality)
       }
       try await library.store.insertPage(documentId: document.id, pageNumber: pageNumber, image: stored)
       continuation.yield(.rendered(page: pageNumber, total: document.pageCount))
     }
-    let outline = OutlineExtractor.encodeJSON(OutlineExtractor.extract(from: pdf))
+    pdf = nil
+    let outline = try autoreleasepool {
+      guard let document = PDFDocument(url: url) else { throw StriaError.invalidPDF("Could not open original PDF") }
+      return OutlineExtractor.encodeJSON(OutlineExtractor.extract(from: document))
+    }
     try await library.store.markDocumentReady(id: document.id, outlineJSON: outline)
   }
 

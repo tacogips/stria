@@ -72,6 +72,7 @@ public final class AgentPaneViewModel {
   private let library: StriaLibrary
   private let reader: ReaderViewModel
   private let processEnvironment: [String: String]
+  private var credentialRevision = 0
   private var sendTask: Task<Void, Never>?
   private var historyReloadTask: Task<Void, Never>?
   private let historyDebounce: Duration
@@ -117,6 +118,7 @@ public final class AgentPaneViewModel {
   }
 
   public func availability(of vendor: String) -> VendorAvailability {
+    _ = credentialRevision
     guard KnownVendors.isAvailableOnThisPlatform(vendor, platform: library.environment.platform) else { return .unavailableOnThisPlatform }
     guard KnownVendors.apiKeyVendors.contains(vendor) else { return .ready }
     guard let name = library.environment.config.agent.credential(for: vendor) else { return .needsCredentialName }
@@ -126,6 +128,8 @@ public final class AgentPaneViewModel {
     guard let value = merged?[name], !value.isEmpty else { return .missingKey(name) }
     return .ready
   }
+
+  public func refreshCredentialStatus() { credentialRevision += 1 }
 
   public func modelOptions(for vendor: String) -> [String] {
     var models = ModelCatalog.models(for: vendor)
@@ -184,6 +188,20 @@ public final class AgentPaneViewModel {
   }
 
   public var vendorConfigured: Bool { selection != nil }
+
+  public var isNewChat: Bool { threadId == nil && transcript.isEmpty && !inFlight }
+
+  /// A visible setup warning, even before the user attempts to send a question.
+  public var configurationWarning: String? {
+    guard let vendor = selectedVendor else { return "Choose a vendor and model. Configure API keys in Settings." }
+    switch availability(of: vendor) {
+    case .unavailableOnThisPlatform: return KnownVendors.platformUnavailableReason
+    case .needsCredentialName, .missingKey:
+      return "Add an API key for \(SettingsViewModel.displayName(for: vendor)) in Settings to start chatting."
+    case .ready:
+      return selection == nil ? "Choose a model for \(SettingsViewModel.displayName(for: vendor)) to start chatting." : nil
+    }
+  }
 
   public var scopeDescription: String {
     let page = reader.currentPage

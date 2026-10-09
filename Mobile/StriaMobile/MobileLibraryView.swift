@@ -4,27 +4,15 @@ import UniformTypeIdentifiers
 
 struct MobileRootView: View {
   @Bindable var model: MobileModel
-  @Environment(\.horizontalSizeClass) private var sizeClass
-
   var body: some View {
-    Group {
-      if sizeClass == .regular {
-        NavigationSplitView {
-          MobileLibraryView(model: model)
-        } detail: {
-          NavigationStack { detail }
-        }
-      } else {
-        NavigationStack {
-          MobileLibraryView(model: model)
-            .navigationDestination(isPresented: $model.showingReader) { detail }
-        }
-      }
+    NavigationStack {
+      MobileLibraryView(model: model)
+        .navigationDestination(isPresented: $model.showingReader) { detail }
     }
     .sheet(isPresented: $model.showingSettings) {
       MobileSettingsView(settings: model.settings, sync: model.sync, showingVendors: model.showingVendors)
     }
-    .sheet(isPresented: Binding(get: { model.search.isShowingResults && (sizeClass == .regular || !model.showingAgent) }, set: { if !$0 { model.search.close() } })) {
+    .sheet(isPresented: Binding(get: { model.search.isShowingResults && !model.showingAgent }, set: { if !$0 { model.search.close() } })) {
       MobileSearchResults(model: model)
     }
     .alert("Stria", isPresented: Binding(get: { model.library.alert != nil }, set: { if !$0 { model.library.alert = nil } })) {

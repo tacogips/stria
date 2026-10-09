@@ -13,7 +13,7 @@ public final class SyncController {
   public var isEnabled: Bool { options().enabled }
 
   private let options: () -> SyncConfig
-  private let resolveFolder: () throws -> SyncFolder.Location
+  private let resolveFolder: () async throws -> SyncFolder.Location
   private let run: (SyncFolder.Location, SyncConfig) async throws -> SyncReport
   private let clock: () -> Date
   private let sleep: (Duration) async throws -> Void
@@ -25,13 +25,17 @@ public final class SyncController {
 
   public convenience init(library: StriaLibrary, debounce: Duration = .seconds(3)) {
     self.init(options: { library.environment.config.sync },
-              folder: { try library.environment.syncFolder.resolve(options: library.environment.config.sync) },
+              folder: {
+                try await Task.detached(priority: .utility) {
+                  try library.environment.syncFolder.resolve(options: library.environment.config.sync)
+                }.value
+              },
               run: { try await SyncEngine(library: library).sync(location: $0, options: $1) },
               clock: library.environment.clock, debounce: debounce)
   }
 
   /// Inject timing and the pass for deterministic scheduling tests.
-  public init(options: @escaping () -> SyncConfig, folder: @escaping () throws -> SyncFolder.Location,
+  public init(options: @escaping () -> SyncConfig, folder: @escaping () async throws -> SyncFolder.Location,
               run: @escaping (SyncFolder.Location, SyncConfig) async throws -> SyncReport,
               clock: @escaping () -> Date = { Date() }, debounce: Duration = .seconds(3),
               sleep: @escaping (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) {
@@ -41,7 +45,10 @@ public final class SyncController {
   }
 
   public func refreshFolderDescription() {
-    do { folderDescription = try resolveFolder().url.path } catch { folderDescription = (error as? StriaError)?.message ?? error.localizedDescription }
+    Task { [weak self] in
+      guard let self else { return }
+      do { folderDescription = try await resolveFolder().url.path } catch { folderDescription = (error as? StriaError)?.message ?? error.localizedDescription }
+    }
   }
 
   public func syncNow() async {
@@ -53,7 +60,7 @@ public final class SyncController {
     repeat {
       followUp = false
       do {
-        let location = try resolveFolder()
+        let location = try await resolveFolder()
         folderDescription = location.url.path
         let report = try await run(location, options())
         lastReport = report; lastSyncAt = clock(); lastError = report.errors.first
