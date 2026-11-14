@@ -1,0 +1,153 @@
+{
+  "taskId": "stria-session-247",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "remote": "origin",
+  "originalHead": "88612271ac89b053263ea92147057b3b8e703e51",
+  "evidenceRoot": "tmp/stria-session-247",
+  "evidenceLayout": "tmp/stria-session-247/<planId>/ holds per-plan logs (build.log, test-focused.log, test-all.log, swiftlint.log, cli-smoke.log); repeated attempts use tmp/stria-session-247/<planId>/attempt-<n>/. tmp/ is gitignored and never declared as a plan path.",
+  "planIndexPath": "impl-plans/README.md",
+  "designDocPaths": [
+    "design-docs/specs/design-agent-integration.md",
+    "design-docs/references/agent-gateway-c7f2697.md",
+    "design-docs/user-qa/ocr-empty-reply.md"
+  ],
+  "reviewContext": {
+    "issueReference": "workflowInput issue 'Fix: page images are silently dropped for CLI agent-gateway vendors (claude-code, codex, cursor) in OCR and ask' (no GitHub URL or number supplied); workflowExecutionId opus-luna-design-and-implement-review-loop-session-247; plan accepted at step5-impl-plan-review communication comm-003286",
+    "userProblem": "With ocr.vendor = claude-code, stria ocr stored the reply \"I don't see an image attached to your message...\" as ocrStatus = done. GatewayPromptRunner sends page images as ACP image blocks, but agent-gateway c7f2697 forwards GatewayExecuteParams.images only for API vendors; CLI vendors (GatewayVendor.isCLI: claude-code, codex, cursor) drop them silently, so OCR and ask lose their page images.",
+    "requiredOutcomes": [
+      "For CLI vendors, every image prompt part is rendered at the same index as a text part naming the absolute PNG path with an instruction to open and read the file; the session cwd stays paths.cache.",
+      "API vendors (openai, anthropic, gemini, openrouter, cursor-api) receive the same parts as before, including image blocks.",
+      "The rendering decision lives in the pure function GatewayPromptParts.rendered(_:for:), unit-tested offline.",
+      "A gateway OCR reply that is empty after cleaning, or that says no image was received (English and Japanese phrases, reply at most 600 characters), throws ServiceError.failed with a fixed reason, so the page is recorded failed and --retry-failed re-runs it.",
+      "New offline tests cover CLI vs API rendering, the reply check and the coordinator failed path.",
+      "swift build, swift test, swiftlint (0 violations) and scripts/cli-smoke.sh (SMOKE OK) pass; every Swift file stays under 1000 lines."
+    ],
+    "nonGoals": [
+      "No change to agent-gateway, riela, .build/, Package.swift or Package.resolved; no new dependency or target dependency.",
+      "No change to OCRCoordinator, PDFTextLayerOCRService, OCRTextPostProcessor, OCRDefaults.prompt, GatewayPreflight, GatewayAgentService, FakeOCRService, AgentRunRecord.imageCount, the app, the CLI or scripts/cli-smoke.sh.",
+      "No reply check for ask.",
+      "No new protocol, injection seam, config key or prompt sentinel.",
+      "No design doc edits during implementation; the design is already accepted."
+    ],
+    "constraints": [
+      "Follow AGENTS.md: English only, no emojis, Swift coding skill, swiftlint after Swift edits, every Swift file under 1000 lines.",
+      "Workers edit only the plan writePaths and only the Progress Log section of the plan file; sharedPaths are read-only.",
+      "Workers make no git state changes; read-only git status and git diff are allowed.",
+      "No network or real vendor process in tests.",
+      "Run verification in the foreground with set -o pipefail and tee logs under tmp/stria-session-247/P12/; final verification records use a numeric exitCode and exclude intentional red-phase runs.",
+      "Commit messages carry no AI tool attribution or co-authorship lines (repository policy)."
+    ],
+    "designDecisionsAndRationale": [
+      "CLI vendors get PNG paths as prompt text because GatewayExecution.executeCLI never reads images; a manual claude-code run confirmed the agent reads an image path given in the prompt with cwd = paths.cache (design-agent-integration.md#vendor-image-capability, agent-gateway-c7f2697.md#image-inputs-and-process-errors).",
+      "The vendor split uses GatewayVendor.isCLI from AgentGateway, so the rule follows the gateway's own classification.",
+      "Image parts are replaced at the same index with a fixed two-line template, one wording for OCR and ask, so prompt order is preserved.",
+      "The reply check lives in GatewayOCRService, not OCRCoordinator, so pdf-text-layer blank pages stay done.",
+      "Rejection reasons are fixed strings and never quote the reply, so run records do not contain OCR text; the service returns the raw text and the coordinator still cleans it.",
+      "The phrase match is limited to replies of at most 600 characters and excludes a bare 'no image' phrase to avoid false positives on real page text."
+    ],
+    "intentionalTradeoffs": [
+      "Blank pages OCR'd by a gateway vendor become failed (empty reply) and are retried on --retry-failed; tracked as pending in design-docs/user-qa/ocr-empty-reply.md.",
+      "The no-image detection is a phrase heuristic (19 English, 7 Japanese phrases) and can miss other wordings.",
+      "CLI agents need file-read permission inside paths.cache; this is not enforced by stria.",
+      "AgentRunRecord.imageCount keeps counting image parts even when they are sent as paths."
+    ],
+    "supportedEdgeCases": [
+      "Curly apostrophe (U+2019) in the reply, as in the issue repro.",
+      "Case-insensitive English phrases and Japanese phrases.",
+      "Whitespace-only and fenced-empty replies count as empty.",
+      "Replies longer than 600 characters that contain a phrase are accepted as text.",
+      "Ask with several context page images keeps each path text at its original image index."
+    ],
+    "outOfScopeEdgeCases": [
+      "Other no-image wordings or languages beyond the listed phrases.",
+      "CLI agents that refuse or cannot read files in the working directory.",
+      "Reply checks for ask answers.",
+      "cursor-api image support (still rejected by preflight as unavailable)."
+    ],
+    "sourcePaths": [
+      "AGENTS.md",
+      "design-docs/specs/design-agent-integration.md",
+      "design-docs/references/agent-gateway-c7f2697.md",
+      "design-docs/user-qa/ocr-empty-reply.md",
+      "impl-plans/README.md",
+      "impl-plans/active/stria-12-cli-vendor-image-paths.md",
+      "Sources/StriaCore/Integration/GatewayPromptRunner.swift",
+      "Sources/StriaCore/Integration/GatewayPromptParts.swift",
+      "Sources/StriaCore/Integration/GatewayOCRService.swift",
+      "Sources/StriaCore/OCR/OCRCoordinator.swift",
+      "Sources/StriaCore/OCR/OCRTextPostProcessor.swift",
+      "Tests/StriaCoreTests/Integration/PromptPartsTests.swift",
+      "Tests/StriaCoreTests/ImportOCR/ImportOCRTestSupport.swift",
+      "Tests/StriaCoreTests/Support/FakeOCRService.swift"
+    ]
+  },
+  "acceptedDependencies": [
+    {
+      "planId": "stria-v01",
+      "commit": "88612271ac89b053263ea92147057b3b8e703e51",
+      "provides": "stria v0.1 P01-P11 on main: GatewayPromptRunner, GatewayPromptParts, GatewayOCRService, OCRCoordinator, OCRTextPostProcessor, test support (withTestDataRoot, FakeOCRService, ImportOCRTestSupport) and scripts/cli-smoke.sh"
+    }
+  ],
+  "plans": [
+    {
+      "planId": "P12",
+      "planPath": "impl-plans/active/stria-12-cli-vendor-image-paths.md",
+      "wave": 1,
+      "kind": "fix",
+      "dependsOn": [],
+      "writePaths": [
+        "Sources/StriaCore/Integration/GatewayPromptParts.swift",
+        "Sources/StriaCore/Integration/GatewayPromptRunner.swift",
+        "Sources/StriaCore/Integration/GatewayOCRReplyCheck.swift",
+        "Sources/StriaCore/Integration/GatewayOCRService.swift",
+        "Tests/StriaCoreTests/Integration/PromptPartsTests.swift",
+        "Tests/StriaCoreTests/Integration/OCRReplyCheckTests.swift",
+        "impl-plans/active/stria-12-cli-vendor-image-paths.md"
+      ],
+      "sharedPaths": [
+        "design-docs/specs/design-agent-integration.md",
+        "design-docs/references/agent-gateway-c7f2697.md",
+        "Sources/StriaCore/OCR/OCRTextPostProcessor.swift",
+        "Sources/StriaCore/OCR/OCRCoordinator.swift",
+        "Tests/StriaCoreTests/Support/FakeOCRService.swift",
+        "Tests/StriaCoreTests/ImportOCR/ImportOCRTestSupport.swift",
+        "scripts/cli-smoke.sh"
+      ],
+      "sharedPathNotes": [
+        {"path": "design-docs/specs/design-agent-integration.md", "intendedEdit": "read-only; accepted design (#vendor-image-capability, #ocr-reply-check)"},
+        {"path": "design-docs/references/agent-gateway-c7f2697.md", "intendedEdit": "read-only; accepted reference (#image-inputs-and-process-errors)"},
+        {"path": "Sources/StriaCore/OCR/OCRTextPostProcessor.swift", "intendedEdit": "read-only; GatewayOCRReplyCheck calls OCRTextPostProcessor.clean"},
+        {"path": "Sources/StriaCore/OCR/OCRCoordinator.swift", "intendedEdit": "read-only; ServiceError.failed already maps to a failed page and failed run"},
+        {"path": "Tests/StriaCoreTests/Support/FakeOCRService.swift", "intendedEdit": "read-only; used by the coordinator failed-path test"},
+        {"path": "Tests/StriaCoreTests/ImportOCR/ImportOCRTestSupport.swift", "intendedEdit": "read-only; makeImportFixture and importFixture used by tests"},
+        {"path": "scripts/cli-smoke.sh", "intendedEdit": "read-only; run as verification only"},
+        {"path": "Sources/StriaCore/Integration/GatewayOCRReplyCheck.swift", "intendedEdit": "new file; enum GatewayOCRReplyCheck with fixed reasons, phrase lists and rejectionReason(for:)"},
+        {"path": "Tests/StriaCoreTests/Integration/OCRReplyCheckTests.swift", "intendedEdit": "new file; reply-check cases and the offline coordinator failed-path test"},
+        {"path": "impl-plans/active/stria-12-cli-vendor-image-paths.md", "intendedEdit": "append to the Progress Log section only"}
+      ],
+      "tasks": [
+        "TASK-001 GatewayPromptParts.rendered(_:for:) plus runner iteration over its output, with PromptPartsTests CLI and API vendor cases",
+        "TASK-002 GatewayOCRReplyCheck plus GatewayOCRService rejection, with OCRReplyCheckTests and the coordinator failed-path test"
+      ],
+      "acceptanceCriteria": [
+        "GatewayPromptParts.rendered(_:for:) exists with the pinned signature; CLI vendors (.claudeCode, .codex, .cursor) get no .image part and the two-line 'Page image file: <path>' text at the same index; API vendors (.openAI, .anthropic, .gemini, .openRouter) get output equal to input.",
+        "GatewayPromptRunner.run iterates GatewayPromptParts.rendered(parts, for: vendor); cwd, error mapping and stopReason handling are unchanged.",
+        "GatewayOCRReplyCheck has the pinned emptyReason and noImageReason, the 19 English and 7 Japanese phrases and the 600-character limit; GatewayOCRService.recognize throws ServiceError.failed(reason) on rejection and otherwise returns the raw text.",
+        "All test cases listed in the plan exist and pass offline; the existing PromptPartsTests are unchanged.",
+        "swift build, swift test (more than 120 tests, 0 failures), swiftlint (0 violations) and scripts/cli-smoke.sh (SMOKE OK) pass; no Swift file reaches 1000 lines.",
+        "No file outside writePaths changes, apart from the pre-existing checkpoint docs; the Progress Log has pre/post hashes and numeric-exitCode verification records."
+      ],
+      "verification": [
+        "set -o pipefail; swift build 2>&1 | tee tmp/stria-session-247/P12/build.log",
+        "set -o pipefail; swift test --filter 'PromptPartsTests|OCRReplyCheckTests' 2>&1 | tee tmp/stria-session-247/P12/test-focused.log",
+        "set -o pipefail; swift test 2>&1 | tee tmp/stria-session-247/P12/test-all.log",
+        "set -o pipefail; swiftlint 2>&1 | tee tmp/stria-session-247/P12/swiftlint.log",
+        "set -o pipefail; bash scripts/cli-smoke.sh 2>&1 | tee tmp/stria-session-247/P12/cli-smoke.log",
+        "find Sources Tests -name '*.swift' -exec wc -l {} + | awk '$2 != \"total\" && $1 >= 1000'",
+        "git status --porcelain=v1 --untracked-files=all"
+      ]
+    }
+  ]
+}
