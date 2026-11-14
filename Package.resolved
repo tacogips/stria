@@ -1,0 +1,14 @@
+{
+  "originHash" : "220c598fd8651f4a956ccb42e082179cbde8dea1929e9c691c11cc11965a1045",
+  "pins" : [
+    {
+      "identity" : "agent-gateway",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tacogips/agent-gateway.git",
+      "state" : {
+        "revision" : "af55cb6c30dedc1c61c47410ef8b0f997f24bf26"
+      }
+    }
+  ],
+  "version" : 3
+}

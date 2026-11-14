@@ -1,0 +1,64 @@
+import Foundation
+
+extension StriaLibrary {
+  /// OCR search. `withContext` adds the text around each hit with the terms
+  /// marked (the app's results view); the CLI leaves it off.
+  public func search(query: String, documentId: String? = nil, limit: Int = 10,
+                     withContext: Bool = false) async throws -> SearchResponse {
+    if let documentId, try await store.document(id: documentId) == nil {
+      throw StriaError.documentNotFound("Document not found: \(documentId)")
+    }
+    let outcome = try await store.search(text: query, documentId: documentId, limit: limit)
+    let cache = PageImageCache(paths: paths)
+    var results: [SearchResultItem] = []
+    for hit in outcome.hits {
+      let imageURL = paths.cachedPage(docId: hit.docId, page: hit.page)
+      let info = try await store.pageInfo(documentId: hit.docId, page: hit.page)
+      let cached = info.map { cache.validCachedURL(docId: hit.docId, page: hit.page, width: $0.width, height: $0.height) != nil } ?? false
+      var context: [TextSegment] = []
+      if withContext {
+        context = SearchContextBuilder.segments(text: info?.ocrText ?? "", query: query)
+        if context.isEmpty { context = SearchContextBuilder.segments(fromBracketedSnippet: hit.snippet) }
+      }
+      results.append(SearchResultItem(docId: hit.docId, title: hit.title, page: hit.page, snippet: hit.snippet,
+                                      score: hit.score, imagePath: imageURL.path, imageCached: cached, context: context))
+    }
+    return SearchResponse(query: query, matchMode: outcome.matchMode, results: results)
+  }
+
+  public func history(documentId: String? = nil, page: Int? = nil, limit: Int = 50) async throws -> [ChatMessageRecord] {
+    if let documentId, try await store.document(id: documentId) == nil {
+      throw StriaError.documentNotFound("Document not found: \(documentId)")
+    }
+    return try await store.history(documentId: documentId, page: page, limit: limit)
+  }
+
+  /// Conversations for the history list, with their summaries.
+  public func threadOverviews(documentId: String? = nil, page: Int? = nil, limit: Int = 50) async throws -> [ThreadOverview] {
+    if let documentId, try await store.document(id: documentId) == nil {
+      throw StriaError.documentNotFound("Document not found: \(documentId)")
+    }
+    return try await store.threadOverviews(documentId: documentId, page: page, limit: limit)
+  }
+
+  /// Summarizes a conversation from its first question, stores and returns
+  /// the summary. The vendor and model resolve like a question's.
+  @discardableResult
+  public func summarizeThread(threadId: String, selection: AgentSelection? = nil) async throws -> String {
+    try await ThreadSummarizer(environment: environment, store: store).summarize(threadId: threadId, selection: selection)
+  }
+
+  /// Asks the agent for a short title for a conversation and stores it.
+  @discardableResult
+  public func titleThread(threadId: String, selection: AgentSelection? = nil) async throws -> String {
+    try await ThreadSummarizer(environment: environment, store: store).title(threadId: threadId, selection: selection)
+  }
+
+  public func threadOverview(threadId: String) async throws -> ThreadOverview? {
+    try await store.threadOverview(threadId: threadId)
+  }
+
+  public func threadMessages(threadId: String) async throws -> [ChatMessageRecord] {
+    try await store.threadMessages(threadId: threadId)
+  }
+}
