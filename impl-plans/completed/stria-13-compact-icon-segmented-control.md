@@ -1,6 +1,6 @@
 # P13: Compact size for IconSegmentedControl
 
-**Status**: In Progress
+**Status**: Completed
 **planId**: P13
 **dependsOn**: none (wave 1)
 **Design Reference**: `design-docs/specs/design-app-ui.md#agent-pane-layout-compact-redesign-macos` ("Compact `IconSegmentedControl`" paragraph)
@@ -110,3 +110,15 @@ Record each exit code and log path in the Progress Log.
 ## Progress Log
 
 - 2026-11-20: Plan created (session 867, step 4).
+- 2026-11-20: Implemented regular and compact metrics, defaulting to regular;
+  preserved tooltips, accessibility, and existing callers. All P13 acceptance
+  criteria are met; P15 adoption and formal review remain downstream.
+  Source SHA-256 before: `f07c7b880bb0340bca067b419e3c777e1806699ea0202ce781d8a5188edc0744`;
+  after: `757a298e988e76b9f78e3444e7cb4a48c00135c48772558fd01142db9bfc5792`.
+  Isolated `swift build --scratch-path /tmp/stria-session-867-P13-build --target StriaApp`
+  passed (exit 0; `tmp/stria-session-867/P13/build.log`); the isolated scratch
+  path avoids shared build output during fanout. `swiftlint lint Sources/StriaApp/IconSegmentedControl.swift`
+  passed with zero violations (exit 0; `tmp/stria-session-867/P13/swiftlint.log`),
+  and strict selected-file lint passed (exit 0; `tmp/stria-session-867/P13/swiftlint-strict.log`).
+  Metric literal check passed (exit 0; `tmp/stria-session-867/P13/metrics.log`).
+- 2026-11-20: Accepted. The step 7 adversarial and test-integrity reviews accepted with no findings. Integration review on the combined P13+P14+P15 tree: `swift build` exit 0 (`tmp/stria-session-867/reconcile-wave-002/build.log`); `swift test` exit 0, 249 tests in 62 suites passed (`tmp/stria-session-867/reconcile-wave-002/test.log`); `swiftlint` 0 violations (`tmp/stria-session-867/reconcile-wave-002/swiftlint.log`). Step 7b browser E2E was skipped because there is no browser surface. Step 8 moved this plan and the session-867 dispatch manifest to `impl-plans/completed/`. Open: no visual comparison against `design-docs/references/agent-pane-redesign/mockup.png` yet.

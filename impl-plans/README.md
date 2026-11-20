@@ -8,13 +8,17 @@ Implementation plans translate design documents into actionable work.
 
 ## Status
 
-Active (session 867, macOS agent pane compact redesign; design in `design-docs/specs/design-app-ui.md`, "Agent pane layout (compact redesign, macOS)"):
+No plans are active.
+
+Completed (session 867, macOS agent pane compact redesign; design in `design-docs/specs/design-app-ui.md`, "Agent pane layout (compact redesign, macOS)"):
 
 | planId | Plan | dependsOn |
 | --- | --- | --- |
-| P13 | [`stria-13-compact-icon-segmented-control.md`](active/stria-13-compact-icon-segmented-control.md) | - |
-| P14 | [`stria-14-agent-pane-width.md`](active/stria-14-agent-pane-width.md) | - |
-| P15 | [`stria-15-agent-pane-compact-layout.md`](active/stria-15-agent-pane-compact-layout.md) | P13 |
+| P13 | [`stria-13-compact-icon-segmented-control.md`](completed/stria-13-compact-icon-segmented-control.md) | - |
+| P14 | [`stria-14-agent-pane-width.md`](completed/stria-14-agent-pane-width.md) | - |
+| P15 | [`stria-15-agent-pane-compact-layout.md`](completed/stria-15-agent-pane-compact-layout.md) | P13 |
+
+The session-867 dispatch manifest is kept with them as `completed/stria-session-867-dispatch.json`; the `planPath` values inside it record the original `impl-plans/active/` locations.
 
 Completed after v0.1 (session 247):
 

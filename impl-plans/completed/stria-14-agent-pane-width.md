@@ -1,6 +1,6 @@
 # P14: Wider macOS agent pane (default 640, min 520, max 1100)
 
-**Status**: In Progress
+**Status**: Completed
 **planId**: P14
 **dependsOn**: none (wave 1)
 **Design Reference**: `design-docs/specs/design-app-ui.md#agent-pane-layout-compact-redesign-macos` ("Pane width (macOS split view)" paragraph); `design-docs/agent-chat-layout.md` (updated numbers)
@@ -99,3 +99,6 @@ Record each exit code and log path in the Progress Log.
 ## Progress Log
 
 - 2026-11-20: Plan created (session 867, step 4).
+- 2026-11-20: Implemented P14. All four acceptance criteria are complete: the unchanged storage key defaults to `AgentPaneWidth.ideal` (640); 520/640/1100 literals occur only in the constants; both the split frame and keeper use `AgentPaneWidth.clamped`; changes are limited to ReaderView and this Progress Log. The existing initial available width uses the same 1100 constant and remains numerically unchanged. The clamp maps stored 360/480 to 520, 700 to 700, and 1300 to 1100; the default 640 remains 640. Saving remains drag-only.
+- Final-source verification (moving shared tree): `swift build --target StriaApp --scratch-path /tmp/stria-p14-build` exit 0, `tmp/stria-session-867/P14/build-final.log`; `swiftlint lint Sources/StriaApp/ReaderView.swift` exit 0, `tmp/stria-session-867/P14/swiftlint-final.log`; selected-file strict SwiftLint via `tmp/stria-session-867/P14/changed-swift.nul` exit 0, `tmp/stria-session-867/P14/swiftlint-strict-final.log`; `grep -nE '\b(480|520|640|800|1100)\b' Sources/StriaApp/ReaderView.swift` exit 0, `tmp/stria-session-867/P14/grep-widths-final.log`. The isolated scratch path avoids shared build output; serial integration owns stable aggregate verification and formal review.
+- 2026-11-20: Accepted. The step 7 adversarial and test-integrity reviews accepted with no findings. Integration review on the combined P13+P14+P15 tree: `swift build` exit 0 (`tmp/stria-session-867/reconcile-wave-002/build.log`); `swift test` exit 0, 249 tests in 62 suites passed (`tmp/stria-session-867/reconcile-wave-002/test.log`); `swiftlint` 0 violations (`tmp/stria-session-867/reconcile-wave-002/swiftlint.log`). Step 7b browser E2E was skipped because there is no browser surface. Step 8 moved this plan and the session-867 dispatch manifest to `impl-plans/completed/`. Open: no visual comparison against `design-docs/references/agent-pane-redesign/mockup.png` yet.

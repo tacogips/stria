@@ -1,6 +1,6 @@
 # P15: Compact agent pane layout (toolbar, title row, scope row, composer)
 
-**Status**: In Progress
+**Status**: Completed
 **planId**: P15
 **dependsOn**: P13 (uses `IconSegmentedControlSize` and `size:`) (wave 2)
 **Design Reference**: `design-docs/specs/design-app-ui.md#agent-pane-layout-compact-redesign-macos` (items 1-4 and the "Composer sizing" table); mockup `design-docs/references/agent-pane-redesign/mockup.png` (read-only)
@@ -140,3 +140,8 @@ Record each exit code and log path in the Progress Log.
 ## Progress Log
 
 - 2026-11-20: Plan created (session 867, step 4).
+- 2026-11-20: Implemented compact toolbar and scope controls, conditional compact title, and composer sizing. All five acceptance criteria are met by source inspection; the file has 519 lines. Source SHA-256: `6e462ac4b95ed89641154b003ecba2f1187d2ae66c74685b8cda19943c0733d8`.
+- Verification on the shared tree with isolated `/tmp/stria-p15-build`: `swift build --scratch-path /tmp/stria-p15-build --target StriaApp` exit 0 (`tmp/stria-session-867/P15/build.log`); `swift test --scratch-path /tmp/stria-p15-build --filter AgentPaneViewModelTests` exit 0, 6 tests passed (`tmp/stria-session-867/P15/test-focused.log`).
+- `swiftlint lint Sources/StriaApp/AgentPaneView.swift` exit 0, no violations (`tmp/stria-session-867/P15/swiftlint.log`); strict selected-file lint exit 0 (`tmp/stria-session-867/P15/swiftlint-strict.log`, manifest `changed-swift.nul`). Grep and line count exit 0 (`tmp/stria-session-867/P15/grep.log`, `lines.log`).
+- Formal review, combined-tree checks and visual comparison are pending integration.
+- 2026-11-20: Accepted. The step 7 adversarial and test-integrity reviews accepted with no findings. Integration review on the combined P13+P14+P15 tree: `swift build` exit 0 (`tmp/stria-session-867/reconcile-wave-002/build.log`); `swift test` exit 0, 249 tests in 62 suites passed (`tmp/stria-session-867/reconcile-wave-002/test.log`); `swiftlint` 0 violations (`tmp/stria-session-867/reconcile-wave-002/swiftlint.log`). Step 7b browser E2E was skipped because there is no browser surface. Step 8 updated `README.md` and moved this plan and the session-867 dispatch manifest to `impl-plans/completed/`. Open: no visual comparison against `design-docs/references/agent-pane-redesign/mockup.png` yet.

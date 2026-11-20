@@ -2,6 +2,16 @@ import AppKit
 import SwiftUI
 import StriaCore
 
+private enum AgentPaneWidth {
+  static let min = 520.0
+  static let ideal = 640.0
+  static let max = 1100.0
+
+  static func clamped(_ width: Double) -> Double {
+    Swift.min(max, Swift.max(min, width))
+  }
+}
+
 struct ReaderView: View {
   @Bindable var model: AppModel
   @Bindable var reader: ReaderViewModel
@@ -9,7 +19,7 @@ struct ReaderView: View {
   @AppStorage("showAgentInspector") private var showAgent = true
   @State private var compactSidebar = false
   @State private var compactAgent = false
-  @State private var availableWidth: CGFloat = 1100
+  @State private var availableWidth: CGFloat = CGFloat(AgentPaneWidth.max)
   @State private var showPageSheet = false
   @State private var showShortcutHelp = false
   /// The document's library row while the OCR run sheet is open.
@@ -19,7 +29,7 @@ struct ReaderView: View {
   @AppStorage(Appearance.storageKey) private var appearance = Appearance.default
   /// The side panes' last widths, restored the next time a reader opens.
   @AppStorage("readerLeftPaneWidth") private var leftPaneWidth = 240.0
-  @AppStorage("readerAgentPaneWidth") private var agentPaneWidth = 520.0
+  @AppStorage("readerAgentPaneWidth") private var agentPaneWidth = AgentPaneWidth.ideal
 
   var body: some View {
     GeometryReader { geometry in
@@ -105,7 +115,8 @@ struct ReaderView: View {
         }
       if agentVisible {
         agentPane()
-          .frame(minWidth: 480, idealWidth: max(480, agentPaneWidth), maxWidth: 800)
+          .frame(minWidth: AgentPaneWidth.min, idealWidth: AgentPaneWidth.clamped(agentPaneWidth),
+                 maxWidth: AgentPaneWidth.max)
           .background(Flat.panel)
 
       }
@@ -331,7 +342,7 @@ private struct SplitWidthKeeper: NSViewRepresentable {
     coordinator.saveLeft = { leftWidth = $0 }
     coordinator.saveAgent = { agentWidth = $0 }
     coordinator.savedLeft = leftWidth
-    coordinator.savedAgent = max(480, agentWidth)
+    coordinator.savedAgent = AgentPaneWidth.clamped(agentWidth)
     coordinator.applySavedWidths()
   }
 

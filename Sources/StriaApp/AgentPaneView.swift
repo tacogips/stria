@@ -2,8 +2,8 @@ import AppKit
 import SwiftUI
 import StriaCore
 
-/// The right pane has two tabs: Chat (scope, transcript, composer) and
-/// History (past questions for this page or this PDF). Picking a history
+/// The right pane has Chat, History, and Summary tabs.
+/// History lists past questions for this page or PDF. Picking a history
 /// entry reopens its thread in the Chat tab and jumps to its page.
 struct AgentPaneView: View {
   @Bindable var agent: AgentPaneViewModel
@@ -26,10 +26,13 @@ struct AgentPaneView: View {
           IconSegment(value: Tab.chat, symbol: "bubble.left.and.bubble.right", help: "Chat: ask about this PDF"),
           IconSegment(value: Tab.history, symbol: "clock.arrow.circlepath", help: "History: earlier questions and answers"),
           IconSegment(value: Tab.summary, symbol: "doc.plaintext", help: "Summary: this page's tags and summary")
-        ])
-        Divider().frame(height: 22)
+        ], size: .compact)
+        Divider().frame(height: IconSegmentedControlSize.compact.segmentHeight)
         Button { agent.newChat(); agent.requestInputFocus() } label: {
           Image(systemName: "square.and.pencil")
+            .font(IconSegmentedControlSize.compact.symbolFont)
+            .frame(width: IconSegmentedControlSize.compact.segmentWidth, height: IconSegmentedControlSize.compact.segmentHeight)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(agent.inFlight)
@@ -39,6 +42,9 @@ struct AgentPaneView: View {
           Task { if await agent.resumePreviousChat() { agent.requestInputFocus() } }
         } label: {
           Image(systemName: "arrow.uturn.backward.circle")
+            .font(IconSegmentedControlSize.compact.symbolFont)
+            .frame(width: IconSegmentedControlSize.compact.segmentWidth, height: IconSegmentedControlSize.compact.segmentHeight)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(agent.inFlight)
@@ -46,8 +52,8 @@ struct AgentPaneView: View {
         .accessibilityLabel("Resume Previous Chat")
       }
       .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.horizontal)
-      .padding(.vertical, 8)
+      .padding(.horizontal, 10)
+      .padding(.vertical, 4)
       Divider()
       tabContent
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -77,8 +83,10 @@ struct AgentPaneView: View {
     VStack(spacing: 0) {
       switch tab {
       case .chat:
-        chatTitleBar
-        Divider()
+        if showsChatTitle {
+          chatTitleBar
+          Divider()
+        }
         scopePicker
         if let notice = agent.notice {
           Label(notice, systemImage: "exclamationmark.circle")
@@ -99,14 +107,19 @@ struct AgentPaneView: View {
     }
   }
 
+  private var showsChatTitle: Bool {
+    agent.currentThread != nil || agent.transcript.contains { $0.role == .user }
+  }
+
   /// The open conversation's title, a button that asks the AI for a new
   /// one, and a jump to the page where the chat started.
   private var chatTitleBar: some View {
     HStack(alignment: .firstTextBaseline, spacing: 8) {
       Text(agent.chatTitle)
-        .font(.headline)
+        .font(.subheadline.weight(.semibold))
         .foregroundStyle(agent.threadId == nil ? .secondary : .primary)
-        .lineLimit(2)
+        .lineLimit(1)
+        .truncationMode(.tail)
         .help(agent.chatTitle)
         .frame(maxWidth: .infinity, alignment: .leading)
       if agent.isTitlingCurrentChat {
@@ -133,7 +146,7 @@ struct AgentPaneView: View {
       }
     }
     .padding(.horizontal)
-    .padding(.vertical, 8)
+    .padding(.vertical, 4)
   }
 
   /// Vendor and model controls stacked along the composer's bottom edge.
@@ -193,21 +206,21 @@ struct AgentPaneView: View {
   }
 
   private var scopePicker: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      HStack(spacing: 8) {
-        IconSegmentedControl(selection: $agent.scope, segments: [
-          IconSegment(value: AgentScope.page, symbol: "doc", help: "This page: the agent sees the page you are on"),
-          IconSegment(value: AgentScope.nearby, symbol: "doc.on.doc", help: "Nearby pages: this page and its neighbours"),
-          IconSegment(value: AgentScope.document, symbol: "books.vertical", help: "Whole PDF: the most relevant pages of the document")
-        ])
-        Spacer()
-      }
-      Text(agent.scopeDescription)
-        .font(.caption)
+    HStack(spacing: 8) {
+      IconSegmentedControl(selection: $agent.scope, segments: [
+        IconSegment(value: AgentScope.page, symbol: "doc", help: "This page: the agent sees the page you are on"),
+        IconSegment(value: AgentScope.nearby, symbol: "doc.on.doc", help: "Nearby pages: this page and its neighbours"),
+        IconSegment(value: AgentScope.document, symbol: "books.vertical", help: "Whole PDF: the most relevant pages of the document")
+      ], size: .compact)
+      Image(systemName: "info.circle")
+        .font(IconSegmentedControlSize.compact.symbolFont)
         .foregroundStyle(.secondary)
+        .help(agent.scopeDescription)
+        .accessibilityLabel(agent.scopeDescription)
+      Spacer()
     }
     .padding(.horizontal, 12)
-    .padding(.vertical, 8)
+    .padding(.vertical, 4)
   }
 
   private var transcript: some View {
@@ -252,9 +265,9 @@ struct AgentPaneView: View {
             .font(.body)
             .scrollContentBackground(.hidden)
             .focused($inputFocused)
-            .frame(minHeight: agent.isNewChat ? 160 : 120,
-                   idealHeight: agent.isNewChat ? 280 : 160,
-                   maxHeight: agent.isNewChat ? .infinity : 200)
+            .frame(minHeight: 180,
+                   idealHeight: agent.isNewChat ? 280 : 240,
+                   maxHeight: agent.isNewChat ? .infinity : 360)
             .accessibilityLabel("Question")
           if agent.input.isEmpty {
             Text("Question")
