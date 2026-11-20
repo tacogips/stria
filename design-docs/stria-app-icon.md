@@ -1,14 +1,9 @@
 # Stria app icon
 
-Generated on 2026-10-06 with the built-in ImageGen tool. The design uses a folded
-ivory paper S, parallel page edges, a coral bookmark, and a dark navy background.
+The current artwork was generated with Runway through `runwayml-cli`. The design uses an ivory paper S with a broad diagonal fold, narrow page edges, and a coral bookmark on an ink-blue background.
 
-Production asset: `Mobile/StriaMobile/Assets.xcassets/AppIcon.appiconset/Stria-Paper.png`.
-The generated square was resized with `sips` to 1024 by 1024 pixels for the iOS
-asset catalog. The image is opaque; the original asset remains available. The
-same artwork is rendered into the macOS icon grid by `scripts/make-app-icon.swift`
-and saved as `Resources/Stria.icns` for the signed Mac app bundle.
+The opaque 1024 × 1024 production PNG is stored at `Mobile/StriaMobile/Assets.xcassets/AppIcon.appiconset/Stria-Paper.png` for iOS. `scripts/make-app-icon.swift` renders that artwork at macOS icon sizes and packages it as `Resources/Stria.icns`.
 
 ## Generation prompt
 
-Use case: logo-brand. Asset type: final production iOS app icon for Stria, a thoughtful PDF reader with OCR and page-based AI assistance. Create a refined, distinctive, minimal square app icon, 1024x1024. A single ivory folded paper ribbon forming an elegant abstract S, with three parallel page-edge striations suggesting a stack of readable pages. Strong sculptural silhouette, precise geometric edges, subtle paper depth and very restrained soft shadow. Deep dark ink/navy background with a subtle luminous blue cast. One small vivid coral-orange bookmark accent integrated into the folded page form. Premium editorial reading-tool aesthetic, calm, clever, highly recognizable at 40 pixels. Centered large symbol occupying about 65 percent of the square with generous breathing room. Full-bleed opaque square background all the way to each edge; do not draw a rounded icon tile, exterior border, device, mockup, or extra padding around the square. No text, no letters printed on the paper, no words, no watermark, no sparkles. Deliver only the icon artwork.
+Finished square app icon artwork for Stria, a polished editorial PDF reader. One bold, sculptural and immediately legible letter S formed by a single wide folded strip of warm ivory paper, translating a book page turning into a graceful geometric S. Cohesive silhouette built from broad shapes, one dominant diagonal fold and two restrained parallel page-edge striations at the lower terminal. A small coral vermilion bookmark peeks out from beneath that fold. Understated Swiss editorial identity, art-directed paper lighting, crisp edges, and large negative spaces. The mark occupies about 62 percent of the width and height and is optically centered. Full-bleed dark ink blue square background, uniform to all four corners, with a subtle diffuse ultramarine lift near the center. Flat frontal artwork, sharp contrast, recognizable at 32 pixels. No rounded tile, border, inset frame, mockup, lettering apart from the S, watermark, or extra graphics.
