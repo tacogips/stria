@@ -1,0 +1,161 @@
+{
+  "taskId": "stria-session-867",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "remote": "origin",
+  "originalHead": "49561763d651051e1784f87c824624c648c1f2b3",
+  "designDocPaths": [
+    "design-docs/specs/design-app-ui.md",
+    "design-docs/agent-chat-layout.md"
+  ],
+  "evidenceRoot": "tmp/stria-session-867",
+  "reviewContext": {
+    "issueReference": "local-request:opus-terra-design-and-implement-review-loop-session-867",
+    "userProblem": "The macOS agent pane spends too much height on header controls, shows a 'New Chat' title for an empty chat, has a small composer, and is too narrow. The user supplied mockup design-docs/references/agent-pane-redesign/mockup.png (generated with runwayml-cli).",
+    "requiredOutcomes": [
+      "For a new chat, no 'New Chat' text is shown anywhere in the agent pane; the title row is hidden for a new chat and shown compactly only for existing threads.",
+      "Chat/History/Summary tab icons and the new-chat/resume buttons are small compact icon buttons (24x18 compact IconSegmentedControl size) in one slim toolbar row.",
+      "The scope picker is one slim row of tiny icons; the scope description moves into a help tooltip on an info icon.",
+      "The composer TextEditor is taller: new chat min 180, ideal 280, max .infinity; existing chats min 180, ideal 240, max 360 points.",
+      "On macOS the agent pane defaults to 640pt width with min 520 and max 1100; stored widths are clamped on read into 520...1100 without migration.",
+      "mise run build, swiftlint and mise run test pass."
+    ],
+    "nonGoals": [
+      "No change to Sources/StriaCore, including AgentPaneViewModel.chatTitle, which keeps its 'New Chat' fallback for Mobile and tests.",
+      "No change to IconSegmentedControl regular metrics or its other callers (LeftPaneView.swift, SearchViews.swift, the History tab control).",
+      "No change to the 1000-point agentVisible threshold, 760-point sidebar threshold, left pane width, compact lower-half agent or SplitWidthKeeper drag/restore logic.",
+      "No UserDefaults migration of readerAgentPaneWidth.",
+      "No new keyboard shortcuts, symbols or menu commands."
+    ],
+    "constraints": [
+      "Do not modify unrelated files; preserve the user's uncommitted icon changes (Mobile/StriaMobile/Assets.xcassets/AppIcon.appiconset/Stria-Paper.png, Resources/Stria.icns, design-docs/stria-app-icon.md).",
+      "Keep Swift files under 1000 lines; run swiftlint.",
+      "Keep keyboard shortcuts, help tooltips and accessibility labels working.",
+      "Do not break the iOS/iPadOS Mobile/StriaMobile build that shares StriaCore.",
+      "No emojis. No AI attribution in commits. No git push.",
+      "Workers make no git state changes; each plan edits only its writePaths and its own plan Progress Log."
+    ],
+    "designDecisionsAndRationale": [
+      {
+        "decision": "Add opt-in IconSegmentedControlSize (regular 30x22 default font, compact 24x18 .system(size: 11), separator equals segment height), declared after segments.",
+        "rationale": "Existing callers compile unchanged and regular rendering stays identical; P15 reuses the compact metrics for standalone toolbar buttons."
+      },
+      {
+        "decision": "Show the chat title row only when currentThread != nil or the transcript contains a user message.",
+        "rationale": "Mirrors the branches of AgentPaneViewModel.chatTitle (AgentPaneViewModel.swift:316-320), so the 'New Chat' fallback is never rendered without changing StriaCore."
+      },
+      {
+        "decision": "Agent pane width constants min 520 / default 640 / max 1100 defined once in ReaderView.swift and applied through one clamp helper in both the frame and SplitWidthKeeper.",
+        "rationale": "Prevents the keeper fighting the frame for stored values above 1100; read-side clamp avoids a migration and view-update loops."
+      },
+      {
+        "decision": "Scope description moves to an info.circle icon's help and accessibility label.",
+        "rationale": "An outer help on the row would be hidden by each segment's own tooltip."
+      }
+    ],
+    "intentionalTradeoffs": [
+      "Compact 24x18 hit targets are smaller than the regular 30x22.",
+      "The compact lower-half agent leaves less transcript space with the taller composer.",
+      "StriaApp has no UI test target; the rendered layout is checked visually against the mockup at integration review."
+    ],
+    "supportedEdgeCases": [
+      "New chat (no thread, empty transcript): no title row or divider; toolbar, scope row, 32-point transcript, composer fills the rest.",
+      "After the first question is sent (provisional user message): title row shows the question's first line.",
+      "Thread reopened from History: title row shows the thread title.",
+      "Stored width 360 or 480 opens at 520; 700 stays 700; 1300 opens at 1100; no stored value opens at 640."
+    ],
+    "outOfScopeEdgeCases": [
+      "iPad/iPhone MobileAgentView layout and its 'New Chat' title.",
+      "Rewriting stored readerAgentPaneWidth values."
+    ],
+    "sourcePaths": [
+      "Sources/StriaApp/IconSegmentedControl.swift",
+      "Sources/StriaApp/ReaderView.swift",
+      "Sources/StriaApp/AgentPaneView.swift",
+      "Sources/StriaCore/AppModel/AgentPaneViewModel.swift",
+      "Tests/StriaCoreTests/AppModel/AgentPaneViewModelTests.swift",
+      "Mobile/StriaMobile/MobileAgentView.swift",
+      "design-docs/references/agent-pane-redesign/mockup.png",
+      "impl-plans/README.md"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "P13",
+      "planPath": "impl-plans/active/stria-13-compact-icon-segmented-control.md",
+      "dependsOn": [],
+      "writePaths": [
+        "Sources/StriaApp/IconSegmentedControl.swift",
+        "impl-plans/active/stria-13-compact-icon-segmented-control.md"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "IconSegmentedControlSize with regular/compact and segmentWidth, segmentHeight, symbolFont exists in Sources/StriaApp/IconSegmentedControl.swift.",
+        "IconSegmentedControl has var size: IconSegmentedControlSize = .regular declared after segments; existing callers compile unchanged.",
+        "The 30/22 numbers appear only in the metric definitions; regular rendering is unchanged.",
+        "Only Sources/StriaApp/IconSegmentedControl.swift and the plan Progress Log change."
+      ],
+      "verification": [
+        "swift build --target StriaApp",
+        "swiftlint lint Sources/StriaApp/IconSegmentedControl.swift",
+        "grep -n \"30\\|22\" Sources/StriaApp/IconSegmentedControl.swift"
+      ]
+    },
+    {
+      "planId": "P14",
+      "planPath": "impl-plans/active/stria-14-agent-pane-width.md",
+      "dependsOn": [],
+      "writePaths": [
+        "Sources/StriaApp/ReaderView.swift",
+        "impl-plans/active/stria-14-agent-pane-width.md"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "readerAgentPaneWidth AppStorage default is the 640 constant; the key string is unchanged.",
+        "No literal 480 or 800 remains for agent pane width; 520/640/1100 appear only in the constants.",
+        "The agent pane frame and SplitWidthKeeper use the same clamp helper into 520...1100.",
+        "Only Sources/StriaApp/ReaderView.swift and the plan Progress Log change."
+      ],
+      "verification": [
+        "swift build --target StriaApp",
+        "swiftlint lint Sources/StriaApp/ReaderView.swift",
+        "grep -nE \"\\b(480|520|640|800|1100)\\b\" Sources/StriaApp/ReaderView.swift"
+      ]
+    },
+    {
+      "planId": "P15",
+      "planPath": "impl-plans/active/stria-15-agent-pane-compact-layout.md",
+      "dependsOn": ["P13"],
+      "writePaths": [
+        "Sources/StriaApp/AgentPaneView.swift",
+        "impl-plans/active/stria-15-agent-pane-compact-layout.md"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "'\"New Chat\"' appears only in the New Chat button's accessibilityLabel.",
+        "size: .compact appears exactly twice (tabs, scope).",
+        "scopeDescription is used only in .help and .accessibilityLabel (no Text).",
+        "TextEditor frame: minHeight 180, idealHeight isNewChat ? 280 : 240, maxHeight isNewChat ? .infinity : 360.",
+        "Title row and its divider render only when currentThread != nil or the transcript contains a user message.",
+        "Only Sources/StriaApp/AgentPaneView.swift and the plan Progress Log change; file stays under 1000 lines."
+      ],
+      "verification": [
+        "swift build --target StriaApp",
+        "swiftlint lint Sources/StriaApp/AgentPaneView.swift",
+        "swift test --filter AgentPaneViewModelTests",
+        "grep -n '\"New Chat\"\\|size: .compact\\|scopeDescription' Sources/StriaApp/AgentPaneView.swift",
+        "wc -l Sources/StriaApp/AgentPaneView.swift"
+      ]
+    }
+  ],
+  "integrationVerification": [
+    "mise run build",
+    "swiftlint",
+    "mise run test",
+    "xcodebuild -project Mobile/StriaMobile.xcodeproj -destination 'generic/platform=iOS Simulator' build CODE_SIGNING_ALLOWED=NO"
+  ]
+}

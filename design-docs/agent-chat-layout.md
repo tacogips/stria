@@ -8,8 +8,11 @@ the empty transcript small when starting a new conversation.
 
 ## Implementation
 
-- macOS uses a 520-point default pane, a 480-point minimum, and an 800-point
-  maximum. Existing narrower preferences are clamped to the new minimum.
+- macOS uses a 640-point default pane, a 520-point minimum, and a 1100-point
+  maximum (superseded the earlier 520 / 480 / 800 values; see
+  `specs/design-app-ui.md`, "Agent pane layout (compact redesign, macOS)",
+  which also owns the macOS toolbar, title row and editor heights). Existing
+  narrower preferences are clamped to the new minimum on read.
 - iPad retains the desktop-style sidebar and uses 42% of the available width,
   bounded between 420 and 520 points. Compact readers on iPhone, iPad, and
   macOS show the agent below the PDF, using half the available reader height.

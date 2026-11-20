@@ -201,12 +201,15 @@ library. One `SearchViewModel` (on `AppModel`) serves both screens.
 
 - Visibility: the flat split pane or compact sheet, toggled from the toolbar button or
   View > Show Agent (`Cmd-Opt-0`). The width can be adjusted, and the pane
-  is shown by default the first time.
+  is shown by default the first time. See "Agent pane layout (compact
+  redesign)" below for the toolbar, title row, scope row, composer sizing
+  and pane width rules; they override older numbers elsewhere.
 - Scope picker: "This page", "Nearby pages" or "Whole PDF"
-  (`design-agent-integration.md#ask`). A scope indicator line below it states
-  what the assistant will see, for example "Sees page 12",
-  "Sees pages 11-13", or "Sees up to 4 relevant pages of <title>, including
-  page 12".
+  (`design-agent-integration.md#ask`). The scope description
+  (`AgentPaneViewModel.scopeDescription`) states what the assistant will see,
+  for example "Sees page 12", "Sees pages 11-13", or "Sees up to 4 relevant
+  pages of <title>, including page 12". It is shown as a hover tooltip, not
+  a visible line (see the redesign section).
 - Transcript: the active thread's messages as chat bubbles: the user's
   questions on the right in the accent colour, the assistant's answers (and
   the streaming bubble) on the left.
@@ -219,11 +222,10 @@ library. One `SearchViewModel` (on `AppModel`) serves both screens.
     persisted records replace it when the answer arrives, and it is removed
     if the request is cancelled or unavailable.
   - Failed answers appear as error messages, and they are persisted.
-- Suggested questions: an empty thread shows three fixed prompts: "Summarize
-  this page", "Explain the key terms on this page" and "What should I read
-  next to understand this?". Clicking one sends it.
-- Input: a rounded box spanning the pane (a text editor, 96 points high;
-  Return inserts a new line). Along its bottom edge sit the vendor menu and
+- Suggested questions: removed (see `design-docs/agent-chat-layout.md`); an
+  empty thread shows only the composer.
+- Input: a rounded box spanning the pane (a text editor whose height follows
+  the redesign section; Return inserts a new line). Along its bottom edge sit the vendor menu and
   model picker, stacked to fit narrow panes, and the
   send button (an up-arrow; `Cmd-Return`), which becomes a stop button
   while an answer is in flight. A warning with an Open Settings link
@@ -239,10 +241,11 @@ library. One `SearchViewModel` (on `AppModel`) serves both screens.
 - The pane has three tabs, **Chat**, **History** and **Summary** (the
   current page's summary, `design-page-summaries.md#app`), as a segmented control
   pinned at the top (the content below is top-aligned, so switching tabs
-  never moves the control). Chat holds a title bar, the scope picker,
-  transcript and composer (no suggested questions). The title bar shows the
-  open chat's title (`AgentPaneViewModel.chatTitle`: the AI title, else the
-  first question's first line, else "New Chat" in secondary colour), a
+  never moves the control). Chat holds a title bar (existing chats only), the
+  scope picker, transcript and composer (no suggested questions). The title
+  bar shows the open chat's title (`AgentPaneViewModel.chatTitle`: the AI
+  title, else the first question's first line; the macOS pane never renders
+  the "New Chat" fallback, it hides the row instead), a
   "wand.and.stars" button that asks the AI for a new title (a spinner while
   it runs; disabled for a new chat or without a vendor), and the `p.N` flag
   button for the chat's start page. History lists conversations, not
@@ -268,6 +271,99 @@ library. One `SearchViewModel` (on `AppModel`) serves both screens.
   this PDF." Go to Chat Start Page (`s`, `Cmd-Shift-J`, flag button) jumps
   to the page of the open chat's first question.
 
+### Agent pane layout (compact redesign, macOS)
+
+Reference mockup: `design-docs/references/agent-pane-redesign/mockup.png`
+(read-only input). Goal: header controls take as little height as possible
+and the composer and pane get the space. Applies to the macOS `StriaApp`
+target only (`AgentPaneView.swift`, `IconSegmentedControl.swift`,
+`ReaderView.swift`). `StriaCore` behaviour, including
+`AgentPaneViewModel.chatTitle` (still "New Chat" as a fallback, used by
+`MobileAgentView` and asserted by `AgentPaneViewModelTests`), is unchanged.
+
+From top to bottom the Chat tab is:
+
+1. **Toolbar row** (all tabs, one slim row): the Chat / History / Summary
+   `IconSegmentedControl` in its compact size, a 1-point vertical divider,
+   then the New Chat (`square.and.pencil`) and Resume Previous Chat
+   (`arrow.uturn.backward.circle`) icon buttons. Both buttons already exist
+   in the header; they stay in this row and adopt the compact metrics. Row
+   padding: 10 points horizontal, 4 points vertical; a `Divider` below.
+   Tooltips, accessibility labels, disabled-while-in-flight state and the
+   `n` / `r` / `Cmd-Shift-N` / `Cmd-Shift-R` shortcuts are unchanged (the
+   shortcuts are handled by the reader monitor and menu commands, not by
+   these views).
+2. **Title row** (existing chats only): shown when the open chat has a title
+   source, i.e. `agent.currentThread != nil` or the transcript contains a
+   user message. This is exactly the condition under which `chatTitle` is
+   not the "New Chat" fallback, so the literal "New Chat" is never rendered
+   in the macOS pane. A new chat (and any momentary state without either)
+   shows no title row and no divider for it. When shown, the row is
+   compact: title in `.subheadline` weight semibold, one line
+   (`lineLimit(1)`, truncated, full title in `.help`), 4 points vertical
+   padding, followed by the existing retitle (`wand.and.stars`) / spinner and
+   the `p.N` flag button with their current tooltips, labels and enablement.
+   The check is a private computed property in `AgentPaneView`; no
+   `StriaCore` API is added or changed.
+3. **Scope row** (one slim row): the scope `IconSegmentedControl` in compact
+   size, then a small `info.circle` image (secondary colour, compact icon
+   size) carrying `.help(agent.scopeDescription)` and
+   `.accessibilityLabel(agent.scopeDescription)`, then a spacer. The visible
+   description `Text` is removed. Each segment keeps its own tooltip. Padding
+   12 horizontal, 4 vertical.
+4. Notice label (unchanged), transcript, composer.
+
+**Compact `IconSegmentedControl`.** Add an opt-in size to the existing
+control (an enum or Boolean property with a default equal to today's
+metrics), so `SearchViews.swift`, `LeftPaneView.swift` and the History tab's
+This page / This PDF control are unchanged. Regular: 30 x 22 segments,
+default symbol size (current). Compact: 24 x 18 segments, symbol font
+`.system(size: 11)`, separator height 18. Tooltips, accessibility labels and
+the `.isSelected` trait are produced the same way in both sizes. The two
+toolbar buttons use the same 24 x 18 frame and 11-point symbol so the row is
+visually uniform. No new view type is introduced.
+
+**Composer sizing** (`TextEditor` frame; the bottom bar with vendor/model,
+voice, send/cancel is unchanged):
+
+| State (`agent.isNewChat`) | min | ideal | max |
+| --- | --- | --- | --- |
+| New chat | 180 | 280 | `.infinity` (fills the remaining space) |
+| Existing chat | 180 | 240 | 360 |
+
+The new-chat transcript keeps its 32-point reserved height
+(`design-docs/agent-chat-layout.md`), so the editor takes the rest of the
+pane without a layout loop (the transcript is a fixed frame, the editor is
+the only flexible child). For existing chats the transcript `ScrollView`
+remains the flexible child and the editor stays within 180-360.
+
+**Pane width (macOS split view).** Default 640, minimum 520, maximum 1100
+points:
+
+- `@AppStorage("readerAgentPaneWidth")` default becomes 640. A user who never
+  dragged the divider has no stored value (the keeper saves only on user
+  drags), so they get 640.
+- Stored values are clamped on read, not migrated: the split pane frame uses
+  `minWidth: 520, idealWidth: clamp(stored, 520...1100), maxWidth: 1100`,
+  and `SplitWidthKeeper` receives the same clamped value (it currently uses
+  `max(480, agentWidth)`). A stored 360 or 480 therefore opens at 520; the
+  stored value is only rewritten when the user drags the divider again.
+- The three numbers are defined once as private constants in `ReaderView`
+  and used by both the frame and the keeper.
+- Unchanged: the 1000-point window threshold for showing the split agent
+  pane (below it the compact lower-half agent is used, whose 420-point
+  scroll content is not resized), and the left pane's 180-400 range. At the
+  1000-point threshold with both side panes at minimum the PDF keeps about
+  300 points.
+
+**Verification.** `mise run build`, `swiftlint` (zero new violations),
+`mise run test` (existing `AgentPaneViewModelTests` chatTitle expectations,
+including "New Chat", pass unchanged), and, when feasible, an unsigned
+generic iOS Simulator `xcodebuild build` of `Mobile/StriaMobile` to show the
+shared code still builds. Visual check against the mockup: new chat shows no
+title text; toolbar and scope rows are each one slim line; tooltips appear on
+every icon including the scope info icon.
+
 ## Visual Style and Appearance
 
 Flat and solid: no translucent fills, and no corner radius except on chat
@@ -286,7 +382,7 @@ from Settings > Appearance, View > Appearance, or toggled with
 scenes apply it with `preferredColorScheme`.
 
 Mode switches are icon-only (`IconSegmentedControl`): sidebar Contents /
-Thumbnails / Search, agent pane Chat / History, scope This page / Nearby
+Thumbnails / Search, agent pane Chat / History / Summary (compact size), scope This page / Nearby
 pages / Whole PDF, history This page / This PDF, and library List / Cards.
 Each segment is its own button so it has its own hover description; the
 selected one is a solid accent square. Back to Library, New Chat, Send and
