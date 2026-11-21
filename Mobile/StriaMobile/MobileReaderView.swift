@@ -73,32 +73,24 @@ struct MobileReaderView: View {
           Divider()
         }
         VStack(spacing: 0) {
-          VStack(spacing: 0) {
-            MobilePDFView(reader: reader)
-            Divider()
-            Button("\(reader.currentPage) / \(reader.pageCount)") { goToPage = true }
-              .monospacedDigit().padding(10).accessibilityLabel("Go to page, \(reader.currentPage) of \(reader.pageCount)")
-          }
-          .frame(maxWidth: .infinity, maxHeight: .infinity)
+          MobilePDFView(reader: reader)
+            .overlay(alignment: .bottom) { pagePill.padding(.bottom, showsAgentBelow ? 28 : 12) }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
           if showsAgentBelow {
-            Divider()
-            VStack(spacing: 0) {
-              HStack {
-                Text("Agent").font(.headline)
-                Text("Page \(reader.currentPage) of \(reader.pageCount)")
-                  .font(.caption).monospacedDigit().foregroundStyle(.secondary)
-                Spacer()
-                Button("Done") { model.showingAgent = false }
-              }.padding(.horizontal, 12).padding(.vertical, 8)
-              MobileAgentView(model: model, reader: reader, agent: agent, compact: true)
+            MobileAgentView(model: model, reader: reader, agent: agent, compact: true) {
+              model.showingAgent = false
             }
-            .frame(height: geometry.size.height / 2)
+            .background(Flat.panel)
+            .clipShape(UnevenRoundedRectangle(topLeadingRadius: Flat.cardRadius, topTrailingRadius: Flat.cardRadius))
+            .shadow(color: .black.opacity(0.12), radius: 12, y: -2)
+            .padding(.top, -16)
+            .frame(height: geometry.size.height * 0.55)
           }
         }
         if showsAgentInline {
           Divider()
           MobileAgentView(model: model, reader: reader, agent: agent)
-            .frame(width: min(520, max(420, availableWidth * 0.42)))
+            .frame(width: min(760, max(480, availableWidth * 0.5)))
         }
       }
       .onAppear { availableWidth = geometry.size.width }
@@ -135,6 +127,18 @@ struct MobileReaderView: View {
     }
     .onDisappear { agent.cancelDictation() }
     .onChange(of: reader.currentPage) { _, _ in agent.scheduleHistoryReload() }
+  }
+
+  /// A floating page counter over the PDF; tap to go to a page.
+  private var pagePill: some View {
+    Button { goToPage = true } label: {
+      Text("\(reader.currentPage) / \(reader.pageCount)")
+        .font(.footnote.weight(.semibold)).monospacedDigit().foregroundStyle(.white)
+        .padding(.horizontal, 14).padding(.vertical, 6)
+        .background(Flat.ink.opacity(0.85), in: Capsule())
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel("Go to page, \(reader.currentPage) of \(reader.pageCount)")
   }
 
   private var isPad: Bool { UIDevice.current.userInterfaceIdiom == .pad }

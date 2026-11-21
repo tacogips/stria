@@ -17,7 +17,7 @@ struct VoiceInputButton: View {
           ProgressView().controlSize(.small)
         default:
           Image(systemName: state.isRecording ? "mic.fill" : "mic")
-            .font(.title2).foregroundStyle(state.isRecording ? Color.red : Color.secondary)
+            .font(.system(size: 18)).foregroundStyle(state.isRecording ? Color.red : Color.secondary)
         }
       }
       .buttonStyle(.plain)

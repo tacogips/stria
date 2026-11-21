@@ -54,4 +54,14 @@ enum Flat {
   static let panel = Color(uiColor: .systemBackground)
   static let assistantBubble = Color(uiColor: .secondarySystemBackground)
   static let border = Color(uiColor: .separator)
+  /// Deep ink blue: user bubbles, the send button and the tab capsule.
+  static let ink = Color(uiColor: UIColor { traits in
+    traits.userInterfaceStyle == .dark
+      ? UIColor(red: 0.20, green: 0.33, blue: 0.52, alpha: 1)
+      : UIColor(red: 0.08, green: 0.19, blue: 0.31, alpha: 1)
+  })
+  /// Coral highlight: the selected tab and the needs-setup badge.
+  static let coral = Color(red: 0.95, green: 0.44, blue: 0.36)
+  static let cardRadius: CGFloat = 22
+  static let bubbleRadius: CGFloat = 18
 }
